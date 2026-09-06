@@ -23,9 +23,14 @@ with sync_playwright() as pw:
         }""")
         exp = boards[i - 1]
         cells = []
-        for x, y, ln, col, vert in exp["seats"]:
+        # ⚠ The fifth field is a SeatDirect 0..3, not a boolean. Only 1 and 3 run
+        # down the screen - 2 is an ordinary across-the-screen seat turned to face
+        # down - so reading it as truthy laid out the 44 boards with a long dir-2
+        # seat the wrong way and reported every one of them as a mismatch. The
+        # engine's own `cellsOf` is `dir & 1`; so is this.
+        for x, y, ln, col, direct in exp["seats"]:
             for k in range(ln):
-                cells.append([x, y + k, col] if vert else [x + k, y, col])
+                cells.append([x, y + k, col] if direct & 1 else [x + k, y, col])
         cells.sort(key=lambda a: (a[0], a[1]))
         if (got["name"] != exp["id"] or got["w"] != exp["w"] or got["h"] != exp["h"]
                 or got["time"] != exp["time"] or got["riders"] != len(exp["queue"])
