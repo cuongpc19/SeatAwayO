@@ -126,6 +126,37 @@ def guest_parts(pose="idle", phase=0.0, face=True):
     return P
 
 
+# ============================== SEAT (the puzzle piece) ==============================
+CELL = 1.60                 # grid pitch, must match SX/SZ in the player
+
+
+def seat_parts(cells=1):
+    """A bus seat spanning `cells` grid cells, authored facing +z.
+
+    Lives here rather than in seat_atlas.py because the home cover bakes the same
+    seat at its own scale, and two copies of a shape are two shapes."""
+    W = cells * CELL - 0.30          # leave a gap between neighbouring seats
+    SEAT_Y = 0.44
+    P = []
+    P.append(dict(geo=rbox((0, 0.95, -0.30), (W, 1.00, 0.46), 0.19),
+                  k=1.00, spec=0.44, shin=18))
+    P.append(dict(geo=capsule((-W / 2 + 0.16, 1.40, -0.30), (W / 2 - 0.16, 1.40, -0.30), 0.16),
+                  k=1.10, spec=0.55))
+    P.append(dict(geo=rbox((0, SEAT_Y, 0.20), (W - 0.08, 0.20, 0.52), 0.10),
+                  k=1.14, spec=0.50, shin=22))
+    P.append(dict(geo=capsule((-W / 2 + 0.20, SEAT_Y - 0.02, 0.44), (W / 2 - 0.20, SEAT_Y - 0.02, 0.44), 0.075),
+                  k=1.06, spec=0.52))
+    for i in range(cells):           # a divider between neighbouring places
+        if i:
+            x = -W / 2 + i * CELL
+            P.append(dict(geo=rbox((x, 0.72, -0.06), (0.07, 0.62, 0.82), 0.03), k=0.86, spec=0.4))
+    for sx in (-1, 1):
+        for sz in (0.30, -0.30):
+            P.append(dict(geo=rbox((sx * (W / 2 - 0.14), 0.20, sz), (0.13, 0.40, 0.13), 0.045),
+                          k=0.62, spec=0.26))
+    return P
+
+
 # ============================== FENCE ==============================
 def fence_post_parts():
     P = [dict(geo=rbox((0, 0.34, 0), (0.34, 0.68, 0.34), 0.10), fixed=WOOD, spec=0.35),
