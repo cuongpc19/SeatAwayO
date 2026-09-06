@@ -335,7 +335,14 @@ function startLevel(n) {
   JUMP = false;
   closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
-  setTimeout(announceBoosters, 600);
+  // anything this board is the first to carry gets explained before it opens
+  const owed = introDue(CUR);
+  if (owed) { hideCard(); showIntro(owed, openBoard); return; }
+  openBoard();
+}
+
+/** The board itself, once there is nothing left to explain. */
+function openBoard() {
   hideCard();
   show("play");
   applyTheme(CUR);                 // before load(), so the first frame is right
@@ -373,17 +380,6 @@ onHud = function () {
    Time is bought per use and is unlimited; Jump is bought in charges and the
    shipped game caps it at ten. Both appear only once the level they unlock at
    has been reached. */
-/** Announce a booster the first time the player is high enough to use it. */
-function announceBoosters() {
-  for (const [f, label] of [["booster_jump", "Jump - lift a seat over everything"],
-                            ["booster_time", "+15 seconds on the clock"]]) {
-    if (!has(f) || save.seenBoosters.includes(f)) continue;
-    save.seenBoosters.push(f); persist();
-    say("New booster: " + label + ".");
-    return;                        // one at a time, or the second overwrites the first
-  }
-}
-
 /** A booster that has not unlocked yet stays on the row, greyed, showing the
     level it arrives at. It used to be hidden outright, which changed the shape
     of the row from one level to the next and never said that more was coming.
@@ -453,6 +449,52 @@ onSeatMoved = () => {
   persist(); onHud();
 };
 
+/* ---- introducing a feature ---------------------------------------------
+   One card, once, the first time the player reaches the level that carries the
+   thing. The levels come from FEATURES above rather than from a second list
+   here: that ladder already works out where each piece arrives, and a hand
+   written copy of it would go stale the moment the ladder moved - which is the
+   very thing the comment up there warns about.
+
+   The card is shown BEFORE the board loads, so there is no clock running behind
+   it and no queue boarding unseen while it is being read. */
+const INTRO_TEXT = {
+  grey: "Grey seats never move, whatever you drag. In exchange they take a "
+      + "passenger of any colour - so work the other seats around them.",
+  jump: "Jump lifts a seat straight over everything else instead of sliding it. "
+      + "Tap it, then drag any seat wherever you want it.",
+  twin: "A double seats two passengers, both of its own colour, and it needs two "
+      + "free cells to slide into.",
+  time: "This one buys more seconds on the clock. Tap it whenever time gets tight.",
+};
+
+/** The introduction owed on this level, or null. `at <= n` rather than `at === n`
+    so that a player who jumps ahead from the level picker still gets it. */
+function introDue(n) {
+  for (const f of featureLevels())
+    if (f.at <= n && INTRO_TEXT[f.id] && !save.seenBoosters.includes(f.id)) return f;
+  return null;
+}
+
+let introThen = null;                  // what to do once the card is dismissed
+function showIntro(f, then) {
+  $("intro-title").textContent = f.label;
+  $("intro-text").textContent = INTRO_TEXT[f.id];
+  save.seenBoosters.push(f.id); persist();
+  introThen = then;
+  // Normally the outgoing board has been won and its clock is already stopped,
+  // but jumping straight out of a live board from the level picker leaves one
+  // running, and it would time out behind the card.
+  PAUSED = true;
+  $("intro").classList.add("on");
+}
+$("intro-ok").onclick = () => {
+  $("intro").classList.remove("on");
+  PAUSED = false;
+  const then = introThen; introThen = null;
+  if (then) then();
+};
+
 /* ---- the tutorial, on the first two boards -----------------------------
    These two levels carry the one rule that is not guessable: you never tap a
    passenger. You slide a seat, and the queue walks itself in. So on board 1 and
@@ -476,7 +518,10 @@ function tutorStep() {
   if (!S || S.phase !== "play" || !TEACH.has(CUR)) return null;
   if (!S.queue.length || S.anim.length || S.boarding) return null;
   const blocked = !isFree(S, S.W - 1, S.door);
-  if (!blocked && pickSeat(S, S.queue[0])) return null;   // the queue is already moving
+  // A blocked doorway is no longer proof that nobody can move: the seat in the
+  // way may be one the front of the queue can simply sit in. Teach only when
+  // they genuinely have nowhere to go.
+  if (pickSeat(S, S.queue[0])) return null;              // the queue is already moving
 
   // With the doorway blocked there is only one seat worth talking about. With
   // it clear the fault is somewhere in the floor, so weigh every seat that moves.
@@ -499,7 +544,7 @@ function tutorStep() {
   return { seat: best.seat, to: best.to,
     title: blocked ? "A seat is in the doorway" : "Open them a path",
     text: blocked
-      ? "Nobody can get on. Press and hold that seat, drag it onto the glowing tile and let go - the queue boards on its own."
+      ? "Drag and drop: press and hold the seat, drag it onto the glowing tile, then let go. The queue boards on its own - you never tap a passenger."
       : "The front of the queue cannot reach a seat it fits. Slide this one onto the glowing tile to open the way." };
 }
 

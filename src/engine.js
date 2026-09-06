@@ -39,6 +39,7 @@ let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
                            // the new board. Every load stamps a fresh token.
 let GUIDES = false;        // the coaching overlays - none of these are in the real game
 let SPEED = 1;             // 1 = normal, 2 = double
+const OPEN_MS = 2000;      // the pause between a board appearing and the queue starting
 /* Walking pace. These three move together: taking one without the others gives
    a passenger who strides across the floor and then dawdles onto the seat, or a
    short walk that ignores the change entirely because it lands on the floor.
@@ -253,7 +254,17 @@ function load(n) {
   LAY = layout();
   onNewLevel();                 // each shell clears its own end-of-level card
   onHud(); draw();
-  autoBoard();
+  /* A beat before anybody moves. Boarding used to start on the same frame the
+     board appeared, so on a level where the queue can walk straight in - level 1
+     is one - the first passenger was already sitting down before the player had
+     looked at the screen, and the hop that teaches the whole game went unseen.
+     INSTANT keeps its synchronous path: headless play-throughs read S.seated on
+     the next line and cannot wait out a timer. */
+  if (INSTANT) autoBoard();
+  else {
+    const token = S.token;
+    setTimeout(() => { if (S && S.token === token) autoBoard(); }, OPEN_MS / SPEED);
+  }
 }
 
 /* ---------------- the line at the stop ---------------- */
