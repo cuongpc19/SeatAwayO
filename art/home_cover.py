@@ -11,19 +11,27 @@ someone in it, a double seat with two, and a grey seat nobody can move. Those ar
 the three things the game teaches in its first ten levels, and the results card
 counts down to two of them by name.
 
-  python home_cover.py     ->  home_cover.png, home_cover_b64.txt
+  python home_cover.py     ->  home_cover.png
 
 Slow (a raymarcher, at cover resolution), so it is not part of `build.py`; the
 PNG it leaves behind is what the build inlines.
 """
-import base64, math, os, time
+import math, os, time
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from toy3d import Cam, bake, colorize, contact_shadow, scale_parts, rotate_parts, xform
 from assets import guest_parts, seat_parts, PALETTE, CELL
 
 W, H = 1080, 1620           # 2:3, so the cover fills a phone and crops sideways
-SCALE = 150                 # px per world unit - the atlas bakes at 74
+SCALE = 112                 # px per world unit - the atlas bakes at 74
+
+# ⚠ The row has to fit the middle 70% of the render and not a pixel more. The
+# cover fills the screen rather than fitting inside it, so a 9:19.5 phone sees
+# 540 of the 773 units the art is scaled to - x from 15% to 85% - and anything
+# outside that band is cropped off on the one device the game is for. At this
+# scale the row runs 18% to 82%, the same band Marble Sort's own three pieces
+# sit in. It was 150 with the pieces at 2.5 cells, which put the outer two seats
+# half off the screen on a phone; 122 put them exactly on the crop line.
 PITCH = 1.33                # the board's own camera, 76 degrees above the horizon
 FACE = math.pi              # SeatDirect 0: the seat faces up the screen
 
@@ -103,9 +111,9 @@ cam = Cam(yaw=0.0, pitch=PITCH, scale=SCALE, ox=W / 2, oy=H * ROW_Y)
 # ⚠ The row is measured in cells, not pixels. A double seat is two cells wide by
 # definition, so writing the gaps in cells is the only way the middle piece stays
 # visibly twice the others if `CELL` ever moves.
-scene = (seat(1, "red", -2.5) + rider("red", -2.5)
+scene = (seat(1, "red", -2.45) + rider("red", -2.45)
          + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("cyan", CELL / 2)
-         + seat(1, "grey", 2.5))
+         + seat(1, "grey", 2.45))
 
 shadow = contact_shadow(scene, cam, W, H, blur=26, alpha=150)
 print("  shadow  %.1fs" % (time.time() - t0))
@@ -117,7 +125,7 @@ out.alpha_composite(shadow)
 out.alpha_composite(lit)
 out = out.convert("RGB")
 out.save("home_cover.png", optimize=True)
-b64 = base64.b64encode(open("home_cover.png", "rb").read()).decode()
-open("home_cover_b64.txt", "w").write(b64)
-print("home_cover.png  %d x %d  %.0f KB  (data URI %.0f KB)  %.1fs"
-      % (W, H, os.path.getsize("home_cover.png") / 1024, len(b64) / 1024, time.time() - t0))
+# No .b64 twin beside the atlas ones: `build.py` inlines this straight from the
+# PNG, and a second copy on disk is only a second thing to forget to regenerate.
+print("home_cover.png  %d x %d  %.0f KB  %.1fs"
+      % (W, H, os.path.getsize("home_cover.png") / 1024, time.time() - t0))

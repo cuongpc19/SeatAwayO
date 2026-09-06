@@ -38,15 +38,23 @@ with sync_playwright() as pw:
     pg.wait_for_timeout(900)
     print("card shown            :", pg.locator("#card").is_visible())
     print("  title               :", pg.locator("#c-title").inner_text())
-    print("  stars lit           :", pg.evaluate("document.querySelectorAll('#c-stars svg path[fill^=url]').length"))
-    print("  summary             :", pg.locator("#c-sum").inner_text())
+    # the star is a flat gold path now, the way Marble Sort bakes it
+    print("  stars lit           :", pg.evaluate("document.querySelectorAll('#c-stars path[fill=\"#ffc21e\"]').length"))
+    print("  feature bar         :", pg.locator("#c-feat-lab").inner_text(),
+          "| badge:", pg.evaluate("$('c-feat-badge').firstElementChild.tagName"))
+    print("  purse               :", " ".join(pg.locator("#c-coins").inner_text().split()),
+          "| summary hidden:", pg.evaluate("$('c-sum').hidden"))
     print("  confetti pieces     :", pg.evaluate("document.querySelectorAll('#c-confetti i').length"))
     sv = pg.evaluate("JSON.parse(localStorage.getItem('seataway.save.v2'))")
     print("  saved               :", json.dumps(sv))
 
     pg.click("#c-next"); pg.wait_for_timeout(500)
     print("next level            :", pg.evaluate("S.level"), "card hidden:", not pg.locator("#card").is_visible())
-    pg.click("#g-home"); pg.wait_for_timeout(200)
+    # the gear pauses and opens the card; HOME is a row on it now
+    pg.click("#g-menu"); pg.wait_for_timeout(250)
+    print("pause card            :", pg.locator("#settings").is_visible(),
+          "| clock held:", pg.evaluate("PAUSED"))
+    pg.click("#set-home"); pg.wait_for_timeout(200)
     pg.click("#h-levels"); pg.wait_for_timeout(300)
     print("picker buttons        :", pg.evaluate("document.querySelectorAll('#l-grid .cellbtn').length"),
           "unlocked:", pg.evaluate("document.querySelectorAll('#l-grid .cellbtn:not(.locked)').length"))
@@ -54,6 +62,8 @@ with sync_playwright() as pw:
     # a loss
     pg.evaluate("startLevel(3); S.left = 0.02"); pg.wait_for_timeout(900)
     print("loss card             :", pg.locator("#c-title").inner_text(),
-          "| lose styling:", pg.evaluate("document.getElementById('c-card').classList.contains('lose')"))
+          "| lose styling:", pg.evaluate("document.getElementById('c-card').classList.contains('lose')"),
+          "| stars:", pg.evaluate("document.querySelectorAll('#c-stars .star').length"))
+    print("  summary             :", " ".join(pg.locator("#c-sum").inner_text().split()))
     print("errors:", errs[:4] or "none")
     br.close()

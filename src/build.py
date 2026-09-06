@@ -5,7 +5,7 @@
   ../game.html           the real game: one board at a time, saved progress,
                          a full room around the grid, a proper win card
 """
-import json, pathlib, sys
+import json, pathlib, sys, time
 
 ART = pathlib.Path("../art")
 DATA = open("data_slots.js", encoding="utf-8").read()
@@ -47,13 +47,25 @@ def fill(html):
                 .replace("/*__WMETA__*/", open(ART / "walk_atlas.json", encoding="utf-8").read())
                 .replace("/*__WALK__*/", open(ART / "walk_atlas_b64.txt", encoding="utf-8").read().strip()))
 
-def movie_uri():
-    """The cinema still, inlined, so a published single-file build can show it."""
-    f = pathlib.Path("../bg/movie1.jpg")
+def inline(path, mime):
+    """A picture the published single-file build has to carry with it."""
+    f = pathlib.Path(path)
     if not f.exists():
         return ""
     import base64
-    return "data:image/jpeg;base64," + base64.b64encode(f.read_bytes()).decode()
+    return "data:%s;base64,%s" % (mime, base64.b64encode(f.read_bytes()).decode())
+
+
+def movie_uri():
+    """The cinema still."""
+    return inline("../bg/movie1.jpg", "image/jpeg")
+
+
+def cover_uri():
+    """The home screen's cover art. Rendered by `art/home_cover.py`, which is
+    slow enough not to belong in a build - the PNG it leaves behind is what is
+    inlined here."""
+    return inline("../art/home_cover.png", "image/png")
 
 
 def live_config():
@@ -88,6 +100,8 @@ def build(head_file, shell_file, out):
     shell = open(shell_file, encoding="utf-8").read()
     page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + shell + "\n</script>\n"
     page = (fill(page).replace("/*__MOVIE__*/", movie_uri())
+                      .replace("/*__COVER__*/", cover_uri())
+                      .replace("/*__BUILT__*/", time.strftime("%Y-%m-%d"))
                       .replace("/*__CONFIG__*/", live_config()))
     open(out, "w", encoding="utf-8").write(page)
     print("%-24s %6.0f KB" % (out, len(page) / 1024))

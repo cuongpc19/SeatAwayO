@@ -22,6 +22,10 @@ venv/
 /src/*.png
 /shot_*.png
 
+# Scratch output from the board scanners (src/check_free.py) - working notes on
+# every campaign board, regenerable by rerunning the script that wrote them.
+/src/free_scan.json
+
 # Logs
 *.log
 

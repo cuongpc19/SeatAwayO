@@ -1,7 +1,17 @@
+<meta charset="utf-8">
+<!-- Without this a phone lays the page out at 980px and scales the result down
+     to fit, so everything on screen arrives at roughly 40% of its drawn size.
+     viewport-fit=cover then lets the room run under the notch, and the bars
+     below pad themselves back out with env(safe-area-inset-*). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b7f93">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Seat Away</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lilita+One&family=Nunito:wght@600;700;800&display=swap">
 
 <style>
 /* One committed visual world - a sunny depot at midday - so there is no dark
@@ -19,13 +29,33 @@
   --go: #3fb95a; --go-dk: #2c8b41;
   --no: #d8556a; --no-dk: #a63c4e;
   --disp: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  /* The home screen and the results card are ports of Marble Sort's, down to the
+     coordinates, so they carry that game's own face and palette rather than
+     being re-tinted into this one. Everything else stays Seat Away's. */
+  --ms: "Lilita One", "Baloo 2", Arial, sans-serif;
+  --ms-ink: #2b3550; --ms-face: #e9e8f7; --ms-edge: #c6c2e2;
+  --ms-win: #4bc84b; --ms-lose: #d8556a; --ms-gold: #ffc21e; --ms-rays: #ffd75e;
+  /* Sampled off the cover's own top and bottom rows, not chosen. A frame whose
+     aspect is taller than the design box's leaves a band above and below the
+     art, and a flat fill there matches the render at one end and steps away
+     from it at the other - a line across the screen at the height the eye is
+     already looking. */
+  --cover-top: #161a36; --cover-foot: #4a548e;
   --body: Nunito, "Segoe UI", system-ui, sans-serif;
+  /* the notch, the home indicator and the rounded corners */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
 }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--ink); color: var(--ink);
   font-family: var(--body); overscroll-behavior: none;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  /* a phone inflates text it decides is an article column, and without
+     manipulation every tap waits out a possible double-tap zoom first */
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation;
 }
 #app {
   width: 100%; min-height: 100vh; min-height: 100dvh;
@@ -37,49 +67,169 @@ body {
 .screen { display: none; flex: 1; flex-direction: column; }
 .screen.on { display: flex; }
 
-/* ---------- home ---------- */
-#home { align-items: center; justify-content: center; gap: 1.1rem; padding: 2rem 1.25rem; text-align: center; }
-#levels .grid, #home > * { max-width: 46rem; margin-inline: auto; width: 100%; }
-#home > .logo, #home > .blurb, #home > .btn, #home > .stat-row { width: auto; }
+/* ---------- home ----------
+   A port of Marble Sort's HomeScene, which is a picture with two buttons on it.
+   That game lays out in a 540 x 1160 design box and lets Phaser FIT it to the
+   frame; the same thing here is a `.design` block of exactly those pixels,
+   scaled by `--k`, so every number below is the number in its source and there
+   is nothing to convert. `--dw` is the box's width, which Home - and only Home -
+   widens on a landscape frame, because it is the one screen with no board on it. */
+#home { position: relative; overflow: hidden;
+  background: linear-gradient(180deg, var(--cover-top), var(--cover-foot)); }
+#home .design {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--dw) * 1px); height: 1160px;
+  transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
+  font-family: var(--ms);
+}
+/* Everything inside is placed in design units, from the top left of the box. */
+#home .design > * { position: absolute; }
+
+/* The cover, fitted to the box the way HomeScene fits it: filling a portrait
+   frame, and fitted to the height and moved left on a wide one. */
+.cover {
+  left: calc(var(--art-l) * 1px); top: calc(var(--art-t) * 1px);
+  width: calc(var(--art-w) * 1px); height: calc(var(--art-h) * 1px);
+  animation: breathe 5.2s ease-in-out infinite alternate;
+}
+/* A completely still home screen reads as a screenshot rather than as a game
+   waiting for you, so the cover breathes - the same idle the title used to have. */
+@keyframes breathe { to { transform: scale(1.03); } }
+/* Wide, the art is fitted to the height and there is bare box either side. The
+   gap is filled by stretching the render's own edge column, not by a colour
+   picked to look close: the cover's edges are a vertical ramp rather than one
+   navy, so any flat fill draws a soft rectangle around the art at exactly the
+   height the eye is already looking. `background-size` does the stretching -
+   1080 / 6 = 180, so sizing the image at 180 gap-widths puts its leftmost six
+   pixels across the whole gap. */
+.edge {
+  top: 0; height: 100%; background-image: var(--cover-url); background-repeat: no-repeat;
+}
+.edge-l {
+  left: 0; width: calc(var(--art-l) * 1px);
+  background-size: calc(var(--art-l) * 180px) 100%; background-position: left top;
+}
+.edge-r {
+  left: calc((var(--art-l) + var(--art-w)) * 1px); width: calc(var(--edge-r) * 1px);
+  background-size: calc(var(--edge-r) * 180px) 100%; background-position: right top;
+}
+.edge[hidden] { display: none; }
+/* A scrim, not a panel: it darkens the lower third *through* the art so the UI
+   has a ground under it. Portrait only - wide, the button has its own column
+   beside the picture and this would just be dimming it. */
+.scrim {
+  left: 0; top: 696px; width: 100%; height: 464px;
+  background: linear-gradient(180deg, rgba(26,27,72,0), rgba(26,27,72,.82) 40%);
+}
+.scrim[hidden] { display: none; }
+
+/* Our cover carries no lettering - Marble Sort's render does, which is the only
+   reason that screen has no title over it - so the name is set here instead. */
 .logo {
-  font-family: var(--disp); font-weight: 800; font-size: clamp(2.6rem, 13vw, 4rem);
-  line-height: .95; color: var(--livery); letter-spacing: -.01em;
-  text-shadow: 0 3px 0 var(--livery-dk), 0 7px 0 var(--trim-dk), 0 12px 22px rgba(0,0,0,.35);
+  /* over the art, not over the box: wide, the box is half again as wide as the
+     picture and a title centred in it sits off the side of its own cover */
+  left: calc((var(--art-cx) - var(--art-w) / 2) * 1px);
+  width: calc(var(--art-w) * 1px); text-align: center; top: 240px;
+  font-family: var(--ms); font-size: 96px; line-height: .95; color: var(--livery);
+  letter-spacing: .01em;
+  text-shadow: 0 4px 0 var(--livery-dk), 0 9px 0 var(--trim-dk), 0 16px 30px rgba(0,0,0,.45);
 }
-.logo span { display: block; color: #fff; font-size: .42em; letter-spacing: .22em;
-  text-shadow: 0 2px 0 rgba(0,0,0,.28); margin-top: .35em; }
-.blurb { color: #eaf3f7; font-weight: 700; max-width: 30ch; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
-.btn {
-  font-family: var(--disp); font-weight: 800; font-size: 1.28rem; letter-spacing: .03em;
-  color: #fff; border: 0; border-radius: 18px; padding: .82rem 2.1rem; cursor: pointer;
-  background: linear-gradient(180deg, var(--go), var(--go-dk));
-  box-shadow: 0 5px 0 var(--go-dk), 0 10px 18px rgba(0,0,0,.28);
-  text-shadow: 0 2px 0 rgba(0,0,0,.28); transition: transform .06s, box-shadow .06s;
+.logo span {
+  display: block; color: #fff; font-size: .30em; letter-spacing: .22em;
+  text-shadow: 0 3px 0 rgba(0,0,0,.35); margin-top: .45em;
 }
-.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--go-dk), 0 4px 10px rgba(0,0,0,.28); }
-.btn.blue { background: linear-gradient(180deg, #4a7fd0, #33599a); box-shadow: 0 5px 0 #33599a, 0 10px 18px rgba(0,0,0,.28); }
-.btn.blue:active { box-shadow: 0 1px 0 #33599a, 0 4px 10px rgba(0,0,0,.28); }
-.btn.ghost { background: rgba(255,255,255,.16); box-shadow: 0 4px 0 rgba(0,0,0,.22); font-size: 1rem; padding: .6rem 1.4rem; }
-.stat-row { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
-.badge {
-  background: rgba(12,20,34,.42); color: #fff; font-weight: 800; font-size: .82rem;
-  padding: .4rem .85rem; border-radius: 999px; letter-spacing: .04em;
+
+/* ---- the chrome: two gold discs, one call to action, one wallet row ---- */
+.round {
+  width: 76px; height: 76px; padding: 0; border: 0; background: none; cursor: pointer;
+  display: grid; place-items: center;
 }
-.badge b { color: var(--gold); }
+.round i {
+  position: absolute; width: 52px; height: 52px; border-radius: 16px;
+  background: linear-gradient(180deg, #ffd964, #f5a91a);
+  box-shadow: 0 6px 0 #c67a06;
+}
+.round i::before {
+  content: ""; position: absolute; left: 5px; right: 5px; top: 4px; height: 16px;
+  border-radius: 9px; background: rgba(255,255,255,.4);
+}
+.round span { position: relative; font-size: 26px; line-height: 1; }
+.round:active i { transform: translateY(3px); box-shadow: 0 3px 0 #c67a06; }
+#h-hearts { left: calc(var(--corner-l) * 1px); top: 70px; transform: translate(-50%, -50%); }
+#h-levels { left: calc(var(--corner-r) * 1px); top: 70px; transform: translate(-50%, -50%); }
+/* "there is something here" - a badge that is always on is furniture within a
+   day, so it only lights when the count is actually below full. */
+.round b {
+  position: absolute; right: 8px; top: 6px; min-width: 26px; height: 26px; padding: 0 6px;
+  border-radius: 999px; background: #e33b3b; border: 3px solid #fff; color: #fff;
+  font-size: 17px; line-height: 20px; font-family: var(--ms);
+}
+.round.full b { background: #3fb43f; }
+.round em {
+  position: absolute; left: 50%; top: 76px; transform: translateX(-50%);
+  font-style: normal; font-size: 19px; color: #fff; opacity: .8; white-space: nowrap;
+  text-shadow: 0 2px 3px rgba(0,0,0,.6);
+}
+
+/* The two button faces are Marble Sort's `face()` painter written as CSS: an
+   edge slab 6px below the face, a vertical ramp on the face, and a white gloss
+   over its top third. */
+.wide-btn {
+  width: 260px; height: 76px; border: 0; border-radius: 24px; cursor: pointer; padding: 0;
+  font-family: var(--ms); font-size: 27px; color: #fff;
+  background: linear-gradient(180deg, #7fe06a, #3fb43f);
+  box-shadow: 0 6px 0 #2c8330;
+  -webkit-text-stroke: 6px var(--ms-ink); paint-order: stroke fill;
+}
+.wide-btn.blue { background: linear-gradient(180deg, #8fb6ff, #4a7de0); box-shadow: 0 6px 0 #2c53a3; }
+.wide-btn::before {
+  content: ""; position: absolute; left: 6px; right: 6px; top: 5px; height: 23px;
+  border-radius: 14px; background: rgba(255,255,255,.4); pointer-events: none;
+}
+.wide-btn:active { transform: translate(-50%, 3px) scale(var(--play-s)); box-shadow: 0 3px 0 #2c8330; }
+
+#h-play {
+  left: calc(var(--ui-cx) * 1px); top: calc(var(--play-y) * 1px);
+  transform: translate(-50%, -50%) scale(var(--play-s));
+}
+#h-play:active { transform: translate(-50%, calc(-50% + 3px)) scale(var(--play-s)); }
+
+.wallet {
+  left: calc(var(--ui-cx) * 1px); top: calc(var(--wallet-y) * 1px);
+  transform: translate(-50%, -50%) scale(var(--wallet-s));
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--ms); font-size: 30px; color: #fff;
+  -webkit-text-stroke: 6px var(--ms-ink); paint-order: stroke fill;
+}
+.wallet .gap { width: 34px; }
+.wallet .starw { display: block; width: 42px; height: 42px; }
+.wallet .starw svg { display: block; width: 100%; height: 100%; }
+.wallet .coin {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.18);
+}
+.ver {
+  left: calc(var(--ui-cx) * 1px); top: 1120px; transform: translateX(-50%);
+  font-size: 16px; color: #fff; opacity: .55; white-space: nowrap;
+}
 
 /* ---------- top bar ---------- */
 #play { position: relative; }
 #play .topbar { position: relative; z-index: 2; }
 .topbar {
   display: grid; grid-template-columns: auto 1fr auto; gap: .6rem; align-items: center;
-  padding: .7rem .8rem .55rem;
+  padding: calc(.7rem + var(--safe-t)) calc(.8rem + var(--safe-r)) .55rem calc(.8rem + var(--safe-l));
 }
 .icon-btn {
-  width: 42px; height: 42px; border: 0; border-radius: 13px; cursor: pointer;
+  width: 44px; height: 44px; border: 0; border-radius: 13px; cursor: pointer;
   background: rgba(12,20,34,.4); color: #fff; font-size: 1.15rem; line-height: 1;
   display: grid; place-items: center; box-shadow: 0 3px 0 rgba(0,0,0,.25);
 }
 .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.icon-btn .gear { width: 60%; height: 60%; display: block; }
+.icon-btn .gear path, .icon-btn .gear circle {
+  fill: none; stroke: #fff; stroke-width: 1.9; stroke-linejoin: round; }
 .meter { display: flex; flex-direction: column; gap: .28rem; }
 .meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem;
   font-family: var(--disp); font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
@@ -110,20 +260,10 @@ body {
   background: radial-gradient(circle at 34% 30%, #ffe89a, var(--gold) 55%, var(--gold-dk));
   box-shadow: inset 0 0 0 2px rgba(0,0,0,.12);
 }
-/* the clock says how much time is left, the bar says how much of it has gone:
-   the same fact twice, but the bar is the one you read without looking */
-.hud-sub {
-  width: 100%; max-width: 46rem; margin-inline: auto; padding: 0 .9rem;
-  position: relative; z-index: 2; display: flex; flex-direction: column; gap: .28rem;
-}
-.hud-counts {
-  display: flex; justify-content: space-between;
-  font: 800 .74rem/1 var(--body); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5);
-}
-.bar { height: 9px; border-radius: 99px; background: rgba(10,18,30,.45); overflow: hidden; }
-.bar i { display: block; height: 100%; width: 100%; border-radius: 99px;
-  background: linear-gradient(90deg, #7fe08f, #3fb95a); transition: width .25s linear; }
-.bar i.warn { background: linear-gradient(90deg, #ffd75e, #e8663f); }
+/* The strip under the pills held a progress bar, and it is gone: the clock says
+   how much time is left and the bar said how much of it had gone - the same fact
+   twice, one of them a green rule ruled across the top of the room. The clock
+   still turns gold under 25%, which is the part of it that was doing any work. */
 
 /* ---------- stage ---------- */
 #play { background: #98a1ab; }
@@ -131,21 +271,55 @@ body {
 canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   display: block; touch-action: none; }
 
-/* boosters, under the room */
-.boosters { position: absolute; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
-  z-index: 3; display: flex; gap: .6rem; }
-.boost {
-  display: flex; flex-direction: column; align-items: center; gap: .1rem; cursor: pointer;
-  border: 0; border-radius: 15px; padding: .5rem .85rem; min-width: 5.2rem;
-  background: rgba(14,20,30,.55); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.28);
+/* ---------- boosters ----------
+   A row of tiles under the room, each one a colour of its own with the cost on a
+   chip across its foot. They used to be dark slabs with the price inside them,
+   which read as three copies of the same disabled button. The chip hangs over
+   the bottom edge on purpose: it is what makes the tile look like a thing you
+   spend on rather than a label. */
+.boosters {
+  position: absolute; left: 50%; bottom: calc(1.1rem + var(--safe-b));
+  transform: translateX(-50%); z-index: 3; display: flex; gap: .8rem;
 }
-.boost:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.28); }
-.boost .ico { font-size: 1.25rem; line-height: 1.1; }
-.boost .lab { font: 800 .72rem/1 var(--body); letter-spacing: .06em; text-transform: uppercase; }
-.boost .cost { font: 800 .78rem/1.2 var(--disp); color: var(--gold); }
-.boost.armed { outline: 2px solid var(--gold); outline-offset: 2px; }
-.boost.broke .cost { color: #f2867a; }
-.boost[hidden] { display: none; }
+.boost {
+  position: relative; width: 4.1rem; height: 4.1rem; padding: 0; border: 0;
+  border-radius: 20px; cursor: pointer; color: #fff;
+  display: grid; place-items: center;
+  background: linear-gradient(180deg, var(--b-hi), var(--b-lo));
+  box-shadow: 0 4px 0 var(--b-dk), 0 6px 14px rgba(0,0,0,.3);
+  transition: transform .08s, filter .15s;
+}
+#b-time { --b-hi: #ffa63d; --b-lo: #f4801c; --b-dk: #c25f0d; }
+#b-jump { --b-hi: #b06ff0; --b-lo: #8f4ade; --b-dk: #6b32ad; }
+.boost:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-dk); }
+.boost .ico { width: 54%; height: 54%; margin-bottom: .35rem; display: block; }
+.boost .ico path, .boost .ico circle, .boost .ico rect {
+  fill: none; stroke: #fff; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round;
+}
+/* the cost chip, sitting across the bottom edge of the tile */
+.boost .cost {
+  position: absolute; left: 50%; bottom: -.42rem; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .22rem; white-space: nowrap;
+  background: linear-gradient(180deg, #5fd472, #3aa94f);
+  box-shadow: 0 2px 0 #2b8039; border-radius: 999px; padding: .1rem .5rem;
+  font: 800 .78rem/1.35 var(--disp); color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.25);
+}
+.boost .cost::after {
+  content: ""; width: 11px; height: 11px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--gold) 55%, var(--gold-dk));
+}
+.boost.armed { outline: 3px solid var(--gold); outline-offset: 3px; }
+/* too poor to press it: the tile stays lit, only the price turns */
+.boost.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 2px 0 #a3374a; }
+/* not unlocked yet. It stays on the row, greyed, with the level it arrives at:
+   hiding it made the row change shape without ever saying why. */
+.boost.locked { --b-hi: #7c8798; --b-lo: #5d687a; --b-dk: #414b5a; filter: saturate(.35); }
+.boost.locked .ico { opacity: .55; }
+.boost.locked .cost {
+  background: linear-gradient(180deg, #6a7686, #4c5666); box-shadow: 0 2px 0 #39424f;
+  font-size: .7rem; letter-spacing: .04em;
+}
+.boost.locked .cost::after { display: none; }
 
 /* ---------- tutorial coach mark ----------
    The pointing is done on the canvas, in the room's own projection; this is
@@ -172,7 +346,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 
 /* a message has to live somewhere now the hint bar is gone */
 .toast {
-  position: absolute; left: 50%; bottom: 5.6rem; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: calc(5.9rem + var(--safe-b)); transform: translateX(-50%);
   margin: 0; z-index: 3; max-width: 24rem; text-align: center;
   background: rgba(14,20,30,.72); color: #fff; font-weight: 700; font-size: .88rem;
   padding: .55rem 1rem; border-radius: 999px; pointer-events: none;
@@ -182,7 +356,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 
 
 /* ---------- level grid ---------- */
-#levels { padding: 1rem; overflow-y: auto; }
+#levels { overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l)); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .5rem; }
 .cellbtn {
   aspect-ratio: 1; border: 0; border-radius: 14px; cursor: pointer; font-family: var(--disp);
@@ -193,65 +368,315 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 .cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); cursor: not-allowed; }
 .cellbtn .s { position: absolute; inset: auto 0 3px 0; font-size: .55rem; letter-spacing: .1em; color: var(--gold); }
 
-/* ---------- result card ---------- */
-#card { position: absolute; inset: 0; display: none; place-items: center; z-index: 20; }
-#card.on { display: grid; }
+/* ---------- result card ----------
+   Marble Sort's `GameScene.overlay`, port for port. Same 540 x 1160 design box
+   as the home screen, so every coordinate here is the coordinate in its source:
+   the panel at x 66 w 408, the header 84 tall, the stars on y 500, the bar on
+   564, and everything below the stars pushed down by `--dy` (66) when the
+   feature bar is on the card. */
+#card { position: absolute; inset: 0; display: none; z-index: 20; font-family: var(--ms); }
+#card.on { display: block; }
+#card .design {
+  --dy: 0px; --dz: 0px;              /* the room the bar and the streak line need */
+  position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
+  transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
+}
+#card .design > * { position: absolute; }
 .dim { position: absolute; inset: 0; background: rgba(13,10,42,.78); }
+
+/* A slow sunburst, and it is the one element that keeps moving - which is what
+   stops a static results card feeling like an error dialog. Sixteen wedges with
+   the light falling off outwards: flat wedges have a hard outer edge and read as
+   cut paper. `screen` is the CSS of the additive blend it is drawn with. */
 .rays {
-  position: absolute; width: 160%; aspect-ratio: 1; border-radius: 50%; mix-blend-mode: screen;
-  background: repeating-conic-gradient(rgba(255,215,94,.34) 0 8deg, rgba(255,215,94,0) 8deg 16deg);
-  animation: spin 26s linear infinite; pointer-events: none;
+  left: 50%; top: 50%; width: 988px; height: 988px; border-radius: 50%;
+  transform: translate(-50%, -50%) scale(var(--k)) translateY(-80px);
+  mix-blend-mode: screen; pointer-events: none;
+  background: repeating-conic-gradient(var(--ms-rays) 0deg 14.1deg, transparent 14.1deg 22.5deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 5%, rgba(0,0,0,.55) 45%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 5%, rgba(0,0,0,.55) 45%, transparent 100%);
+  animation: spin 26s linear infinite, rayfade 3.2s ease-in-out infinite alternate;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-.card {
-  position: relative; width: min(400px, 86vw); border-radius: 30px; overflow: hidden;
-  background: var(--panel); box-shadow: 0 18px 44px rgba(0,0,0,.5);
-  border: 5px solid var(--panel-dk); text-align: center;
+@keyframes spin { to { transform: translate(-50%, -50%) scale(var(--k)) translateY(-80px) rotate(360deg); } }
+@keyframes rayfade { from { opacity: .6; } to { opacity: .32; } }
+.rays[hidden] { display: none; }
+
+/* Three stacked plates: a soft drop, the machine's edge, and its face.
+
+   ⚠ The extra 46 is the one number on this card that is not Marble Sort's. Its
+   panel is `392 + dy` tall and its HOME button is centred 4px below the foot of
+   that, so the button hangs two thirds of its height off the card it belongs to.
+   Reproduced faithfully it reads as a layout that failed rather than as a style,
+   so the panel is grown to hold both buttons and every other coordinate is left
+   exactly where it was found. `--dz` is the same idea as `--dy`, for the streak
+   line this game has and that one does not: one number, so the card without a
+   streak stays exactly the card it already was. */
+.panel {
+  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + 46px);
+  border-radius: 36px; background: rgba(29,26,69,.55);
 }
-.card .head {
-  background: linear-gradient(180deg, var(--go), var(--go-dk)); padding: 1rem 1rem .9rem;
-  font-family: var(--disp); font-weight: 800; font-size: 1.75rem; color: #fff;
-  letter-spacing: .04em; text-shadow: 0 3px 0 rgba(0,0,0,.28);
+.panel i {
+  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + 46px);
+  border-radius: 34px; background: var(--ms-edge);
 }
-.card.lose .head { background: linear-gradient(180deg, var(--no), var(--no-dk)); }
-.card .body { padding: 1.1rem 1.3rem 1.4rem; display: flex; flex-direction: column; gap: .9rem; align-items: center; }
-.stars { display: flex; gap: .5rem; align-items: center; justify-content: center; height: 74px; }
-.star { width: 52px; height: 52px; transform: scale(.1); }
-.star.big { width: 68px; height: 68px; }
-.star.pop { animation: pop .34s cubic-bezier(.34,1.56,.64,1) forwards; }
-@keyframes pop { to { transform: scale(1); } }
-.card .sum { font-weight: 700; color: var(--ink-soft); line-height: 1.5; }
-.card .sum b { color: var(--ink); }
-.coins { font-family: var(--disp); font-weight: 800; font-size: 1.5rem; color: var(--gold-dk);
-  display: flex; align-items: center; gap: .45rem; }
-.coins .disc { width: 26px; height: 26px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffe89a, var(--gold) 60%, var(--gold-dk));
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
-.card .row { display: flex; gap: .6rem; width: 100%; }
-.card .row .btn { flex: 1; font-size: 1.1rem; padding: .75rem 1rem; }
-.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.confetti i { position: absolute; width: 9px; height: 14px; border-radius: 2px; top: -20px;
+.panel u {
+  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + 46px);
+  border-radius: 32px; background: var(--ms-face); overflow: hidden;
+}
+/* The header band: rounded at the top, square where it meets the face. */
+.panel u b {
+  position: absolute; inset: 0 0 auto 0; height: 84px; border-radius: 32px 32px 0 0;
+  background: var(--ms-win);
+}
+#c-card.lose .panel u b { background: var(--ms-lose); }
+.head {
+  left: 0; top: 398px; width: 540px; text-align: center; transform: translateY(-50%);
+  font-size: 40px; color: #fff; -webkit-text-stroke: 8px var(--ms-ink); paint-order: stroke fill;
+}
+
+/* ---- stars ----
+   The middle one is the big one, they land one after another, and each landing
+   punches a flash and a scatter of twinkles. */
+.stars { left: 0; top: 0; width: 540px; height: 0; }
+.star {
+  position: absolute; top: 500px; transform: translate(-50%, -50%) scale(.1);
+  width: 55px; height: 55px; margin-top: 0;
+}
+.star.big { width: 70px; height: 70px; top: 486px; }
+.star.pop { animation: starpop .3s cubic-bezier(.34,1.56,.64,1) forwards; }
+@keyframes starpop { to { transform: translate(-50%, -50%) scale(1); } }
+.flash, .spark {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  transform: translate(-50%, -50%); mix-blend-mode: screen;
+}
+.flash {
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(255,224,122,.95), rgba(255,224,122,.35) 45%, transparent 70%);
+  animation: flashout .42s ease-out forwards;
+}
+@keyframes flashout {
+  from { transform: translate(-50%, -50%) scale(.25); opacity: .75; }
+  to   { transform: translate(-50%, -50%) scale(1);   opacity: 0; }
+}
+.spark { width: 26px; height: 26px; background: #ffe07a; animation: sparkout .5s ease-out forwards; }
+@keyframes sparkout {
+  from { transform: translate(-50%, -50%) scale(.45); opacity: 1; }
+  to   { transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(.02); opacity: 0; }
+}
+
+/* ---- "you are this far from something new" ----
+   The bar animates from where the player was, not from zero and not straight to
+   the answer: a bar drawn at 63% is a fact, a bar that visibly moves from 56% to
+   63% is the reward for the level they just played. */
+.feat { left: 0; top: 564px; width: 540px; height: 0; }
+.feat[hidden] { display: none; }
+.feat .track {
+  position: absolute; left: 92px; top: -13px; width: 300px; height: 26px;
+  border-radius: 13px; background: #2f3550;
+}
+.feat .fill {
+  position: absolute; left: 95px; top: -10px; height: 20px; border-radius: 10px;
+  background: #5ecfe0; width: 0; min-width: 20px; transition: width .9s cubic-bezier(.33,1,.68,1);
+}
+.feat .fill.empty { min-width: 0; }
+/* The prize on the end of the bar. A frame rather than a bare sprite: these are
+   board pieces, and one floating on a results card reads as a stray until
+   something holds it. */
+.feat .badge {
+  position: absolute; left: 390px; top: -34px; width: 68px; height: 68px;
+  border-radius: 16px; background: #b4801a; display: grid; place-items: center;
+}
+.feat .badge::before {
+  content: ""; position: absolute; left: 4px; top: 4px; width: 60px; height: 60px;
+  border-radius: 13px; background: var(--ms-gold);
+}
+.feat .badge::after {
+  content: ""; position: absolute; left: 9px; top: 9px; width: 50px; height: 50px;
+  border-radius: 10px; background: #b6b1d8;
+}
+.feat .badge > * {
+  position: relative; z-index: 1; max-width: 44px; max-height: 44px;
+  width: auto; height: auto; display: block;
+}
+.feat .badge svg { width: 40px; height: 40px; }
+.feat .badge svg path, .feat .badge svg circle {
+  fill: none; stroke: var(--ms-ink); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round;
+}
+.feat .badge.hit { animation: badgehit .26s ease-in-out 3 alternate; }
+@keyframes badgehit { to { transform: scale(1.12); } }
+.feat .lab {
+  position: absolute; left: 0; top: 20px; width: 540px; text-align: center;
+  font-size: 20px; color: #b58a2b;
+}
+
+/* ---- the purse, the buttons, the paper ---- */
+.coins {
+  left: 232px; top: calc(602px + var(--dy)); transform: translateY(-50%);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 30px; color: #ffd964; -webkit-text-stroke: 6px var(--ms-ink); paint-order: stroke fill;
+}
+.coins .coin {
+  width: 44px; height: 44px; border-radius: 50%; -webkit-text-stroke: 0;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.18);
+}
+.coins[hidden] { display: none; }
+.streak {
+  left: 0; top: calc(636px + var(--dy)); width: 540px; text-align: center;
+  font-size: 19px; color: #b58a2b;
+}
+.streak[hidden] { display: none; }
+.sum { left: 66px; top: 500px; width: 408px; text-align: center; margin: 0;
+  font-size: 23px; line-height: 1.4; color: #3b465f; }
+.sum b { color: var(--ms-ink); }
+.sum span { display: block; margin-top: 26px; font-size: 19px; color: #7c88a6; }
+#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+
+/* Paper falling past the card. */
+.confetti { inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; width: 14px; height: 20px; border-radius: 3px; top: -30px;
   animation: fall linear infinite; }
-@keyframes fall { to { transform: translateY(120vh) rotate(720deg); } }
+@keyframes fall { to { transform: translateY(1240px) rotate(720deg); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .rays, .confetti i { animation: none; }
-  .star.pop { animation: none; transform: scale(1); }
+  .rays, .confetti i, .cover { animation: none; }
+  .star.pop { animation: none; transform: translate(-50%, -50%) scale(1); }
+  .feat .fill { transition: none; }
 }
+
+/* A 390px phone cannot hold two 44px buttons and three pills at full size: the
+   restart button fell off the right edge. Everything in the bar steps down a
+   size rather than anything being dropped. */
+@media (max-width: 26rem) {
+  .topbar { gap: .35rem;
+    padding-left: calc(.45rem + var(--safe-l)); padding-right: calc(.45rem + var(--safe-r)); }
+  .icon-btn { width: 38px; height: 38px; border-radius: 11px; font-size: 1rem; }
+  .pill { padding: .26rem .6rem; gap: .3rem; }
+  .pill-lab { font-size: .66rem; letter-spacing: .06em; }
+  .pill-val { font-size: .95rem; }
+  .pill-time { padding: .16rem .72rem .22rem; }
+  .pill-time .pill-val { font-size: 1.3rem; }
+  .pill-gold .disc { width: 17px; height: 17px; }
+}
+
+/* 320px, the smallest phone still in use, needs one more notch off everything. */
+@media (max-width: 21rem) {
+  .topbar { gap: .25rem; padding-left: calc(.3rem + var(--safe-l)); padding-right: calc(.3rem + var(--safe-r)); }
+  .icon-btn { width: 34px; height: 34px; }
+  .pill { padding: .24rem .5rem; }
+  .pill-lab { font-size: .6rem; }
+  .pill-time .pill-val { font-size: 1.2rem; }
+}
+
+/* ---------- the pause card ----------
+   Marble Sort's `openSettings`, ported: the gear stops the clock and puts up a
+   plain plate with everything there is to do on it, one full-width row per line,
+   90 apart, starting 140 down. The results card's three plates and its coloured
+   header are deliberately NOT reused - that panel announces that the level has
+   ended, and dressing a pause in it says the same thing when it is not true.
+
+   ⚠ The panel used to be `<div class="panel set-panel">`, which inherits
+   `height: calc(392px + var(--dy) + ...)` - and `--dy` is declared on
+   `#card .design`, not here. The calc was invalid, the face collapsed to nothing
+   and the card was a set of buttons floating over the board with no plate under
+   them at all.
+
+   The same 540 x 1160 design box as everything else; `--k` is set on #app by
+   fitDesign, so this inherits it and needs no fitting of its own. */
+#settings { position: absolute; inset: 0; display: none; z-index: 22; font-family: var(--ms); }
+#settings.on { display: block; }
+#settings .dim { background: rgba(16,26,51,.7); }
+#settings .design {
+  position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
+  transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
+}
+#settings .design > * { position: absolute; }
+/* five rows: 140 + 5 x 90 tall, centred in the box. Nothing here is measured
+   from the bottom - see the note on the home screen's furniture. */
+.set-panel {
+  left: 66px; top: 285px; width: 408px; height: 590px; border-radius: 30px;
+  background: var(--ms-face); box-shadow: 0 14px 36px rgba(0,0,0,.45);
+}
+.set-head {
+  left: 0; top: 335px; width: 540px; text-align: center; transform: translateY(-50%);
+  font-size: 38px; color: #fff; -webkit-text-stroke: 8px var(--ms-ink); paint-order: stroke fill;
+}
+
+/* The close disc, hung on the panel's top right corner. Marble Sort has no such
+   thing - RESUME is its only way back - but the two do the same job and the disc
+   is where a thumb already goes to dismiss a card. */
+.set-x {
+  left: 474px; top: 285px; width: 60px; height: 60px; padding: 0; cursor: pointer;
+  transform: translate(-50%, -50%); border: 4px solid #fff; border-radius: 50%;
+  background: linear-gradient(180deg, #ff8a8a, #d8556a); box-shadow: 0 4px 0 #a63c4e;
+  color: #fff; font-family: var(--ms); font-size: 26px; line-height: 1;
+}
+.set-x:active { transform: translate(-50%, calc(-50% + 3px)); box-shadow: 0 1px 0 #a63c4e; }
+
+/* One row per switch: an icon, a name, and the switch itself hard right. Marble
+   Sort says SOUND ON / SOUND OFF on a button, which states the action rather
+   than the state; a switch states the state, which is what the row is for. */
+.set-row {
+  left: 90px; width: 360px; height: 74px; border-radius: 20px; transform: translateY(-50%);
+  background: rgba(43,53,80,.09);
+  display: flex; align-items: center; gap: 16px; padding: 0 18px;
+}
+#set-row-sound { top: 425px; }
+#set-row-vibe  { top: 515px; }
+.set-ico { width: 38px; height: 38px; flex: none; display: block; }
+.set-ico path, .set-ico rect { fill: none; stroke: var(--ms-ink); stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; }
+.set-ico path.solid { fill: var(--ms-ink); stroke: none; }
+.set-lab { flex: 1; font-size: 27px; color: var(--ms-ink); }
+
+/* The switch. Off is grey and the knob is left; on is the same green as the
+   winning header, so the two overlays agree on what "good" looks like. */
+.tog {
+  flex: none; width: 96px; height: 48px; padding: 0; border: 0; border-radius: 999px;
+  cursor: pointer; background: #b3b0c9; box-shadow: inset 0 3px 0 rgba(0,0,0,.12);
+  transition: background .16s;
+}
+.tog i {
+  display: block; width: 38px; height: 38px; margin: 5px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.2);
+  transition: transform .16s;
+}
+.tog[aria-checked="true"] { background: var(--ms-win); }
+.tog[aria-checked="true"] i { transform: translateX(48px); }
+
+.set-btn { left: 270px; transform: translate(-50%, -50%); }
+.set-btn:active { transform: translate(-50%, calc(-50% + 3px)); }
+#set-retry  { top: 605px; }
+#set-home   { top: 695px; }
+#set-resume { top: 785px; }
+
 </style>
 
 <div id="app">
   <section id="home" class="screen on">
-    <div class="logo">Seat Away<span>find everyone a seat</span></div>
-    <p class="blurb">Seats slide, people don&rsquo;t. Clear a path from the door and the queue
-      seats itself &mdash; but only from the front or the sides of a seat, never over its back.</p>
-    <button class="btn" id="h-play">PLAY</button>
-    <div class="stat-row">
-      <span class="badge" id="h-hearts">Lives <b>5</b></span>
-      <span class="badge">Level <b id="h-level">1</b></span>
-      <span class="badge">Stars <b id="h-stars">0</b></span>
-      <span class="badge">Gold <b id="h-coins">0</b></span>
+    <div class="design">
+      <div class="edge edge-l" id="h-edge-l"></div>
+      <div class="edge edge-r" id="h-edge-r"></div>
+      <img class="cover" id="h-cover" alt="Seat Away">
+      <div class="scrim" id="h-scrim"></div>
+      <div class="logo" id="h-logo">Seat Away<span>find everyone a seat</span></div>
+
+      <!-- Top left, the lives that let you start a level at all; top right, the
+           picker. Mirroring each other rather than sitting together: one is a
+           resource and the other is navigation. -->
+      <button class="round" id="h-hearts" aria-label="Lives"><i></i><span>&#10084;</span><b>5</b><em></em></button>
+      <button class="round" id="h-levels" aria-label="Choose a level"><i></i><span>&#9638;</span></button>
+
+      <button class="wide-btn" id="h-play">PLAY</button>
+      <div class="wallet">
+        <i class="starw" id="h-star-icon"></i><span id="h-stars">0</span>
+        <span class="gap"></span>
+        <i class="coin"></i><span id="h-coins">0</span>
+      </div>
+      <div class="ver" id="h-ver"></div>
     </div>
-    <button class="btn ghost" id="h-levels">CHOOSE A LEVEL</button>
   </section>
 
   <section id="levels" class="screen">
@@ -269,7 +694,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
     <!-- level, clock and gold across the top; boosters along the bottom -->
     <div class="topbar">
       <div class="hud-side">
-        <button class="icon-btn" id="g-home" aria-label="Home">&#9776;</button>
+        <button class="icon-btn" id="g-menu" aria-label="Settings">
+          <svg class="gear" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1"></circle>
+            <path d="M12 2.6l1.5 2.3 2.7-.5.5 2.7 2.3 1.5-1.4 2.4 1.4 2.4-2.3 1.5-.5 2.7-2.7-.5L12 21.4
+                     l-1.5-2.3-2.7.5-.5-2.7-2.3-1.5L4.4 13 3 10.6l2.3-1.5.5-2.7 2.7.5z"></path>
+          </svg>
+        </button>
         <div class="pill"><span class="pill-lab">Level</span><span class="pill-val" id="g-level">1</span></div>
       </div>
       <div class="pill pill-time">
@@ -281,40 +712,84 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
         <button class="icon-btn" id="g-retry" aria-label="Restart">&#8635;</button>
       </div>
     </div>
-    <div class="hud-sub">
-      <div class="bar"><i id="g-bar"></i></div>
-      <div class="hud-counts"><span id="g-seated">0 / 0 seated</span><span id="g-left">0 waiting</span></div>
-    </div>
 
+    <!-- drawn, not typed: an entity glyph is whatever font the phone happens to
+         have, and the two of them came out at different sizes on every device -->
     <div class="boosters" id="boosters">
-      <button class="boost" id="b-time" hidden>
-        <span class="ico">&#9201;</span><span class="lab">+15s</span><span class="cost" id="b-time-cost">300</span>
+      <button class="boost" id="b-time" aria-label="Add time">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="13" r="8"></circle>
+          <path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path>
+        </svg>
+        <span class="cost" id="b-time-cost">300</span>
       </button>
-      <button class="boost" id="b-jump" hidden>
-        <span class="ico">&#8607;</span><span class="lab">Jump</span><span class="cost" id="b-jump-cost">600</span>
+      <button class="boost" id="b-jump" aria-label="Jump a seat">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3.4v11M12 3.4 7.6 8M12 3.4 16.4 8M4.6 18.6h14.8"></path>
+        </svg>
+        <span class="cost" id="b-jump-cost">600</span>
       </button>
     </div>
     <div class="coach" id="coach" hidden role="status">
       <b id="coach-title"></b><span id="coach-text"></span>
     </div>
-    <p class="toast" id="hint" role="status"></p>
   </section>
+
+  <p class="toast" id="hint" role="status"></p>
+
+  <!-- Settings, built on the card's own panel so the two read as one family.
+       Only switches that do something are here: there is no music track in the
+       build, so there is no music switch to go with it. -->
+  <div id="settings">
+    <div class="dim" id="set-dim"></div>
+    <div class="design">
+      <div class="set-panel"></div>
+      <div class="set-head">PAUSED</div>
+      <button class="set-x" id="set-close" aria-label="Close">&#10005;</button>
+
+      <div class="set-row" id="set-row-sound">
+        <svg class="set-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="solid" d="M4 9.5h3.4L12 5.4v13.2L7.4 14.5H4z"></path>
+          <path d="M16 9.2a4 4 0 0 1 0 5.6M18.8 6.6a7.6 7.6 0 0 1 0 10.8"></path>
+        </svg>
+        <span class="set-lab">Sound</span>
+        <button class="tog" id="set-sound" role="switch" aria-checked="true" aria-label="Sound"><i></i></button>
+      </div>
+
+      <div class="set-row" id="set-row-vibe">
+        <svg class="set-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="8" y="3.4" width="8" height="17.2" rx="2"></rect>
+          <path d="M4.6 9.4v5.2M2 10.6v2.8M19.4 9.4v5.2M22 10.6v2.8"></path>
+        </svg>
+        <span class="set-lab">Vibration</span>
+        <button class="tog" id="set-vibe" role="switch" aria-checked="true" aria-label="Vibration"><i></i></button>
+      </div>
+
+      <button class="wide-btn set-btn" id="set-retry">RESTART LEVEL</button>
+      <button class="wide-btn blue set-btn" id="set-home">HOME</button>
+      <button class="wide-btn set-btn" id="set-resume">RESUME</button>
+    </div>
+  </div>
 
   <div id="card">
     <div class="dim"></div>
     <div class="rays" id="c-rays"></div>
-    <div class="confetti" id="c-confetti"></div>
-    <div class="card" id="c-card">
-      <div class="head" id="c-title">LEVEL CLEAR!</div>
-      <div class="body">
-        <div class="stars" id="c-stars"></div>
-        <p class="sum" id="c-sum"></p>
-        <div class="coins" id="c-coins"><span class="disc"></span><span>+0</span></div>
-        <div class="row">
-          <button class="btn blue" id="c-home">HOME</button>
-          <button class="btn" id="c-next">NEXT</button>
-        </div>
+    <div class="design" id="c-card">
+      <div class="confetti" id="c-confetti"></div>
+      <div class="panel"><i></i><u><b></b></u></div>
+      <div class="head" id="c-title">LEVEL COMPLETE!</div>
+      <div class="stars" id="c-stars"></div>
+      <p class="sum" id="c-sum"></p>
+      <div class="feat" id="c-feat" hidden>
+        <div class="track"></div>
+        <div class="fill" id="c-feat-fill"></div>
+        <div class="badge" id="c-feat-badge"></div>
+        <div class="lab" id="c-feat-lab"></div>
       </div>
+      <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
+      <div class="streak" id="c-streak" hidden></div>
+      <button class="wide-btn" id="c-next">NEXT LEVEL</button>
+      <button class="wide-btn blue" id="c-home">HOME</button>
     </div>
   </div>
 </div>

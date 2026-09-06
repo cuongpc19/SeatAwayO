@@ -9,6 +9,8 @@ RICH = true;                       // the engine draws a room, not a bare grid
    of play keeps moving somewhere new without needing 633 rooms to do it.
    ?theme=<name> pins one for testing and stops the rotation. */
 const MOVIE_SRC = "/*__MOVIE__*/";
+const COVER_SRC = "/*__COVER__*/";       // the home screen's own render
+const BUILT = "/*__BUILT__*/";           // the stamp on the home screen's foot
 const THEME_RUN = 5;                    // levels before the room changes
 const THEME_ORDER = ["classroom", "station", "stadium", "concert", "cinema"];
 const pinnedTheme = new URLSearchParams(location.search).get("theme");
@@ -65,7 +67,26 @@ const blank = () => ({
   streak: 0,                       // wins in a row
   hearts: CF.heartMax, heartAt: 0, // heartAt: when the next one lands, ms epoch
   jumps: 0,                        // jump booster charges bought
+  sound: true, vibe: true,         // the two switches in Settings
 });
+/* ---- deep links --------------------------------------------------------
+   ?level=N opens a board straight away, past the home screen and past the
+   unlock gate: the picker only lists what has been earned, which is no help
+   when the board you want to look at is number 300. ?reset wipes the save
+   before it is read, so ?reset&level=1 is a clean run from the very top.
+
+   Neither is a way round the campaign - the level still has to be won to
+   unlock the next, and a reset is just the blank save. The reset flag is
+   dropped from the address bar once used, or every later refresh would throw
+   away the progress made since. */
+const LINK = new URLSearchParams(location.search);
+if (LINK.has("reset")) {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  LINK.delete("reset");
+  const rest = LINK.toString();
+  history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
+}
+
 let save = blank();
 try { save = Object.assign(blank(), JSON.parse(localStorage.getItem(SAVE_KEY) || "{}")); }
 catch (e) { /* private window, cleared data, a browser that refuses storage */ }
@@ -113,14 +134,111 @@ function show(name) {
   if (name === "levels") buildGrid();
   if (name === "play") requestAnimationFrame(draw);
 }
+/* ---- the design box ----------------------------------------------------
+   The home screen and the results card are ports of Marble Sort's, and that
+   game lays both out in a fixed 540 x 1160 box which Phaser then FITs to the
+   frame. Rather than convert several dozen coordinates into percentages and
+   lose the ability to diff them against their source, the box is kept: `--k`
+   scales it, and everything inside is written in design units.
+
+   Home is the one screen that may be wide, and the reason is that it is the one
+   screen with no board on it - `fitCanvas` gives the carriage a portrait strip
+   whatever the window does, so a landscape frame on any other screen is empty
+   room the game cannot grow into. Home is a picture and two buttons, and has
+   nothing to lose by filling the frame, so it widens its own box instead.     */
+const DW = 540, DH = 1160;
+/* The furniture at the foot of the home screen, measured up from the foot of
+   the design box. Nothing here may be an absolute y: the box is 1160 tall on a
+   phone and shorter on a squat desktop frame, and a PLAY button written as
+   "952" is drawn below the bottom edge of the one screen it exists for. */
+const PLAY_UP = 208;
+const WALLET_UP = 98;
+
+const WIDE_FROM = 1.2;             // where furniture becomes a landscape menu
+const WIDE_COL = .95;              // how much room the column beside the art may take
+
+/* The cover is inlined by the build; a served page reads the file beside it.
+   Both layers are the same image - the crisp one, and a blurred copy that fills
+   the box either side of it on a wide frame. */
+{
+  const src = COVER_SRC || "art/home_cover.png";
+  document.getElementById("h-cover").src = src;
+  // the same file again, for the two strips that fill a wide box either side
+  document.getElementById("home").style.setProperty("--cover-url", 'url("' + src + '")');
+}
+
+function fitDesign() {
+  const app = document.getElementById("app");
+  const w = app.clientWidth, h = app.clientHeight;
+  if (!w || !h) return;
+  const k = Math.min(w / DW, h / DH);
+  app.style.setProperty("--k", k);
+
+  // Home's own box: never narrower than the design width, or a portrait phone
+  // asks for a box taller than 540 x 1160 and letterboxes the one screen that
+  // has no letterbox anywhere else in the game.
+  const W = Math.max(DW, w / k);
+  const wide = W / DH >= WIDE_FROM;
+  // Cover, not contain: the 2:3 render fills the screen and there is no painted
+  // ground under it. Wide, it is fitted to the height and moved left instead of
+  // being blown up - covering a 16:9 box with a 2:3 render keeps 37% of its
+  // height, and the pieces are in the part that would go.
+  const scale = wide ? DH / 1620 : Math.max(W / 1080, DH / 1620);
+  const artW = 1080 * scale, artH = 1620 * scale;
+  const colWant = wide ? Math.min(W - artW, artW * WIDE_COL) : 0;
+  // The art and the column are laid out as one group, centred, rather than the
+  // art taking a fixed share of the width: on a 21:9 monitor a fixed share puts
+  // a third of the screen of nothing between them.
+  const groupL = wide ? (W - artW - colWant) / 2 : 0;
+  const groupR = wide ? groupL + artW + colWant : W;
+  const artCx = wide ? groupL + artW / 2 : W / 2;
+  const uiCx = wide ? artCx + artW / 2 + colWant / 2 : W / 2;
+  const playY = wide ? DH * .5 : DH - PLAY_UP;
+
+  const st = document.getElementById("home").style;
+  const set = (n, v) => st.setProperty(n, v);
+  set("--dw", W);
+  set("--art-l", artCx - artW / 2);  set("--art-t", (DH - artH) / 2);
+  set("--art-w", artW);              set("--art-h", artH);
+  set("--art-cx", artCx);
+  set("--ui-cx", uiCx);
+  set("--play-y", playY);
+  // Bigger on a wide box, not the same button moved sideways - and capped
+  // against the column, because just past WIDE_FROM the space beside the art is
+  // narrower than a 1.7x button.
+  set("--play-s", wide ? Math.min(1.7, colWant * .78 / 260) : 1.35);
+  set("--wallet-y", wide ? playY + 118 : DH - WALLET_UP);
+  set("--wallet-s", wide ? 1.25 : 1);
+  // The two corner buttons line up with the group, not with the canvas: pinned
+  // to the edge they are the only things left touching it once everything else
+  // has been pulled in, and read as the layout having missed them.
+  set("--corner-l", wide ? groupL + 36 : 70);
+  set("--corner-r", wide ? groupR - 36 : W - 70);
+  set("--edge-r", W - (artCx + artW / 2));
+  document.getElementById("h-scrim").hidden = wide;
+  document.getElementById("h-edge-l").hidden = !wide;
+  document.getElementById("h-edge-r").hidden = !wide;
+}
+
 function refreshHome() {
-  $("h-level").textContent = save.unlocked;
+  fitDesign();
+  const lvl = save.unlocked;
+  // One button, always. It says where the player is rather than "PLAY", which
+  // is the only place the level number appears on this screen now.
+  $("h-play").textContent = lvl > 1 ? "LEVEL " + lvl : "PLAY";
   $("h-stars").textContent = totalStars();
   $("h-coins").textContent = save.coins;
-  const w = heartIn();
-  $("h-hearts").innerHTML = "Lives <b>" + hearts() + " / " + CF.heartMax + "</b>"
-    + (w ? " <span style=\"opacity:.7\">" + fmt(w) + "</span>" : "");
+  $("h-star-icon").innerHTML = STAR_ON;
+  const left = hearts(), w = heartIn();
+  const heart = $("h-hearts");
+  heart.classList.toggle("full", left >= CF.heartMax);
+  heart.querySelector("b").textContent = left;
+  // A badge that is always on is furniture within a day, so the countdown only
+  // appears while there is actually a life on its way.
+  heart.querySelector("em").textContent = w ? fmt(w) : "";
+  $("h-ver").textContent = BUILT ? "build " + BUILT : "";
 }
+
 function buildGrid() {
   const grid = document.getElementById("l-grid");
   grid.innerHTML = "";
@@ -146,6 +264,68 @@ function buildGrid() {
 const CAMPAIGN = LEVELS.map((b, i) => i + 1).filter((_, i) => LEVELS[i].variant === 0);
 let CUR = 1;                       // the level number the player sees
 
+/* ---- what the game has not shown the player yet ------------------------
+   Marble Sort's results card ends on a bar counting down to the next piece the
+   player has not met, and that bar is the reason the card is worth reading on a
+   level nobody found hard. Ported whole; only the list of things being counted
+   down to is this game's.
+
+   Seat Away introduces four: two boosters, and two seats. The seats are read
+   off the boards rather than written down, because the ladder moves - it has
+   already been renumbered once - and a hand-written "level 7 -> grey seat" table
+   is a second copy of it that goes stale silently. The boosters cannot be found
+   that way: a booster is a button and leaves no mark on a board, so those come
+   from the same RemoteConfig gate that actually hands them over, which is what
+   stops the bar promising one on a different level from the one it arrives on. */
+const FEATURES = [
+  { id: "grey", label: "FIXED SEAT",
+    from: () => firstBoard(b => b.seats.some(s => s[3] === 0)) },
+  { id: "jump", label: "JUMP BOOSTER", from: () => unlockedAt("booster_jump") },
+  { id: "twin", label: "DOUBLE SEAT",
+    from: () => firstBoard(b => b.seats.some(s => s[2] > 1)) },
+  { id: "time", label: "TIME BOOSTER", from: () => unlockedAt("booster_time") },
+];
+
+const boardOf = n => LEVELS[CAMPAIGN[n - 1] - 1];
+
+/** The first campaign level whose board answers `test`, or Infinity. */
+function firstBoard(test) {
+  for (let n = 1; n <= CAMPAIGN.length; n++) if (test(boardOf(n))) return n;
+  return Infinity;
+}
+
+/* Worked out once. Sorted by the level each arrives on rather than left in
+   written order, so moving a gate in RemoteConfig cannot put the ladder out of
+   sequence without anyone noticing. */
+let featAt = null;
+function featureLevels() {
+  if (!featAt) {
+    featAt = FEATURES.map(f => ({ id: f.id, label: f.label, at: f.from() }))
+      .filter(f => isFinite(f.at)).sort((a, b) => a.at - b.at);
+  }
+  return featAt;
+}
+
+/** How close the player is to the next thing they have not met, having just
+    cleared `cleared`. Null once there is nothing left to count down to - the bar
+    then simply does not appear, which is better than a full one that never
+    moves again. */
+function featureProgress(cleared) {
+  let from = 1;
+  for (const f of featureLevels()) {
+    if (f.at > cleared) {
+      // `cleared + 1` on top, not `cleared`: the bar has to read full on the
+      // card that hands the player the level carrying the piece. The other form
+      // tops out one level short, which reads as the reward receding.
+      const span = Math.max(1, f.at - from);
+      return { id: f.id, label: f.label, at: f.at,
+               pct: Math.min(1, (cleared + 1 - from) / span) };
+    }
+    from = f.at;
+  }
+  return null;
+}
+
 function startLevel(n) {
   if (hearts() <= 0) {
     show("home");
@@ -153,6 +333,7 @@ function startLevel(n) {
     return;
   }
   JUMP = false;
+  closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
   setTimeout(announceBoosters, 600);
   hideCard();
@@ -177,15 +358,10 @@ onHud = function () {
   if (!S) return;
   setAll(["g-level"], CUR);
   setAll(["g-clock"], fmt(S.left));
-  setAll(["g-seated"], S.seated + " / " + S.total + " seated");
-  setAll(["g-left"], S.queue.length + " waiting");
   setAll(["g-coins", "h-coins"], save.coins);
   setAll(["h-stars"], totalStars());
   boosterUi();
-  const pct = Math.max(0, S.left / S.time) * 100;
-  const b = $("g-bar");
-  b.style.width = pct + "%"; b.classList.toggle("warn", pct < 25);
-  $("g-clock").classList.toggle("warn", pct < 25);
+  $("g-clock").classList.toggle("warn", S.left < S.time * .25);
   // the standing hint is gone with the bottom bar; only real messages show now
   if (sayUntil && performance.now() > sayUntil) {
     sayUntil = 0; toastEl().classList.remove("on");
@@ -208,21 +384,45 @@ function announceBoosters() {
   }
 }
 
+/** A booster that has not unlocked yet stays on the row, greyed, showing the
+    level it arrives at. It used to be hidden outright, which changed the shape
+    of the row from one level to the next and never said that more was coming.
+    The unlock levels are RemoteConfig's, out of the tutorial group. */
+function lockChip(el, tagId, feat) {
+  const open = has(feat);
+  el.classList.toggle("locked", !open);
+  if (!open) {
+    const n = unlockedAt(feat);
+    $(tagId).textContent = n === Infinity ? "SOON" : "LV " + n;
+  }
+  return open;
+}
+
 function boosterUi() {
   const t = $("b-time"), j = $("b-jump");
-  t.hidden = !has("booster_time");
-  j.hidden = !has("booster_jump");
-  $("b-time-cost").textContent = CF.boosterTime.price;
-  $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + " left" : CF.boosterJump.price;
-  t.classList.toggle("broke", save.coins < CF.boosterTime.price);
-  j.classList.toggle("broke", save.jumps === 0 && save.coins < CF.boosterJump.price);
+  const tOpen = lockChip(t, "b-time-cost", "booster_time");
+  const jOpen = lockChip(j, "b-jump-cost", "booster_jump");
+  if (tOpen) $("b-time-cost").textContent = CF.boosterTime.price;
+  if (jOpen) $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + "x" : CF.boosterJump.price;
+  t.classList.toggle("broke", tOpen && save.coins < CF.boosterTime.price);
+  j.classList.toggle("broke", jOpen && save.jumps === 0 && save.coins < CF.boosterJump.price);
   j.classList.toggle("armed", JUMP);
+}
+
+/** A locked booster is still worth pressing: it is the only place that says when
+    it opens. */
+function lockedSay(feat, what) {
+  const n = unlockedAt(feat);
+  say(n === Infinity ? what + " is not in this build yet."
+                     : what + " unlocks at level " + n + ".");
 }
 
 $("b-time").onclick = () => {
   if (!S || S.phase !== "play") return;
+  if (!has("booster_time")) return lockedSay("booster_time", "Extra time");
   if (save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
   save.coins -= CF.boosterTime.price;
+  SFX.buy(); buzz(14);
   S.left += CF.boosterTime.value;
   S.time = Math.max(S.time, S.left);          // keep the bar honest
   persist(); say("+" + CF.boosterTime.value + " seconds."); onHud();
@@ -230,11 +430,13 @@ $("b-time").onclick = () => {
 
 $("b-jump").onclick = () => {
   if (!S || S.phase !== "play") return;
+  if (!has("booster_jump")) return lockedSay("booster_jump", "Jump");
   if (JUMP) { JUMP = false; say("Jump cancelled."); onHud(); draw(); return; }
   if (save.jumps === 0) {
     if (save.coins < CF.boosterJump.price) return say("Not enough gold for a jump.");
     save.coins -= CF.boosterJump.price;
     save.jumps = CF.boosterJump.uses > 0 ? CF.boosterJump.uses : 1;
+    SFX.buy(); buzz(14);
     persist();
   }
   JUMP = true;
@@ -244,6 +446,7 @@ $("b-jump").onclick = () => {
 
 /* One charge per seat actually moved, and the arming ends with it. */
 onSeatMoved = () => {
+  SFX.move(); buzz(12);
   if (!JUMP) return;
   JUMP = false;
   save.jumps = Math.max(0, save.jumps - 1);
@@ -367,35 +570,261 @@ onOverlay = () => {
   ctx.restore();
 };
 
-/* ---- the result card --------------------------------------------------- */
+/* ---- sound and haptics -------------------------------------------------
+   There is no audio file anywhere in this build and there is not going to be
+   one: a single-file game that has to carry a sound bank stops being a single
+   file. Every cue below is a shaped oscillator instead, a couple of lines each.
+   The context is built on the first cue rather than at load, because a browser
+   will not let one start before the player has touched something. */
+let AC = null;
+function blip(freq, dur, type, peak, delay) {
+  if (!save.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const t = AC.currentTime + (delay || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + .012);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + dur + .02);
+  } catch (e) { /* no output device, or a browser that refuses one */ }
+}
+const SFX = {
+  move:   () => blip(300, .09, "triangle", .09),
+  seated: () => { blip(560, .08, "sine", .09); blip(840, .11, "sine", .07, .06); },
+  buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
+  win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
+  lose:   () => { blip(300, .22, "sawtooth", .06); blip(190, .34, "sawtooth", .06, .13); },
+};
+/* Android buzzes. iOS Safari has no Vibration API at all, so there the switch is
+   simply inert - which is better than hiding it and guessing wrong about a
+   browser we cannot test from here. */
+function buzz(ms) {
+  if (!save.vibe || !navigator.vibrate) return;
+  try { navigator.vibrate(ms); } catch (e) {}
+}
+
+/* a passenger reaching a seat is the one event in the game the player is waiting
+   for, so it is the one that gets a sound of its own */
+onSeated = () => SFX.seated();
+
+/* ---- settings ----------------------------------------------------------
+   Built on the result card's own panel, so the two overlays read as one family
+   rather than as two dialogs from different games. Only switches that do
+   something are here: there is no music track in the build, so there is no
+   music switch above them pretending there is. */
+const setEl = $("settings");
+function syncToggles() {
+  $("set-sound").setAttribute("aria-checked", String(!!save.sound));
+  $("set-vibe").setAttribute("aria-checked", String(!!save.vibe));
+}
+
+/** The clock, while the card is up.
+
+    ⚠ It used to keep running, which is the whole reason this card is a pause and
+    not a settings sheet: the player opens it, reads two rows, turns the sound
+    off, and comes back to a level they have lost. Marble Sort sets `paused` for
+    exactly this and clears it on the way out.
+
+    Only the clock stops. A passenger already walking to a seat keeps walking -
+    those are the engine's own timers and stopping them mid-stride would need the
+    walk to be resumable, which is a much bigger change than the fault warrants. */
+let PAUSED = false;
+function openSettings() {
+  if (!S || S.phase !== "play" || cardEl.classList.contains("on")) return;
+  PAUSED = true;
+  syncToggles();
+  setEl.classList.add("on");
+}
+function closeSettings() { PAUSED = false; setEl.classList.remove("on"); }
+
+/** Turning a switch on demonstrates itself - a sound cue for sound, a buzz for
+    vibration - which is the only way a player can tell the switch did anything
+    on a device whose ringer is down or whose motor is missing. */
+function toggleSetting(key) {
+  save[key] = !save[key];
+  persist(); syncToggles();
+  if (key === "sound" && save.sound) SFX.seated();
+  if (key === "vibe" && save.vibe) buzz(18);
+}
+$("set-sound").onclick = () => toggleSetting("sound");
+$("set-vibe").onclick = () => toggleSetting("vibe");
+$("set-close").onclick = closeSettings;
+$("set-dim").onclick = closeSettings;
+$("set-retry").onclick = () => { closeSettings(); startLevel(CUR); };
+$("set-home").onclick = () => { closeSettings(); hideCard(); show("home"); };
+/* The way back to the board, and the reason the card needs one: with only a
+   close disc in the corner, the one obvious thing to press was HOME, so
+   opening the settings meant leaving the level. */
+$("set-resume").onclick = closeSettings;
+
+/* ---- the result card ---------------------------------------------------
+   Marble Sort's `GameScene.overlay`, ported: the sunburst, the three-plate
+   panel, the stars that land one after another with a flash and a scatter of
+   twinkles, the bar counting down to the next new thing, the purse, and two
+   buttons. Written in that game's design units - see `fitDesign` above.     */
 const cardEl = document.getElementById("card");
 function hideCard() { cardEl.classList.remove("on"); }
 onNewLevel = hideCard;
 
-const STAR_ON = '<svg viewBox="0 0 24 24"><defs><linearGradient id="g%I%" x1="0" y1="0" x2="0" y2="1">'
-  + '<stop offset="0" stop-color="#ffe89a"/><stop offset="1" stop-color="#e0a71d"/></linearGradient></defs>'
-  + '<path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z" '
-  + 'fill="url(#g%I%)" stroke="#a9761a" stroke-width="1.1" stroke-linejoin="round"/></svg>';
-const STAR_OFF = '<svg viewBox="0 0 24 24">'
-  + '<path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z" '
-  + 'fill="#cfc6b4" stroke="#a79d8a" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+/* The star is Marble Sort's: a flat gold ten-point path with one darker outline,
+   the same construction as everything else it draws - no gradients past a single
+   highlight, so it sits beside the pieces rather than looking imported. */
+const STAR_PATH = "M26 2L32.35 17.26L48.82 18.58L36.27 29.34L40.11 45.42L26 36.8"
+  + "L11.89 45.42L15.73 29.34L3.18 18.58L19.65 17.26Z";
+const star = on => '<svg viewBox="0 0 52 52"><path d="' + STAR_PATH + '" fill="'
+  + (on ? "#ffc21e" : "#7c88a6") + '" stroke="' + (on ? "#c67a06" : "#5a6480")
+  + '" stroke-width="3" stroke-linejoin="round"/></svg>';
+const STAR_ON = star(true), STAR_OFF = star(false);
 
+/** Paper falling past the card. */
 function confetti(on) {
-  const box = document.getElementById("c-confetti");
+  const box = $("c-confetti");
   box.innerHTML = "";
   if (!on) return;
   const cols = ["#e83e48", "#fa822a", "#fac42e", "#4ac65c", "#37c6d8", "#3f7ce8", "#a05de0", "#ff7ab8"];
   for (let i = 0; i < 26; i++) {
     const p = document.createElement("i");
-    p.style.left = Math.random() * 100 + "%";
+    p.style.left = (40 + Math.random() * 460) + "px";
     p.style.background = cols[(Math.random() * cols.length) | 0];
-    p.style.animationDuration = (2.4 + Math.random() * 2.2) + "s";
+    p.style.animationDuration = (2.6 + Math.random() * 2.2) + "s";
     p.style.animationDelay = (-Math.random() * 3) + "s";
     box.appendChild(p);
   }
 }
 
+/** Punch of light where a star lands, plus a scatter of twinkles. */
+function starBurst(into, x, y) {
+  const fl = document.createElement("i");
+  fl.className = "flash"; fl.style.left = x + "px"; fl.style.top = y + "px";
+  into.appendChild(fl);
+  setTimeout(() => fl.remove(), 440);
+  for (let k = 0; k < 6; k++) {
+    const a = Math.random() * Math.PI * 2, d = 30 + Math.random() * 40;
+    const sp = document.createElement("i");
+    sp.className = "spark";
+    sp.style.left = x + "px"; sp.style.top = y + "px";
+    sp.style.setProperty("--sx", Math.cos(a) * d + "px");
+    sp.style.setProperty("--sy", Math.sin(a) * d + "px");
+    into.appendChild(sp);
+    setTimeout(() => sp.remove(), 520);
+  }
+}
+
+/* The prize on the end of the bar. The two seats are drawn from the atlas the
+   board draws them from - a milestone illustrated with a piece the player will
+   not recognise when it arrives is worse than no picture - and the two boosters
+   borrow the glyph off their own button, for the same reason. */
+function featIcon(id) {
+  if (id === "jump" || id === "time") {
+    const svg = $(id === "jump" ? "b-jump" : "b-time").querySelector("svg").cloneNode(true);
+    svg.removeAttribute("class");
+    return svg;
+  }
+  const f = META.frames[id === "twin" ? "s2_0_yellow" : "s1_0_grey"];
+  const c = document.createElement("canvas");
+  if (!f || !ready) return c;
+  c.width = f[2]; c.height = f[3];
+  c.getContext("2d").drawImage(atlas, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+  return c;
+}
+
+/** "You are this far from something new."
+
+    It animates from where the player was, not from zero and not straight to the
+    answer: a bar drawn at 63% is a fact, a bar that visibly moves from 56% to
+    63% is the reward for the level they just played, which is the only reason it
+    is on the card at all. When the last level crossed a milestone the previous
+    value belongs to a different piece, so it starts empty rather than jumping
+    backwards. */
+function featureBar(feat, cleared) {
+  const box = $("c-feat");
+  box.hidden = !feat;
+  if (!feat) return;
+  const before = featureProgress(cleared - 1);
+  const from = before && before.id === feat.id ? before.pct : 0;
+  const fill = $("c-feat-fill"), lab = $("c-feat-lab"), badge = $("c-feat-badge");
+  const TRACK = 294;                       // the 300 track, less its 3px inset each side
+  const paint = p => {
+    fill.classList.toggle("empty", p <= .001);
+    fill.style.width = Math.max(0, TRACK * p) + "px";
+  };
+  badge.classList.remove("hit");
+  badge.innerHTML = "";
+  badge.appendChild(featIcon(feat.id));
+  fill.style.transition = "none"; paint(from);
+  void fill.offsetWidth;                   // land the start before the move is armed
+  fill.style.transition = "";
+  const say = p => lab.textContent = Math.round(p * 100) + "% TO NEXT FEATURE";
+  say(from);
+
+  // ⚠ Generation-stamped, because the card can be built twice in a breath - the
+  // board finishes itself as the level loads, and a second finish lands on top -
+  // and two of these running at once take turns writing the same label. The
+  // loser used to be the one that got the last word, so a full bar stopped at
+  // "100% TO NEXT FEATURE" and never said what it had unlocked.
+  const gen = featureBar.gen = (featureBar.gen || 0) + 1;
+  clearTimeout(featureBar.t);
+  featureBar.t = setTimeout(() => {
+    if (featureBar.gen !== gen) return;
+    paint(feat.pct);
+    const t0 = performance.now();
+    (function step(now) {
+      if (featureBar.gen !== gen) return;
+      const t = Math.min(1, (now - t0) / 900);
+      say(from + (feat.pct - from) * (1 - Math.pow(1 - t, 3)));
+      if (t < 1) return requestAnimationFrame(step);
+      if (feat.pct < 1) return;
+      // Full. Say what it unlocked rather than leaving the player to read the icon.
+      lab.textContent = feat.label + " UNLOCKED!";
+      badge.classList.add("hit");
+    })(t0);
+  }, 700);
+}
+
+/** The card itself. `stars` at 0 is the losing face; `feat` is the bar, and
+    everything below the stars slides down by one number to make room for it. */
+function overlay(title, stars, coins, streak, sum, feat, cleared) {
+  const design = $("c-card");
+  design.style.setProperty("--dy", (feat ? 66 : 0) + "px");
+  design.style.setProperty("--dz", (stars && streak ? 34 : 0) + "px");
+  design.classList.toggle("lose", !stars);
+  $("c-title").textContent = title;
+  $("c-rays").hidden = !stars;
+  $("c-coins").hidden = !stars;
+  $("c-coins").lastElementChild.textContent = coins;
+  $("c-streak").hidden = !stars || !streak;
+  $("c-streak").textContent = streak;
+  $("c-sum").hidden = !!stars;
+  $("c-sum").innerHTML = sum;
+  $("c-next").textContent = stars ? "NEXT LEVEL" : "TRY AGAIN";
+
+  const box = $("c-stars");
+  box.innerHTML = "";
+  for (let i = 0; stars && i < 3; i++) {
+    const big = i === 1;
+    const x = 270 + (i - 1) * 84, y = big ? 486 : 500;
+    const s = document.createElement("div");
+    s.className = "star" + (big ? " big" : "");
+    s.style.left = x + "px";
+    s.innerHTML = i < stars ? STAR_ON : STAR_OFF;
+    box.appendChild(s);
+    // staggered, so three stars land one after another rather than all at once
+    setTimeout(() => {
+      s.classList.add("pop");
+      if (i < stars) setTimeout(() => starBurst(box, x, y), 300);
+    }, 200 + i * 180);
+  }
+  featureBar(stars ? feat : null, cleared);
+  confetti(!!stars);
+  cardEl.classList.add("on");
+}
+
 onFinish = function (won) {
+  if (won) { SFX.win(); buzz([18, 60, 18]); } else { SFX.lose(); buzz(90); }
   TUT = null; tutKey = ""; $("coach").hidden = true;   // the lesson is over either way
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;
@@ -410,48 +839,43 @@ onFinish = function (won) {
     if (hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
   }
   persist();
-  document.getElementById("c-card").classList.toggle("lose", !won);
-  document.getElementById("c-title").textContent = won ? "LEVEL CLEAR!" : "OUT OF TIME";
-  document.getElementById("c-rays").style.display = won ? "" : "none";
-  document.getElementById("c-coins").style.display = won ? "" : "none";
-  document.getElementById("c-coins").lastElementChild.textContent =
-    "+" + pay.total + (pay.bonus ? "  (streak +" + pay.bonus + ")" : "");
-  document.getElementById("c-sum").innerHTML = won
-    ? "Everyone seated with <b>" + fmt(S.left) + "</b> to spare, in <b>" + S.moves + "</b> seat move"
-      + (S.moves === 1 ? "." : "s.")
-      + (has("winstreak") && save.streak > 1 ? " <b>" + save.streak + "</b> in a row." : "")
-    : "The show started with <b>" + S.queue.length + "</b> still outside.";
-  document.getElementById("c-next").textContent = won ? "NEXT" : "RETRY";
-
-  const box = document.getElementById("c-stars");
-  box.innerHTML = "";
-  for (let i = 0; i < 3; i++) {
-    const s = document.createElement("div");
-    s.className = "star" + (i === 1 ? " big" : "");
-    s.innerHTML = i < stars ? STAR_ON.replace(/%I%/g, i) : STAR_OFF;
-    box.appendChild(s);
-    // staggered, so three stars land one after another rather than all at once
-    setTimeout(() => s.classList.add("pop"), 180 + i * 190);
-  }
-  confetti(won);
-  cardEl.classList.add("on");
+  // Asked for `lvl`, the level just cleared - the bar is the reward for this
+  // game, not for the one being handed over.
+  overlay(won ? "LEVEL COMPLETE!" : "OUT OF TIME", stars, "+" + pay.total,
+    has("winstreak") && pay.bonus ? save.streak + " IN A ROW · +" + pay.bonus + " BONUS" : "",
+    "The show started with <b>" + S.queue.length + "</b> still outside."
+      + "<span>" + (has("booster_time") ? "There is more time on the booster row, if the gold is there."
+                                        : "Clear the doorway first - the queue does the rest.") + "</span>",
+    featureProgress(lvl), lvl);
 };
 
 /* ---- wiring ------------------------------------------------------------ */
 document.getElementById("h-play").onclick = () => startLevel(save.unlocked);
+/* The lives are the one number on the home screen that changes on its own, so
+   the button that carries them is the one place that says when the next lands. */
+document.getElementById("h-hearts").onclick = () => {
+  const w = heartIn();
+  say(w ? hearts() + " of " + CF.heartMax + " lives - the next lands in " + fmt(w) + "."
+        : "Lives are full: " + CF.heartMax + " of " + CF.heartMax + ".");
+  show("home");
+};
 document.getElementById("h-levels").onclick = () => show("levels");
 document.getElementById("l-back").onclick = () => show("home");
 $("g-retry").onclick = () => startLevel(CUR);
-$("g-home").onclick = () => { hideCard(); show("home"); };
+// the menu button opens Settings; Home lives inside it, beside the switches
+/* The gear pauses the game and opens the card. It used to be a hamburger
+   wired straight to `show("home")`, so the one control on the HUD that was
+   not the clock took the player off the board in a single tap. */
+$("g-menu").onclick = openSettings;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
 document.getElementById("c-next").onclick = () =>
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
-addEventListener("resize", draw);
+addEventListener("resize", () => { fitDesign(); draw(); });
 
 let last = performance.now();
 function tick(now) {
   const dt = (now - last) / 1000; last = now;
-  if (S && S.phase === "play") {
+  if (S && S.phase === "play" && !PAUSED) {
     S.left -= dt;
     if (S.left <= 0) { S.left = 0; finish(false); }
     onHud();
@@ -459,7 +883,13 @@ function tick(now) {
   }
   requestAnimationFrame(tick);
 }
-CUR = Math.min(save.unlocked, CAMPAIGN.length);
-load(CAMPAIGN[CUR - 1]);   // a board exists from the start, behind the home screen
-show("home");
+fitDesign();
+const asked = parseInt(LINK.get("level"), 10);
+if (asked >= 1) {
+  startLevel(asked);       // straight onto the board named in the address
+} else {
+  CUR = Math.min(save.unlocked, CAMPAIGN.length);
+  load(CAMPAIGN[CUR - 1]); // a board exists from the start, behind the home screen
+  show("home");
+}
 requestAnimationFrame(tick);
