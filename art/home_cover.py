@@ -18,7 +18,7 @@ PNG it leaves behind is what the build inlines.
 """
 import math, os, time
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from toy3d import Cam, bake, colorize, contact_shadow, scale_parts, rotate_parts, xform
 from assets import guest_parts, seat_parts, PALETTE, CELL
 
@@ -105,27 +105,115 @@ def ground():
     return img
 
 
-t0 = time.time()
-cam = Cam(yaw=0.0, pitch=PITCH, scale=SCALE, ox=W / 2, oy=H * ROW_Y)
 
-# ⚠ The row is measured in cells, not pixels. A double seat is two cells wide by
-# definition, so writing the gaps in cells is the only way the middle piece stays
-# visibly twice the others if `CELL` ever moves.
-scene = (seat(1, "red", -2.45) + rider("red", -2.45)
-         + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("sky", CELL / 2)
-         + seat(1, "grey", 2.45))
+# ---- the lettering ---------------------------------------------------------
+# The name used to be HTML laid over this picture. Baked in, it is the same
+# drawing everywhere - the store covers are crops of this render, and a title
+# that lives in the DOM cannot come with them.
+TITLE = "Take a Seat"
+TAGLINE = "find everyone a seat"
+FONT = "Baloo2-ExtraBold.ttf"       # the same face the UI headings use
+TITLE_Y = 0.30                      # the band the row above was laid out to leave free
+SAFE = 0.70                         # ⚠ see below
 
-shadow = contact_shadow(scene, cam, W, H, blur=26, alpha=150)
-print("  shadow  %.1fs" % (time.time() - t0))
-lit = colorize(bake(scene, cam, W, H), (255, 255, 255))
-print("  pieces  %.1fs" % (time.time() - t0))
+LIVERY = (248, 191, 26)             # --livery
+LIVERY_DK = (217, 156, 20)          # --livery-dk
+TRIM_DK = (168, 50, 32)             # --trim-dk
 
-out = ground().convert("RGBA")
-out.alpha_composite(shadow)
-out.alpha_composite(lit)
-out = out.convert("RGB")
-out.save("home_cover.png", optimize=True)
-# No .b64 twin beside the atlas ones: `build.py` inlines this straight from the
-# PNG, and a second copy on disk is only a second thing to forget to regenerate.
-print("home_cover.png  %d x %d  %.0f KB  %.1fs"
-      % (W, H, os.path.getsize("home_cover.png") / 1024, time.time() - t0))
+
+def fitted(text, want_px, cap=260):
+    """Largest size at which `text` still fits `want_px` wide."""
+    lo, hi = 8, cap
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        f = ImageFont.truetype(FONT, mid)
+        lo, hi = (mid, hi) if f.getbbox(text)[2] - f.getbbox(text)[0] <= want_px else (lo, mid - 1)
+    return ImageFont.truetype(FONT, lo)
+
+
+def spaced(d, xy, text, font, fill, track):
+    """PIL has no letter-spacing, and the tagline is set at 0.22em in the CSS."""
+    x, y = xy
+    for ch in text:
+        d.text((x, y), ch, font=font, fill=fill)
+        x += d.textlength(ch, font=font) + track
+
+
+def lettering(img):
+    """Title and tagline, in the livery, with the CSS logo's own drop stack.
+
+    ⚠ Kept inside the same safe band as the row of seats. A 9:19.5 phone crops
+    this 2:3 render to x 15%..85%, so anything wider than 70% of the canvas
+    loses its ends on the one device the game is for. The size is fitted to the
+    measured width rather than written down, so a longer name shrinks instead of
+    running off the crop - which is what a hand-set size does silently.
+    """
+    d = ImageDraw.Draw(img)
+    f = fitted(TITLE, W * SAFE)
+    bb = f.getbbox(TITLE)
+    x = (W - (bb[2] - bb[0])) / 2 - bb[0]
+    y = H * TITLE_Y - (bb[3] - bb[1]) / 2 - bb[1]
+    s = f.size
+
+    # the soft cast first, on its own layer so the blur cannot eat the faces
+    soft = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(soft).text((x, y + s * 0.19), TITLE, font=f, fill=(0, 0, 0, 90))
+    img.alpha_composite(soft.filter(ImageFilter.GaussianBlur(s * 0.06)))
+
+    # then the two hard offsets under the face - the CSS logo's 0 3px / 0 7px
+    d.text((x, y + s * 0.115), TITLE, font=f, fill=TRIM_DK)
+    d.text((x, y + s * 0.050), TITLE, font=f, fill=LIVERY_DK)
+    d.text((x, y), TITLE, font=f, fill=LIVERY)
+
+    # the tagline, tracked out the way the CSS tracks it
+    tf = ImageFont.truetype(FONT, int(s * 0.205))
+    track = tf.size * 0.20
+    wide = sum(d.textlength(c, font=tf) for c in TAGLINE) + track * (len(TAGLINE) - 1)
+    # ⚠ `y + bb[3]`, not `y + (bb[3] - bb[1])`. `y` is already the draw origin,
+    # which sits bb[1] above the ink; subtracting bb[1] again lifted the tagline
+    # by the ascent and printed it through the middle of the title.
+    ty = y + bb[3] + s * 0.10
+    spaced(d, ((W - wide) / 2, ty + 2), TAGLINE, tf, (0, 0, 0, 110), track)
+    spaced(d, ((W - wide) / 2, ty), TAGLINE, tf, (255, 255, 255, 255), track)
+    return img
+
+
+def render(w, h, scale, row_y, title_y, safe, gap=2.45):
+    """One cover, at whatever shape is asked for.
+
+    The store wants 1920x1080, 800x1200 and 800x800 and the home screen wants
+    2:3. Re-rendering the same scene into each is what keeps them one picture in
+    three frames rather than three drawings that drift apart; a crop could not
+    do it, because a 16:9 crop of a 2:3 render loses the row or the title.
+
+    ⚠ The module constants really are rebound here. Every painter below reads
+    W/H/SCALE/ROW_Y/TITLE_Y/SAFE as globals, and threading six arguments through
+    all of them to render one more size would be the larger change for no gain.
+    Nothing calls two sizes at once."""
+    global W, H, SCALE, ROW_Y, TITLE_Y, SAFE
+    W, H, SCALE, ROW_Y, TITLE_Y, SAFE = w, h, scale, row_y, title_y, safe
+
+    t0 = time.time()
+    cam = Cam(yaw=0.0, pitch=PITCH, scale=SCALE, ox=W / 2, oy=H * ROW_Y)
+
+    # ⚠ The row is measured in cells, not pixels. A double seat is two cells wide
+    # by definition, so writing the gaps in cells is the only way the middle
+    # piece stays visibly twice the others if `CELL` ever moves.
+    scene = (seat(1, "red", -gap) + rider("red", -gap)
+             + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("sky", CELL / 2)
+             + seat(1, "grey", gap))
+
+    shadow = contact_shadow(scene, cam, W, H, blur=26, alpha=150)
+    lit = colorize(bake(scene, cam, W, H), (255, 255, 255))
+    out = ground().convert("RGBA")
+    out.alpha_composite(shadow)
+    out.alpha_composite(lit)
+    print("    %d x %d  %.1fs" % (W, H, time.time() - t0))
+    return lettering(out).convert("RGB")
+
+
+if __name__ == "__main__":
+    # No .b64 twin beside the atlas ones: build.py inlines this straight from the
+    # PNG, and a second copy on disk is only a second thing to forget to redo.
+    render(1080, 1620, 112, ROW_Y, TITLE_Y, SAFE).save("home_cover.png", optimize=True)
+    print("home_cover.png  %.0f KB" % (os.path.getsize("home_cover.png") / 1024))

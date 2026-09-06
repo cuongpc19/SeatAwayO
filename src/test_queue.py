@@ -47,18 +47,32 @@ with sync_playwright() as pw:
     print("frames sampled        :", len(samp), "of which the line is moving in", len(moving))
     assert moving, "the line never moved: qstep was empty the whole time"
 
-    # 1. Nobody teleports. A place is QUEUE_PITCH; a frame at 60Hz is a fraction
-    #    of a step, so the biggest single-frame move must be well under a place.
+    # 1. Nobody teleports.
+    # ⚠ Measured as a SPEED, not as a distance per frame. A per-frame bound is a
+    # bound on the frame rate as much as on the game: the same correct shuffle
+    # trips it on a 24ms frame and passes on a 16ms one, and it has to be retuned
+    # by hand every time the walking pace moves. What "nobody teleports" actually
+    # means is that the line never travels faster than the one place per
+    # QUEUE_STEP_MS it is walking at, and that is what is checked here - with
+    # room for the ease at the start and end of a step.
     worst, at = 0.0, None
     for a, b in zip(moving, moving[1:]):
         if not a[1] or not b[1] or a[2] != b[2]:
             continue                       # a shift re-indexes the line; not a move
+        dt = b[0] - a[0]
+        if dt <= 0:
+            continue
         for i in range(min(len(a[1]), len(b[1]))):
-            d = abs(a[1][i] - b[1][i])
-            if d > worst: worst, at = d, (round(b[0] - a[0], 1), i)
-    print("biggest move in a frame: %.4f places  (%s ms, place %s)"
-          % (worst, at[0] if at else "-", at[1] if at else "-"))
-    assert worst < 0.12, "someone jumped %.3f of a place in one frame" % worst
+            rate = abs(a[1][i] - b[1][i]) / dt * 1000       # places per second
+            if rate > worst: worst, at = rate, (round(dt, 1), i)
+    step_ms = pg.evaluate("QUEUE_STEP_MS")
+    nominal = 1000 / step_ms
+    print("fastest the line moves : %.2f places/sec  (walking pace is %.2f, one place per %.0f ms)"
+          % (worst, nominal, step_ms))
+    print("                         seen on a %s ms frame, place %s"
+          % (at[0] if at else "-", at[1] if at else "-"))
+    assert worst < nominal * 1.6, (
+        "the line moved at %.2f places/sec against a walking pace of %.2f" % (worst, nominal))
 
     # 2. They start one after another, not all together.
     first = moving[0][1]

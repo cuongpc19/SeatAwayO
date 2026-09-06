@@ -25,12 +25,51 @@ def drag(pg, seat_id, to):
     pg.mouse.move(*p["from"]); pg.mouse.down()
     pg.mouse.move(p["to"][0], p["to"][1], steps=12); pg.mouse.up()
 
-SETTLED = "() => !S || S.phase !== 'play' || (!S.anim.length && !S.boarding)"
+SIG = "() => S ? [S.phase, S.seated, S.queue.length, S.anim.length, S.boarding].join() : 'x'"
 
-def settle(pg):
-    """Wait for the board to stop moving - a coach mark never shows mid-walk."""
-    pg.wait_for_function(SETTLED, timeout=15000)
-    pg.wait_for_timeout(250)
+
+def settle(pg, quiet_ms=1500, floor_ms=2600, cap_ms=20000):
+    """Wait for the board to stop moving.
+
+    ⚠ Two traps, both of which read exactly like "the coach mark never appeared".
+
+    `!anim.length && !boarding` is true at the instant a level loads, before
+    autoBoard has launched anybody - so on its own it returns immediately and
+    every reading after it is of a board that has not started.
+
+    And the board opens on a still beat of nearly two seconds before the first
+    passenger moves. A short run of identical samples falls entirely inside it.
+    So: nothing may change for `quiet_ms`, and not before `floor_ms` has passed
+    at all."""
+    last, quiet, waited = None, 0, 0
+    step = 200
+    while waited < cap_ms:
+        pg.wait_for_timeout(step)
+        waited += step
+        now = pg.evaluate(SIG)
+        quiet = quiet + step if now == last else 0
+        last = now
+        if (waited >= floor_ms and quiet >= quiet_ms
+                and pg.evaluate("() => !S || (!S.anim.length && !S.boarding)")):
+            return
+    raise AssertionError("board never settled, last state " + str(last))
+
+
+def open_board(pg, lvl):
+    """Get onto the board, past anything in front of it.
+
+    ⚠ startLevel does not always open a board: the first level to carry a new
+    feature stops on an intro card, and the board is behind it. Without this the
+    reading is of a board that never opened - which reads exactly like a coach
+    mark that never appeared."""
+    pg.evaluate("n => startLevel(n)", lvl)
+    for _ in range(4):
+        pg.wait_for_timeout(250)
+        if not pg.locator("#intro").is_visible():
+            return
+        pg.click("#intro-ok")
+    raise AssertionError("intro card would not close on level %d" % lvl)
+
 
 def report(tag, s):
     print("  %-22s coach=%s  %r / %r" % (tag, s["shown"], s["title"], s["text"][:58] + "..."))
@@ -43,12 +82,12 @@ with sync_playwright() as pw:
     errs = []
     pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
-    pg.goto(url); pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.goto(url); pg.wait_for_function("typeof BOOTED !== 'undefined' && BOOTED", timeout=20000)
     pg.evaluate("save.unlocked = 2; persist()")
 
     for lvl in (1, 2):
         print("=== level %d ===" % lvl)
-        pg.evaluate("n => startLevel(n)", lvl)
+        open_board(pg, lvl)
         settle(pg)                            # let whoever can board, board
         # follow the coaching for as long as it keeps pointing: a board is only
         # really taught if doing what it says all the way through wins it

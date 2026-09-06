@@ -7,7 +7,7 @@ with sync_playwright() as pw:
     br = pw.chromium.launch(); pg = br.new_page(viewport={"width": 1440, "height": 900})
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
-    pg.goto(url); pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.goto(url); pg.wait_for_function("typeof BOOTED !== 'undefined' && BOOTED", timeout=20000)
 
     print("config read from the APK:", pg.evaluate("({gold: CF.goldWin, hearts: CF.heartMax, "
           "heartMins: CF.heartSecs/60, jump: CF.boosterJump.price, time: CF.boosterTime.price})"))

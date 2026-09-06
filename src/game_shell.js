@@ -60,13 +60,19 @@ const unlockedAt = f => { const n = CF.unlock[f]; return n > 0 ? n : Infinity; }
 const has = f => save.unlocked >= unlockedAt(f);
 
 /* ---- saved progress ---------------------------------------------------- */
-const SAVE_KEY = "seataway.save.v2";
+/* ⚠ This name is fixed from launch on. CrazyGames' Progress Save backs up
+   localStorage verbatim, so renaming the key later restores the old name into a
+   game that reads the new one and every player loses everything. Marble Sort
+   moved `ms_` to `bf_` before anyone had played, which is the only time it is
+   free; this rename off `seataway.save.v2` is the same window, spent now. */
+const SAVE_KEY = "takeaseat.save.v1";
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
   seenBoosters: [],                // which unlock notices have been shown
   streak: 0,                       // wins in a row
   hearts: CF.heartMax, heartAt: 0, // heartAt: when the next one lands, ms epoch
   jumps: 0,                        // jump booster charges bought
+  freeTime: 0,                     // free goes at the time booster, from its tutorial
   sound: true, vibe: true,         // the two switches in Settings
 });
 /* ---- deep links --------------------------------------------------------
@@ -80,19 +86,25 @@ const blank = () => ({
    dropped from the address bar once used, or every later refresh would throw
    away the progress made since. */
 const LINK = new URLSearchParams(location.search);
-if (LINK.has("reset")) {
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+const RESET_ASKED = LINK.has("reset");
+if (RESET_ASKED) {
   LINK.delete("reset");
   const rest = LINK.toString();
   history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
 }
 
+/* ⚠ The read is deferred to boot(), after PLATFORM.init() has resolved. On a
+   host that keeps a cloud save, reading before init returns the local copy and
+   the next write pushes that stale copy over the player's real save. Until then
+   this is the blank save, which nothing writes because nothing can be pressed
+   while the home screen has not been shown. */
 let save = blank();
-try { save = Object.assign(blank(), JSON.parse(localStorage.getItem(SAVE_KEY) || "{}")); }
-catch (e) { /* private window, cleared data, a browser that refuses storage */ }
-function persist() {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+function loadSave() {
+  if (RESET_ASKED) { PLATFORM.storage.removeItem(SAVE_KEY); return; }
+  try { save = Object.assign(blank(), JSON.parse(PLATFORM.storage.getItem(SAVE_KEY) || "{}")); }
+  catch (e) { /* private window, cleared data, a browser that refuses storage */ }
 }
+function persist() { PLATFORM.storage.setItem(SAVE_KEY, JSON.stringify(save)); }
 const totalStars = () => Object.values(save.stars).reduce((a, v) => a + v, 0);
 
 /* Hearts refill on the clock whether the page is open or not, so the count is
@@ -270,7 +282,7 @@ let CUR = 1;                       // the level number the player sees
    level nobody found hard. Ported whole; only the list of things being counted
    down to is this game's.
 
-   Seat Away introduces four: two boosters, and two seats. The seats are read
+   Take a Seat introduces four: two boosters, and two seats. The seats are read
    off the boards rather than written down, because the ladder moves - it has
    already been renumbered once - and a hand-written "level 7 -> grey seat" table
    is a second copy of it that goes stale silently. The boosters cannot be found
@@ -327,6 +339,7 @@ function featureProgress(cleared) {
 }
 
 function startLevel(n) {
+  PLATFORM.gameplayStart();
   if (hearts() <= 0) {
     show("home");
     say("Out of lives - one comes back every " + Math.round(CF.heartSecs / 60) + " minutes.");
@@ -335,14 +348,15 @@ function startLevel(n) {
   JUMP = false;
   closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
-  // anything this board is the first to carry gets explained before it opens
-  const owed = introDue(CUR);
-  if (owed) { hideCard(); showIntro(owed, openBoard); return; }
   openBoard();
+  // and then, over the board it is talking about, anything new on it
+  const owed = introDue(CUR);
+  if (owed) showIntro(owed);
 }
 
 /** The board itself, once there is nothing left to explain. */
 function openBoard() {
+  INTRO_MARK = null;             // a ring left over from the last board means nothing here
   hideCard();
   show("play");
   applyTheme(CUR);                 // before load(), so the first frame is right
@@ -398,9 +412,9 @@ function boosterUi() {
   const t = $("b-time"), j = $("b-jump");
   const tOpen = lockChip(t, "b-time-cost", "booster_time");
   const jOpen = lockChip(j, "b-jump-cost", "booster_jump");
-  if (tOpen) $("b-time-cost").textContent = CF.boosterTime.price;
+  if (tOpen) $("b-time-cost").textContent = save.freeTime > 0 ? "FREE" : CF.boosterTime.price;
   if (jOpen) $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + "x" : CF.boosterJump.price;
-  t.classList.toggle("broke", tOpen && save.coins < CF.boosterTime.price);
+  t.classList.toggle("broke", tOpen && !save.freeTime && save.coins < CF.boosterTime.price);
   j.classList.toggle("broke", jOpen && save.jumps === 0 && save.coins < CF.boosterJump.price);
   j.classList.toggle("armed", JUMP);
 }
@@ -416,8 +430,10 @@ function lockedSay(feat, what) {
 $("b-time").onclick = () => {
   if (!S || S.phase !== "play") return;
   if (!has("booster_time")) return lockedSay("booster_time", "Extra time");
-  if (save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
-  save.coins -= CF.boosterTime.price;
+  const freeT = save.freeTime > 0;
+  if (!freeT && save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
+  if (freeT) save.freeTime--; else save.coins -= CF.boosterTime.price;
+  $("b-time").classList.remove("hint");        // the tutorial ring is spent with it
   SFX.buy(); buzz(14);
   S.left += CF.boosterTime.value;
   S.time = Math.max(S.time, S.left);          // keep the bar honest
@@ -428,6 +444,7 @@ $("b-jump").onclick = () => {
   if (!S || S.phase !== "play") return;
   if (!has("booster_jump")) return lockedSay("booster_jump", "Jump");
   if (JUMP) { JUMP = false; say("Jump cancelled."); onHud(); draw(); return; }
+  $("b-jump").classList.remove("hint");        // the tutorial ring is spent with it
   if (save.jumps === 0) {
     if (save.coins < CF.boosterJump.price) return say("Not enough gold for a jump.");
     save.coins -= CF.boosterJump.price;
@@ -451,49 +468,103 @@ onSeatMoved = () => {
 
 /* ---- introducing a feature ---------------------------------------------
    One card, once, the first time the player reaches the level that carries the
-   thing. The levels come from FEATURES above rather than from a second list
-   here: that ladder already works out where each piece arrives, and a hand
-   written copy of it would go stale the moment the ladder moved - which is the
-   very thing the comment up there warns about.
+   thing. The levels come from the FEATURES ladder above rather than from a
+   second list here: that ladder already works out where each piece arrives, and
+   a written-down copy of it goes stale the moment the ladder moves.
 
-   The card is shown BEFORE the board loads, so there is no clock running behind
-   it and no queue boarding unseen while it is being read. */
+   The card is shown OVER the live board, not in front of it. A piece explained
+   on a blank screen is a paragraph to skim; explained with the board behind it
+   and the thing itself ringed, it is a pointer. The clock is held while it is
+   up, so nothing is lost to reading it.
+
+   A booster cannot be pointed at and then charged for - the player would have to
+   buy the tutorial. Each booster hands over one free go, and the ring on the
+   button stays until they spend it. */
 const INTRO_TEXT = {
-  grey: "Grey seats never move, whatever you drag. In exchange they take a "
-      + "passenger of any colour - so work the other seats around them.",
-  jump: "Jump lifts a seat straight over everything else instead of sliding it. "
-      + "Tap it, then drag any seat wherever you want it.",
-  twin: "A double seats two passengers, both of its own colour, and it needs two "
-      + "free cells to slide into.",
-  time: "This one buys more seconds on the clock. Tap it whenever time gets tight.",
+  grey: ["GOT IT",
+    "Grey seats never move, whatever you drag. In exchange they take a passenger "
+    + "of any colour - so work the other seats around them."],
+  twin: ["GOT IT",
+    "A double seats two passengers, both of its own colour, and it needs two free "
+    + "cells to slide into."],
+  jump: ["TRY IT",
+    "Jump lifts a seat straight over everything else instead of sliding it. "
+    + "Here is one on the house - tap it, then drag any seat where you want it."],
+  time: ["TRY IT",
+    "This one puts more seconds on the clock. Here is one on the house - tap it "
+    + "whenever time gets tight."],
 };
+const INTRO_BOOSTER = { jump: "b-jump", time: "b-time" };
 
 /** The introduction owed on this level, or null. `at <= n` rather than `at === n`
-    so that a player who jumps ahead from the level picker still gets it. */
+    so a player who jumps ahead from the level picker still gets it. */
 function introDue(n) {
   for (const f of featureLevels())
     if (f.at <= n && INTRO_TEXT[f.id] && !save.seenBoosters.includes(f.id)) return f;
   return null;
 }
 
-let introThen = null;                  // what to do once the card is dismissed
-function showIntro(f, then) {
-  $("intro-title").textContent = f.label;
-  $("intro-text").textContent = INTRO_TEXT[f.id];
-  save.seenBoosters.push(f.id); persist();
-  introThen = then;
-  // Normally the outgoing board has been won and its clock is already stopped,
-  // but jumping straight out of a live board from the level picker leaves one
-  // running, and it would time out behind the card.
-  PAUSED = true;
-  $("intro").classList.add("on");
+let INTRO = null;                      // the feature being introduced, while it is up
+/* The card sits in the middle of the screen and the seats it is describing are
+   under it as often as not, so the ring outlives the card by a few seconds:
+   dismiss it, and the board underneath is still marked. A booster needs no such
+   thing - its ring is on a button beside the card, and it stays until spent. */
+let INTRO_MARK = null;                 // { id, until } - seats still worth ringing
+
+/** The free go that makes "tap it" an offer rather than a price tag. */
+function giveFreeGo(id) {
+  if (id === "jump") save.jumps = Math.max(save.jumps, 1);
+  if (id === "time") save.freeTime = Math.max(save.freeTime, 1);
+  persist();
 }
+
+function showIntro(f) {
+  const [button, text] = INTRO_TEXT[f.id];
+  $("intro-title").textContent = f.label;
+  $("intro-text").textContent = text;
+  $("intro-ok").textContent = button;
+  save.seenBoosters.push(f.id); persist();
+  INTRO = f;
+  const bid = INTRO_BOOSTER[f.id];
+  if (bid) {
+    giveFreeGo(f.id);
+    $("boosters").classList.add("spotlight");
+    $(bid).classList.add("hint");      // stays on after the card, until it is used
+  }
+  setPaused(true);
+  $("intro").classList.add("on");
+  onHud(); introFrame();
+}
+
+/** The ring around a seat is painted on the canvas, in the room's own
+    projection, and the canvas only redraws when something asks it to. */
+function introFrame() {
+  const marking = INTRO_MARK && performance.now() < INTRO_MARK.until;
+  if (!INTRO && !marking) { if (INTRO_MARK) { INTRO_MARK = null; draw(); } return; }
+  if (marking || (INTRO && !INTRO_BOOSTER[INTRO.id])) draw();
+  requestAnimationFrame(introFrame);
+}
+
+const MARK_MS = 3000;                  // how long a seat stays ringed after the card
 $("intro-ok").onclick = () => {
   $("intro").classList.remove("on");
-  PAUSED = false;
-  const then = introThen; introThen = null;
-  if (then) then();
+  $("boosters").classList.remove("spotlight");
+  if (INTRO && !INTRO_BOOSTER[INTRO.id])
+    INTRO_MARK = { id: INTRO.id, until: performance.now() + MARK_MS };
+  INTRO = null;
+  setPaused(false);
+  introFrame(); draw();
 };
+
+/** Which seats on this board the card is talking about. */
+function introSeats() {
+  const id = INTRO ? INTRO.id
+           : (INTRO_MARK && performance.now() < INTRO_MARK.until) ? INTRO_MARK.id : null;
+  if (!id || !S) return [];
+  if (id === "grey") return S.seats.filter(b => b.colour === 0);
+  if (id === "twin") return S.seats.filter(b => b.len > 1);
+  return [];
+}
 
 /* ---- the tutorial, on the first two boards -----------------------------
    These two levels carry the one rule that is not guessable: you never tap a
@@ -531,13 +602,26 @@ function tutorStep() {
     const home = [b.c, b.r];
     for (const [c, r] of placements(S, b)) {
       place(S, b, c, r);
-      // Only a move that both frees the doorway and leaves the front of the
-      // queue a seat it can walk to counts; among those, take the one that
-      // opens the most floor, which is the one that keeps the board going.
-      const gain = isFree(S, S.W - 1, S.door) && pickSeat(S, S.queue[0])
-        ? reachRegion(S).reduce((a, v) => a + v, 0) : 0;
+      // ⚠ `pickSeat` on its own, with no "and the doorway is clear" in front of
+      // it. That test read as a safety check and was really a veto on the
+      // shortest move there is - sliding a seat onto the door cell itself, which
+      // the queue boards by stepping straight into it off the stop. On level 2
+      // that move IS the solution: the corner seat, down one. The coach mark
+      // could not point at it, and pointed two cells away instead. `pickSeat` is
+      // the question `autoBoard` asks before it launches anybody, so it is the
+      // honest one to ask here too.
+      const ok = !!pickSeat(S, S.queue[0]);
+      const open = ok ? reachRegion(S).reduce((a, v) => a + v, 0) : 0;
       place(S, b, home[0], home[1]);                       // and straight back
-      if (gain > (best ? best.gain : 0)) best = { seat: b, to: [c, r], gain };
+      if (!ok) continue;
+      // ⚠ The shortest drag, not the one that opens the most floor. Opening the
+      // most floor is a good move and a bad lesson: it sends the finger the
+      // length of the board when the next cell would have done, and what these
+      // two levels teach is the gesture, not the tactic. Floor opened stays as
+      // the tie-break, so the roomiest of the equally short moves still wins.
+      const steps = Math.abs(c - home[0]) + Math.abs(r - home[1]);
+      if (!best || steps < best.steps || (steps === best.steps && open > best.open))
+        best = { seat: b, to: [c, r], steps, open };
     }
   }
   if (!best) return null;
@@ -612,6 +696,26 @@ function drawHand(x, y, s) {
    right tile at every window size. The engine hands the overlay the last word
    on the frame; everything here is painted over the finished room. */
 onOverlay = () => {
+  if (LAY && introSeats().length) {
+    // the same ring the coach mark uses to say "this one", around every seat on
+    // the board that is an example of what the card just described
+    const t = performance.now() / 1000, pulse = .5 + .5 * Math.sin(t * 3.6);
+    ctx.save();
+    ctx.strokeStyle = "#ffd75e"; ctx.lineWidth = Math.max(2, LAY.s * .06);
+    ctx.globalAlpha = .55 + .4 * pulse;
+    for (const b of introSeats()) {
+      // the mean of the cells, not the middle one: on a two-cell seat there is
+      // no middle cell and the ring lands over its right-hand half
+      const cs = cellsOf(b);
+      const mc = cs.reduce((a, [c]) => a + c, 0) / cs.length;
+      const mr = cs.reduce((a, [, r]) => a + r, 0) / cs.length;
+      const A = P(cellW(mc), .02, cellZ(mr));
+      const rx = SX * (.46 + .06 * pulse) * (b.len > 1 ? b.len * .72 : 1) * LAY.s;
+      ctx.beginPath(); ctx.ellipse(A[0], A[1], rx, SX * .42 * LAY.s, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   if (!TUT || !LAY) return;
   const b = TUT.seat, [tc, tr] = TUT.to;
   const t = performance.now() / 1000, pulse = .5 + .5 * Math.sin(t * 3.6);
@@ -664,7 +768,10 @@ onOverlay = () => {
    will not let one start before the player has touched something. */
 let AC = null;
 function blip(freq, dur, type, peak, delay) {
-  if (!save.sound) return;
+  // ⚠ The host's mute wins. The in-game switch must not be able to bring audio
+  // back over a page the player silenced - which is what the submission form's
+  // "supports CrazyGames muting" box is a promise about.
+  if (!save.sound || PLATFORM.hostMuted()) return;
   try {
     AC = AC || new (window.AudioContext || window.webkitAudioContext)();
     if (AC.state === "suspended") AC.resume();
@@ -719,13 +826,23 @@ function syncToggles() {
     those are the engine's own timers and stopping them mid-stride would need the
     walk to be resumable, which is a much bigger change than the fault warrants. */
 let PAUSED = false;
+
+/** ⚠ The single place the host is told whether play is live. Marble Sort's note
+    is that emitting from each call site guarantees missing one, and the one you
+    miss is where an ad lands in the middle of a turn. Everything that pauses
+    goes through here. */
+function setPaused(v) {
+  if (v === PAUSED) return;
+  PAUSED = v;
+  if (v) PLATFORM.gameplayStop(); else PLATFORM.gameplayStart();
+}
 function openSettings() {
   if (!S || S.phase !== "play" || cardEl.classList.contains("on")) return;
-  PAUSED = true;
+  setPaused(true);
   syncToggles();
   setEl.classList.add("on");
 }
-function closeSettings() { PAUSED = false; setEl.classList.remove("on"); }
+function closeSettings() { setPaused(false); setEl.classList.remove("on"); }
 
 /** Turning a switch on demonstrates itself - a sound cue for sound, a buzz for
     vibration - which is the only way a player can tell the switch did anything
@@ -931,6 +1048,8 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
 onFinish = function (won) {
   if (won) { SFX.win(); buzz([18, 60, 18]); } else { SFX.lose(); buzz(90); }
   TUT = null; tutKey = ""; $("coach").hidden = true;   // the lesson is over either way
+  PLATFORM.gameplayStop();                             // a card is up: an ad may land here
+  if (won) PLATFORM.happytime();
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;
   const pay = purse();
@@ -992,12 +1111,33 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 fitDesign();
-const asked = parseInt(LINK.get("level"), 10);
-if (asked >= 1) {
-  startLevel(asked);       // straight onto the board named in the address
-} else {
-  CUR = Math.min(save.unlocked, CAMPAIGN.length);
-  load(CAMPAIGN[CUR - 1]); // a board exists from the start, behind the home screen
-  show("home");
-}
 requestAnimationFrame(tick);
+
+/* ⚠ Nothing the player can press exists until the host has answered. The save is
+   read here and not at module scope because on a host with a cloud save an early
+   read hands back the local copy, and the first write after it would push that
+   stale copy over their real progress. init() cannot hang - it owns a timeout
+   and resolves either way - so this is a wait with a ceiling, not a gamble. */
+/** ⚠ Anything that drives the game from outside - a test, a screenshot script -
+    has to wait for this, not just for `ready`. `ready` only means the atlases
+    decoded; boot is still going to read the save and pick a screen after it, and
+    a startLevel() called in between is undone by the show("home") that follows. */
+let BOOTED = false;
+
+(async function boot() {
+  PLATFORM.loadingStart();
+  await PLATFORM.init();
+  loadSave();
+  PLATFORM.onHostMuteChange(() => syncToggles());
+  PLATFORM.loadingStop();
+
+  const asked = parseInt(LINK.get("level"), 10);
+  if (asked >= 1) {
+    startLevel(asked);       // straight onto the board named in the address
+  } else {
+    CUR = Math.min(save.unlocked, CAMPAIGN.length);
+    load(CAMPAIGN[CUR - 1]); // a board exists from the start, behind the home screen
+    show("home");
+  }
+  BOOTED = true;
+})();

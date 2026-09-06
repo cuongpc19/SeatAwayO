@@ -9,7 +9,7 @@ with sync_playwright() as pw:
     errs = []
     pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
-    pg.goto(url); pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.goto(url); pg.wait_for_function("typeof BOOTED !== 'undefined' && BOOTED", timeout=20000)
 
     print("home visible          :", pg.locator("#home").is_visible())
     pg.click("#h-play"); pg.wait_for_timeout(600)
@@ -53,7 +53,7 @@ with sync_playwright() as pw:
     print("  purse               :", " ".join(pg.locator("#c-coins").inner_text().split()),
           "| summary hidden:", pg.evaluate("$('c-sum').hidden"))
     print("  confetti pieces     :", pg.evaluate("document.querySelectorAll('#c-confetti i').length"))
-    sv = pg.evaluate("JSON.parse(localStorage.getItem('seataway.save.v2'))")
+    sv = pg.evaluate("JSON.parse(localStorage.getItem('takeaseat.save.v1'))")
     print("  saved               :", json.dumps(sv))
 
     pg.click("#c-next"); pg.wait_for_timeout(500)

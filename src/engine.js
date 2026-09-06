@@ -40,21 +40,31 @@ let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
 let GUIDES = false;        // the coaching overlays - none of these are in the real game
 let SPEED = 1;             // 1 = normal, 2 = double
 const OPEN_MS = 2000;      // the pause between a board appearing and the queue starting
-/* Walking pace. These three move together: taking one without the others gives
-   a passenger who strides across the floor and then dawdles onto the seat, or a
-   short walk that ignores the change entirely because it lands on the floor.
+/* Walking pace. 260, 300 and 520 are the numbers measured off the recording, and
+   each constant is that measurement divided by how much quicker the game runs -
+   always recomputed from the original rather than from the last value, or the
+   rounding creeps further off with every pass.
 
-   260, 300 and 520 are the numbers measured off the recording. The game runs
-   quicker than the recording by 1.15 x 1.20 x 1.20 = 1.656, and each is that
-   measurement divided by 1.656 - always recomputed from the original rather than
-   from the last value, or the rounding creeps further off with every pass.
+   ⚠ The floor and the hop no longer share a divisor, and that is deliberate. The
+   walk is at 1.15 x 1.20 x 1.20 x 1.10 = 1.8216; the hop is one notch back down
+   the same ladder, at 1.38, so it is a fifth slower than the pace that carried
+   the passenger to the seat. Speeding the two together is what made the landing
+   read as a twitch: crossing the floor is travel and can be brisk, but the jump
+   onto the seat is the beat the whole walk was for, and it is the only moment
+   the eye is actually asked to follow.
+
+   The two still have to be moved as a pair even so - taking the floor without
+   the hop gives a passenger who strides across the room and then dawdles onto
+   the seat, which is the same fault in the other direction.
+
+   MIN_WALK_MS keeps the floor's divisor: it is a walk, just a short one.
 
    The walk cycle needs nothing here: `a.phase` counts STRIDE off the distance
    covered, so the legs step faster on their own and stay in step with the floor
    rather than skating over it. */
-const BASE_MS_PER_UNIT = 157;                       // ms per grid unit walked
-const MIN_WALK_MS = 314;                            // a walk is never snappier than this
-const HOP_MS = 181;                                 // the little jump onto the seat
+const BASE_MS_PER_UNIT = 143;                       // ms per grid unit walked
+const MIN_WALK_MS = 285;                            // a walk is never snappier than this
+const HOP_MS = 217;                                 // the little jump onto the seat
 
 const BASE_GAP_MS = 260;                            // pause between passengers - waiting, not walking
 const STRIDE = 0.52;                                // world units per animation frame

@@ -1,11 +1,16 @@
-"""Build both pages from one engine.
+"""Build every page from one engine.
 
   ../level_player.html   the editor / study tool: every board, door controls,
                          guides, the gesture recorder
   ../game.html           the real game: one board at a time, saved progress,
                          a full room around the grid, a proper win card
+  ../dist/index.html     the same game with the CrazyGames host door built in,
+                         ready to drag into their upload box
+
+    python build.py            editor + game
+    python build.py crazy      the upload bundle, and the checks that go with it
 """
-import json, pathlib, sys, time
+import json, pathlib, re, sys, time
 
 ART = pathlib.Path("../art")
 DATA = open("data_slots.js", encoding="utf-8").read()
@@ -95,19 +100,75 @@ def live_config():
     return json.dumps(out, separators=(",", ":"))
 
 
-def build(head_file, shell_file, out):
+def build(head_file, shell_file, out, host="none"):
+    """One page.
+
+    `host` picks which platform door is compiled in, and it is a build-time
+    choice rather than a runtime branch: CrazyGames bans third-party ad SDKs
+    outright, so a build for one store must not be able to carry another's. See
+    platform_base.js. The editor has no shell that talks to a host at all."""
     head = open(head_file, encoding="utf-8").read()
     shell = open(shell_file, encoding="utf-8").read()
-    page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + shell + "\n</script>\n"
+    plat = ""
+    if shell_file == "game_shell.js":
+        plat = (open("platform_base.js", encoding="utf-8").read() + "\n"
+                + open("platform_%s.js" % host, encoding="utf-8").read() + "\n")
+    page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + plat + shell + "\n</script>\n"
     page = (fill(page).replace("/*__MOVIE__*/", movie_uri())
                       .replace("/*__COVER__*/", cover_uri())
                       .replace("/*__BUILT__*/", time.strftime("%Y-%m-%d"))
                       .replace("/*__CONFIG__*/", live_config()))
+    pathlib.Path(out).parent.mkdir(parents=True, exist_ok=True)
     open(out, "w", encoding="utf-8").write(page)
     print("%-24s %6.0f KB" % (out, len(page) / 1024))
+    return page
+
+
+# What a reviewer must never be handed, and what the bundle must never lack.
+DEV_TOOLS = {"the JSON export panel": 'id="exp-json"',
+             "the editor title": "Level Player",
+             "the gesture trace panel": 'id="trace"'}
+
+
+def check_crazy(page, out):
+    """The limits a checklist would otherwise be trusted to remember. All cheap
+    here and all expensive at the upload screen - and the dev-tool one is not a
+    retry, it is a failed review."""
+    size = len(page.encode("utf-8"))
+    # Absolute paths break inside the host's iframe. Everything is inlined into
+    # this one file, so any of these is a slip rather than a dependency.
+    absolute = re.findall(r'(?:src|href)="/[^"]*"', page)
+    strays = [n for n, needle in DEV_TOOLS.items() if needle in page]
+    # Their SDK is fetched by URL at runtime and must not be bundled, so what is
+    # checked is that the code which fetches it made it in.
+    sdk = "sdk.crazygames.com" in page
+
+    rows = [(size <= 20 * 1024 * 1024, "under 20 MB - keeps the mobile front page",
+             "%.2f MB, over the 20 MB limit" % (size / 1048576)),
+            (not absolute, "relative paths only",
+             "absolute paths: " + " ".join(absolute[:4])),
+            (sdk, "CrazyGames SDK wired", "no CrazyGames SDK in the bundle"),
+            (not strays, "no dev tools", "dev tools rode in: " + ", ".join(strays))]
+
+    print("")
+    print('Bundle "crazy": %s - %.2f MB' % (out, size / 1048576))
+    for ok, good, bad in rows:
+        print("  %s %s" % ("OK  " if ok else "FAIL", good if ok else bad))
+    if not all(ok for ok, _, _ in rows):
+        sys.exit(1)
+    print("")
+    print("  Upload: Developer Portal -> your game -> Builds / Files")
+    print("  Drag the CONTENTS of ../dist/ in. Do not zip it - archives are rejected.")
+
 
 targets = sys.argv[1:] or ["editor", "game"]
 if "editor" in targets:
     build("editor_head.html", "editor_shell.js", "../level_player.html")
 if "game" in targets:
-    build("game_head.html", "game_shell.js", "../game.html")
+    page = build("game_head.html", "game_shell.js", "../game.html")
+    # ⚠ Proved, not assumed: the plain web build must carry no host SDK at all.
+    if "sdk.crazygames.com" in page:
+        sys.exit("game.html carries a host SDK - the platform split has leaked")
+if "crazy" in targets:
+    out = "../dist/index.html"
+    check_crazy(build("game_head.html", "game_shell.js", out, host="crazy"), out)

@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Seat Away</title>
+<title>Take a Seat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lilita+One&family=Nunito:wght@600;700;800&display=swap">
@@ -31,7 +31,7 @@
   --disp: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
   /* The home screen and the results card are ports of Marble Sort's, down to the
      coordinates, so they carry that game's own face and palette rather than
-     being re-tinted into this one. Everything else stays Seat Away's. */
+     being re-tinted into this one. Everything else stays Take a Seat's. */
   --ms: "Lilita One", "Baloo 2", Arial, sans-serif;
   --ms-ink: #2b3550; --ms-face: #e9e8f7; --ms-edge: #c6c2e2;
   --ms-win: #4bc84b; --ms-lose: #d8556a; --ms-gold: #ffc21e; --ms-rays: #ffd75e;
@@ -123,21 +123,11 @@ body {
 }
 .scrim[hidden] { display: none; }
 
-/* Our cover carries no lettering - Marble Sort's render does, which is the only
-   reason that screen has no title over it - so the name is set here instead. */
-.logo {
-  /* over the art, not over the box: wide, the box is half again as wide as the
-     picture and a title centred in it sits off the side of its own cover */
-  left: calc((var(--art-cx) - var(--art-w) / 2) * 1px);
-  width: calc(var(--art-w) * 1px); text-align: center; top: 240px;
-  font-family: var(--ms); font-size: 96px; line-height: .95; color: var(--livery);
-  letter-spacing: .01em;
-  text-shadow: 0 4px 0 var(--livery-dk), 0 9px 0 var(--trim-dk), 0 16px 30px rgba(0,0,0,.45);
-}
-.logo span {
-  display: block; color: #fff; font-size: .30em; letter-spacing: .22em;
-  text-shadow: 0 3px 0 rgba(0,0,0,.35); margin-top: .45em;
-}
+/* ⚠ There is no `.logo` rule any more, and that is deliberate. The cover render
+   carries the name itself now - home_cover.py bakes it in the same livery, with
+   the same drop stack this rule used to describe - which is what lets the store
+   covers be crops of that render: a title living in the DOM cannot come with
+   them. Setting it here as well printed it twice. */
 
 /* ---- the chrome: two gold discs, one call to action, one wallet row ---- */
 .round {
@@ -666,6 +656,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    level and the board appearing, so nothing is running behind it: no clock to
    burn and no queue walking in unseen while the player reads. */
 #intro { position: absolute; inset: 0; display: none; z-index: 24; font-family: var(--ms); }
+/* Lighter than the result card's. This one is shown over a board that is being
+   talked about - black it out and the introduction has nothing to point at. */
+#intro .dim { background: rgba(13,10,42,.5); }
 #intro.on { display: block; }
 #intro .design {
   --dy: 0px; --dz: 0px;
@@ -687,6 +680,20 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 }
 #intro-ok { left: 270px; top: 726px; transform: translate(-50%, -50%); }
 #intro-ok:active { transform: translate(-50%, calc(-50% + 3px)); }
+
+/* The booster being introduced is lifted through the overlay and ringed, so the
+   card can say "tap it" and mean a thing the player can actually see and reach.
+   The ring stays until they use it, not until they dismiss the card. */
+#boosters.spotlight { z-index: 25; }
+.boost.hint::before {
+  content: ""; position: absolute; inset: -7px; border-radius: 26px;
+  border: 3px solid var(--gold); animation: boost-hint 1.15s ease-in-out infinite;
+}
+@keyframes boost-hint {
+  0%, 100% { transform: scale(1); opacity: .95; }
+  50%      { transform: scale(1.08); opacity: .45; }
+}
+@media (prefers-reduced-motion: reduce) { .boost.hint::before { animation: none; } }
 </style>
 
 <div id="app">
@@ -694,9 +701,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
     <div class="design">
       <div class="edge edge-l" id="h-edge-l"></div>
       <div class="edge edge-r" id="h-edge-r"></div>
-      <img class="cover" id="h-cover" alt="Seat Away">
+      <img class="cover" id="h-cover" alt="Take a Seat">
       <div class="scrim" id="h-scrim"></div>
-      <div class="logo" id="h-logo">Seat Away<span>find everyone a seat</span></div>
 
       <!-- Top left, the lives that let you start a level at all; top right, the
            picker. Mirroring each other rather than sitting together: one is a

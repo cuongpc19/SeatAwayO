@@ -1,7 +1,7 @@
 """?level= and ?reset on the live server: do they land where they say?"""
 from playwright.sync_api import sync_playwright
 BASE = "http://127.0.0.1:8080/game.html"
-READY = "typeof ready !== 'undefined' && ready"
+READY = "typeof BOOTED !== 'undefined' && BOOTED"
 
 def state(pg):
     return pg.evaluate("""() => ({

@@ -9,7 +9,7 @@ with sync_playwright() as pw:
     for tag, vp in (("phone", {"width": 420, "height": 860}),
                     ("desk", {"width": 1180, "height": 900})):
         pg = br.new_page(viewport=vp)
-        pg.goto(url); pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+        pg.goto(url); pg.wait_for_function("typeof BOOTED !== 'undefined' && BOOTED", timeout=20000)
         pg.evaluate("save.unlocked = 2; persist()")
         for lvl in (1, 2):
             pg.evaluate("n => startLevel(n)", lvl)
