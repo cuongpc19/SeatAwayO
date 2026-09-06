@@ -26,7 +26,7 @@ SHAPES = {
     "walk":  scale_parts(guest_parts("walk", phase=1.15), GUEST_SCALE),
     "cheer": scale_parts(guest_parts("cheer"), GUEST_SCALE),
 }
-ORDER = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "grey"]
+ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "grey"]
 
 t0 = time.time()
 caches = {}

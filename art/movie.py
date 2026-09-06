@@ -70,7 +70,7 @@ CAM = Cam(yaw=0.42, pitch=0.16, scale=1.0, ox=0, oy=0)
 
 CAST = [
     # pose,    colour,  scale, ground x, depth z, turn
-    ("idle",   "cyan",   0.62,  1.15, -0.55, -0.40),
+    ("idle",   "sky",   0.62,  1.15, -0.55, -0.40),
     ("cheer",  "red",    1.00, -0.90,  0.25,  0.50),
     ("idle",   "yellow", 0.84,  0.10,  0.00,  0.18),
 ]

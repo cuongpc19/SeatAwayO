@@ -1,10 +1,19 @@
-const NAMES = ["grey", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "lime", "teal", "brown", "navy"];
+/* Index to colour, and the order is the shipped game's, not ours: level 1 is
+   index 2 and it is sky blue there, the second colour to turn up (level 4) is
+   index 4 and it is green. The level data carries only these indices - it has no
+   colours in it at all - so this table is the whole of the game's palette.
+
+   ⚠ 5 and 6 moved with 2, they were not re-chosen. 2 shares a board with 5 on
+   490 of the 600 levels and with 6 on 13, and 5 was a teal cyan and 6 a blue:
+   put a sky blue at index 2 and those boards have two blues on them that have to
+   be told apart at a glance. 5 takes the orange index 2 gave up, 6 takes purple. */
+const NAMES = ["grey", "red", "sky", "yellow", "green", "orange", "purple", "blue", "pink", "lime", "teal", "brown", "navy"];
 const CSS = { grey: "#969ca8", red: "#e83e48", orange: "#fa822a", yellow: "#fac42e", green: "#4ac65c",
-              cyan: "#2aced6", blue: "#2e92f2", purple: "#a25cea", pink: "#f470b0",
+              sky: "#239be1", blue: "#2e92f2", purple: "#a25cea", pink: "#f470b0",
               lime: "#a8d94a", teal: "#25a89b", brown: "#b0784a", navy: "#3b56a8" };
 const SPRITE = { grey: "grey", red: "red", orange: "orange", yellow: "yellow", green: "green",
-                 cyan: "cyan", blue: "blue", purple: "purple", pink: "pink",
-                 lime: "green", teal: "cyan", brown: "orange", navy: "blue" };
+                 sky: "sky", blue: "blue", purple: "purple", pink: "pink",
+                 lime: "green", teal: "sky", brown: "orange", navy: "blue" };
 const colName = i => NAMES[i] || "grey";
 
 const SX = 1.60, SZ = 1.60;
@@ -30,10 +39,24 @@ let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
                            // the new board. Every load stamps a fresh token.
 let GUIDES = false;        // the coaching overlays - none of these are in the real game
 let SPEED = 1;             // 1 = normal, 2 = double
-const BASE_MS_PER_UNIT = 260;                       // ms per grid unit walked
-const BASE_GAP_MS = 260;                            // pause between passengers
+/* Walking pace. These three move together: taking one without the others gives
+   a passenger who strides across the floor and then dawdles onto the seat, or a
+   short walk that ignores the change entirely because it lands on the floor.
+
+   260, 300 and 520 are the numbers measured off the recording. The game runs
+   quicker than the recording by 1.15 x 1.20 x 1.20 = 1.656, and each is that
+   measurement divided by 1.656 - always recomputed from the original rather than
+   from the last value, or the rounding creeps further off with every pass.
+
+   The walk cycle needs nothing here: `a.phase` counts STRIDE off the distance
+   covered, so the legs step faster on their own and stay in step with the floor
+   rather than skating over it. */
+const BASE_MS_PER_UNIT = 157;                       // ms per grid unit walked
+const MIN_WALK_MS = 314;                            // a walk is never snappier than this
+const HOP_MS = 181;                                 // the little jump onto the seat
+
+const BASE_GAP_MS = 260;                            // pause between passengers - waiting, not walking
 const STRIDE = 0.52;                                // world units per animation frame
-const HOP_MS = 300;                                 // the little jump onto the seat
 const QUEUE_PITCH = 1.15;                           // world units between two people in line
 const QUEUE_STEP_MS = QUEUE_PITCH * BASE_MS_PER_UNIT;   // one place up the line, at walking pace
 const QUEUE_GAP_MS = 110;                           // before the person behind follows
@@ -135,13 +158,27 @@ function touches(g, b, region) {
   return false;
 }
 const freeSlots = b => b.occ.reduce((n, v) => n + (v == null ? 1 : 0), 0);
+
+/** What a grey seat will take.
+
+    ⚠ Not a wildcard. It reads like one - a seat with no colour on it - and this
+    was written as one, but the shipped game only ever seats the FIRST colour in
+    a grey seat, and every screenshot of it shows the same: grey seats with sky
+    blue in them and nothing else. Checked against the boards before changing it:
+    with grey tied to colour 2 there is still a place for every passenger on all
+    600 campaign levels, which is the condition the wildcard was hiding.
+
+    The number is index 2 because that is the colour level 1 opens with - see the
+    note on NAMES. */
+const GREY_TAKES = 2;
 const accepts = (b, ci) =>
-  freeSlots(b) > (b.pending || 0) && (b.colour === 0 || b.colour === ci);
+  freeSlots(b) > (b.pending || 0) && (b.colour === 0 ? ci === GREY_TAKES : b.colour === ci);
 function canSeat(g, b, ci, region) { return accepts(b, ci) && touches(g, b, region || reachRegion(g)); }
 
 /** Where this seat can slide to, one cell at a time through the empty floor. */
-/** Grey seats are fixtures: anybody may sit in one, but they never move. They
-    are the fixed walls of the puzzle - 568 of the 600 boards have at least one. */
+/** Grey seats are fixtures: they never move, and they only take the first colour
+    (see `accepts`). They are the fixed walls of the puzzle - 568 of the 600
+    boards have at least one. */
 const FIXED = b => b.colour === 0;
 
 /** The jump booster lifts a seat over everything instead of sliding it, so the
@@ -1149,9 +1186,32 @@ function floorDist(g) {
   return d;
 }
 
+/** The one place a passenger can take without setting foot on the floor: a seat
+    standing in the doorway itself. The seat is still a plug - nothing behind it
+    is reachable while it sits there - but the passenger is stood right against
+    it, and waiting to be told to move a seat they could simply have sat in reads
+    as the game being broken rather than as a puzzle. */
+function doorSeat(g, ci) {
+  const id = g.occ[idx(g, g.W - 1, g.door)];
+  if (id < 0) return null;                        // -1 is an empty cell
+  const seat = g.seats[id];
+  if (!seat || !accepts(seat, ci)) return null;
+  const cells = cellsOf(seat);
+  for (let k = 0; k < seat.len; k++) {
+    if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
+    // only the place that is actually in the doorway: the rest of a long seat is
+    // inside the room, and there is no floor to walk round to it on
+    if (cells[k][0] === g.W - 1 && cells[k][1] === g.door)
+      return { seat, k, entry: null };            // no entry tile: they step straight up
+  }
+  return null;
+}
+
 /** The nearest place a passenger can actually take: a seat, which of its places,
     and the floor tile they step in from. */
 function pickSeat(g, ci) {
+  const plug = doorSeat(g, ci);
+  if (plug) return plug;                          // null whenever the doorway is clear
   const d = floorDist(g);
   let best = null, bestD = Infinity;
   for (const seat of g.seats) {
@@ -1171,6 +1231,7 @@ function pickSeat(g, ci) {
     from the same BFS that decides reachability, so the route on screen is the
     route the rules used. */
 function walkPath(g, seat, k, entry) {
+  if (!entry) return null;        // straight off the step onto a seat in the doorway
   const d = floorDist(g);
   const path = [entry.slice()];
   let [c, r] = entry;
@@ -1302,7 +1363,7 @@ function autoBoard(instant) {
 
     if (total < 1e-6) { hop(); return; }
 
-    const dur = Math.max(520, total * BASE_MS_PER_UNIT) / SPEED;
+    const dur = Math.max(MIN_WALK_MS, total * BASE_MS_PER_UNIT) / SPEED;
     const t0 = performance.now();
     const tick2 = now => {
       if (stale()) return;

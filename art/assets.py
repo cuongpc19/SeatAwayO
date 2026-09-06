@@ -12,7 +12,16 @@ PALETTE = {
     "orange": (250, 130,  42),
     "yellow": (250, 196,  46),
     "green":  ( 74, 198,  92),
-    "cyan":   ( 42, 206, 214),
+    # ⚠ The first colour the game ever shows - level 1 is all of it, and the
+    # grey seats are drawn holding it. Sky blue, off a screenshot of the
+    # shipped game; the slot used to be a teal cyan that nothing asked for.
+    # ⚠ Deeper than it looks like it should be, and that is the tint factors.
+    # Every part is `k` x this colour and the cushion runs k=1.14, so a light
+    # base clips its own blue channel while red and green keep rising - the
+    # seat washes out to a pale cyan-white. At 225 the highlight lands just
+    # under the ceiling and the piece reads as solid blue, the weight the
+    # orange beside it has always had.
+    "sky":    ( 35, 155, 225),
     "blue":   ( 46, 146, 242),
     "purple": (162,  92, 234),
     "pink":   (244, 112, 176),

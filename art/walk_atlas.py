@@ -19,7 +19,7 @@ CAM = Cam(yaw=0.0, pitch=1.33, scale=SCALE, ox=PIVOT[0], oy=PIVOT[1])
 # screen-space names, and the spin that points the figure that way
 FACINGS = {"d": 0.0, "r": math.pi / 2, "u": math.pi, "l": -math.pi / 2}
 PHASES = 4                      # a full stride, sampled four times
-ORDER = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "grey"]
+ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "grey"]
 
 t0 = time.time()
 caches = {}

@@ -14,12 +14,12 @@ import json, base64, math, os, time
 from PIL import Image
 from toy3d import Cam, bake, colorize, scale_parts, rotate_parts, xform, _bounds
 from assets import guest_parts, PALETTE, EYE, WOOD, WOOD_DARK, fence_post_parts
-from assets import rbox, capsule, seat_parts
+from assets import rbox, capsule, seat_parts, CELL
 
 SCALE = 74
 PITCH = 1.33
 PAD = 10                    # px of slack around a sprite
-ORDER = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "grey"]
+ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "grey"]
 
 # SeatDirect -> how far to spin the model. 0 faces up the screen; the cells of a
 # 1/3 seat run down the screen, so those must face left or right.

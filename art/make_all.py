@@ -9,7 +9,7 @@ from board import build_board, GUEST_SCALE
 os.makedirs("out", exist_ok=True)
 os.makedirs("out/sprites", exist_ok=True)
 BG = (240, 244, 250, 255)
-ORDER = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "grey"]
+ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "grey"]
 
 
 def hero(parts, size=420, scale=None, oy=0.86):

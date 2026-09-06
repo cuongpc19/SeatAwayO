@@ -112,7 +112,7 @@ cam = Cam(yaw=0.0, pitch=PITCH, scale=SCALE, ox=W / 2, oy=H * ROW_Y)
 # definition, so writing the gaps in cells is the only way the middle piece stays
 # visibly twice the others if `CELL` ever moves.
 scene = (seat(1, "red", -2.45) + rider("red", -2.45)
-         + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("cyan", CELL / 2)
+         + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("sky", CELL / 2)
          + seat(1, "grey", 2.45))
 
 shadow = contact_shadow(scene, cam, W, H, blur=26, alpha=150)
