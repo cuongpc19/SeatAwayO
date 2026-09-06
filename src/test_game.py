@@ -33,10 +33,18 @@ with sync_playwright() as pw:
     now = pg.evaluate("i => [S.seats[i].c, S.seats[i].r]", p["i"])
     print("drag %s -> %s          : %s" % (p["home"], p["target"], "OK" if now == p["target"] else "FAILED " + str(now)))
 
-    # clear it with time to spare and read the card
+    # clear it with time to spare. The card is held back for a beat of confetti
+    # first, so check the celebration is up and the card is not, then wait it out.
     pg.evaluate("S.left = S.time * 0.8; S.seated = S.total; S.queue.length = 0; finish(true)")
-    pg.wait_for_timeout(900)
-    print("card shown            :", pg.locator("#card").is_visible())
+    pg.wait_for_timeout(300)
+    cheering = pg.evaluate("cardEl.classList.contains('cheer')")
+    print("celebrating first     :", cheering,
+          "| card held back:", not pg.evaluate("cardEl.classList.contains('on')"),
+          "| paper falling:", pg.evaluate("document.querySelectorAll('#c-confetti i').length"))
+    assert cheering, "no confetti beat: the card came up on the same tick as the win"
+    assert not pg.evaluate("cardEl.classList.contains('on')"), "the card did not wait"
+    pg.wait_for_selector("#card.on", timeout=5000)
+    print("card shown            :", pg.locator("#c-title").is_visible())
     print("  title               :", pg.locator("#c-title").inner_text())
     # the star is a flat gold path now, the way Marble Sort bakes it
     print("  stars lit           :", pg.evaluate("document.querySelectorAll('#c-stars path[fill=\"#ffc21e\"]').length"))
@@ -61,6 +69,7 @@ with sync_playwright() as pw:
 
     # a loss
     pg.evaluate("startLevel(3); S.left = 0.02"); pg.wait_for_timeout(900)
+    assert not pg.evaluate("cardEl.classList.contains('cheer')"), "a loss should not celebrate"
     print("loss card             :", pg.locator("#c-title").inner_text(),
           "| lose styling:", pg.evaluate("document.getElementById('c-card').classList.contains('lose')"),
           "| stars:", pg.evaluate("document.querySelectorAll('#c-stars .star').length"))

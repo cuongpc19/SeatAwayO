@@ -516,6 +516,53 @@ function tutorCheck() {
   draw();
 }
 
+/* Marble Sort's pointing hand, the same drawing: `textures.ts` bakes it as a
+   path rather than reaching for an emoji, because a pictograph is a different
+   shape on every device and missing outright on some Androids. Two details in
+   it are load-bearing and three earlier versions there failed for want of them
+   - the thumb has to protrude as its own lobe, and the three folded fingers
+   have to stay separate humps with creases between. Smoothed into one curve
+   what is left is a fist with one finger out, which is a different gesture.
+
+   Drawn at 86 x 70 with the fingertip on (43, 4). The translate below puts that
+   tip on the point passed in, so a call site aims the tip and never the palm. */
+function drawHand(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-43, -4);
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.lineWidth = 4; ctx.strokeStyle = "#2b3550"; ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(36, 36);
+  ctx.lineTo(36, 12);                       // index finger, left side
+  ctx.quadraticCurveTo(36, 4, 43, 4);       // the tip - on the drawing's centre line
+  ctx.quadraticCurveTo(50, 4, 50, 12);
+  ctx.lineTo(50, 26);                       // index finger, right side
+  ctx.quadraticCurveTo(50, 21, 56, 21);     // folded finger 1
+  ctx.quadraticCurveTo(62, 21, 62, 28);
+  ctx.quadraticCurveTo(62, 24, 68, 24);     // folded finger 2
+  ctx.quadraticCurveTo(74, 24, 74, 31);
+  ctx.quadraticCurveTo(74, 28, 78, 29);     // folded finger 3
+  ctx.quadraticCurveTo(82, 31, 82, 37);
+  ctx.lineTo(82, 48);                       // outside of the palm
+  ctx.quadraticCurveTo(82, 64, 64, 64);
+  ctx.lineTo(48, 64);
+  ctx.quadraticCurveTo(37, 64, 34, 54);     // heel
+  ctx.lineTo(31, 50);
+  ctx.quadraticCurveTo(20, 50, 19, 42);     // the thumb, out clear of the palm
+  ctx.quadraticCurveTo(18, 34, 28, 33);
+  ctx.quadraticCurveTo(34, 33, 36, 36);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // the creases: two between the folded fingers, one where the thumb folds over
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(62, 29); ctx.lineTo(62, 40);
+  ctx.moveTo(74, 32); ctx.lineTo(74, 43);
+  ctx.moveTo(33, 38); ctx.quadraticCurveTo(39, 45, 40, 54);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /* The pointing itself, drawn in the room's own projection so it lands on the
    right tile at every window size. The engine hands the overlay the last word
    on the frame; everything here is painted over the finished room. */
@@ -557,16 +604,10 @@ onOverlay = () => {
 
   const f = Math.min(1, ((t * .6) % 1) / .74);          // travel, then a beat of rest
   const fade = f < .08 ? f / .08 : f > .92 ? (1 - f) / .08 : 1;
-  const fx = A[0] + (B[0] - A[0]) * f, fy = A[1] + (B[1] - A[1]) * f;
-  const fr = Math.max(6, LAY.s * .16);
-  ctx.fillStyle = "#fff";
-  ctx.globalAlpha = .3 * fade;
-  ctx.beginPath(); ctx.arc(fx, fy, fr * 1.8, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = .95 * fade;
-  ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = .85 * fade;
-  ctx.strokeStyle = "#22283c"; ctx.lineWidth = Math.max(1.5, LAY.s * .028);
-  ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.stroke();
+  const bob = Math.sin(t * (2 * Math.PI / 1.24)) * LAY.s * .05;   // Marble Sort's 620ms yoyo
+  ctx.globalAlpha = fade;
+  drawHand(A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f + bob,
+           SX * LAY.s * .85 / 86);
   ctx.restore();
 };
 
@@ -667,7 +708,11 @@ $("set-resume").onclick = closeSettings;
    twinkles, the bar counting down to the next new thing, the purse, and two
    buttons. Written in that game's design units - see `fitDesign` above.     */
 const cardEl = document.getElementById("card");
-function hideCard() { cardEl.classList.remove("on"); }
+/* Stamped, because the win now holds the card back for a beat and the level can
+   be left inside it - by a retry, or by anything that starts a level. Without
+   this the card would arrive over whatever came next. */
+let cardGen = 0;
+function hideCard() { cardGen++; cardEl.classList.remove("on", "cheer"); }
 onNewLevel = hideCard;
 
 /* The star is Marble Sort's: a flat gold ten-point path with one darker outline,
@@ -694,6 +739,18 @@ function confetti(on) {
     p.style.animationDelay = (-Math.random() * 3) + "s";
     box.appendChild(p);
   }
+}
+
+/** The beat between winning and the card: paper, and a few bursts over the
+    board. Losing has nothing to celebrate and still gets its card at once. */
+const CHEER_MS = 1200;
+function cheer() {
+  confetti(true);
+  cardEl.classList.add("cheer");
+  const box = $("c-confetti");
+  for (let i = 0; i < 4; i++)                 // spread over the beat, not all at once
+    setTimeout(() => cardEl.classList.contains("cheer")
+      && starBurst(box, 90 + Math.random() * 360, 250 + Math.random() * 430), 140 + i * 250);
 }
 
 /** Punch of light where a star lands, plus a scatter of twinkles. */
@@ -819,7 +876,10 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
     }, 200 + i * 180);
   }
   featureBar(stars ? feat : null, cleared);
-  confetti(!!stars);
+  // The paper has been falling since the win. Building it again here would send
+  // every piece back to the top of the screen on the frame the card arrives.
+  if (!cardEl.classList.contains("cheer")) confetti(!!stars);
+  cardEl.classList.remove("cheer");
   cardEl.classList.add("on");
 }
 
@@ -841,12 +901,15 @@ onFinish = function (won) {
   persist();
   // Asked for `lvl`, the level just cleared - the bar is the reward for this
   // game, not for the one being handed over.
-  overlay(won ? "LEVEL COMPLETE!" : "OUT OF TIME", stars, "+" + pay.total,
+  const gen = cardGen;
+  const card = () => gen === cardGen &&
+    overlay(won ? "LEVEL COMPLETE!" : "OUT OF TIME", stars, "+" + pay.total,
     has("winstreak") && pay.bonus ? save.streak + " IN A ROW · +" + pay.bonus + " BONUS" : "",
     "The show started with <b>" + S.queue.length + "</b> still outside."
       + "<span>" + (has("booster_time") ? "There is more time on the booster row, if the gold is there."
                                         : "Clear the doorway first - the queue does the rest.") + "</span>",
     featureProgress(lvl), lvl);
+  if (won) { cheer(); setTimeout(card, CHEER_MS); } else card();
 };
 
 /* ---- wiring ------------------------------------------------------------ */

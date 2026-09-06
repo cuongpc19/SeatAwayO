@@ -50,16 +50,19 @@ with sync_playwright() as pw:
         print("=== level %d ===" % lvl)
         pg.evaluate("n => startLevel(n)", lvl)
         settle(pg)                            # let whoever can board, board
-        s = pg.evaluate(STATE)
-        report("before the move:", s)
-        if not s["tut"]:
-            print("   NO COACH - nothing to follow"); continue
-        drag(pg, s["tut"]["seat"], s["tut"]["to"])
-        settle(pg)
+        # follow the coaching for as long as it keeps pointing: a board is only
+        # really taught if doing what it says all the way through wins it
+        for step in range(1, 7):
+            s = pg.evaluate(STATE)
+            if not s["tut"]:
+                break
+            report("step %d:" % step, s)
+            drag(pg, s["tut"]["seat"], s["tut"]["to"])
+            settle(pg)
         a = pg.evaluate(STATE)
-        report("after the move:", a)
+        print("  %-22s %s" % ("steps coached:", step - 1 if not s["tut"] else step))
         print("  %-22s %s" % ("coach cleared:", not a["shown"]))
-        print("  %-22s %s" % ("result:", a["phase"]))
+        print("  %-22s %s  seated %s" % ("result:", a["phase"], a["seated"]))
 
     # it must stay out of every other level
     pg.evaluate("save.unlocked = 12; persist()")
