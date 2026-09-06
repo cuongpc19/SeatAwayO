@@ -34,6 +34,9 @@ const BASE_MS_PER_UNIT = 260;                       // ms per grid unit walked
 const BASE_GAP_MS = 260;                            // pause between passengers
 const STRIDE = 0.52;                                // world units per animation frame
 const HOP_MS = 300;                                 // the little jump onto the seat
+const QUEUE_PITCH = 1.15;                           // world units between two people in line
+const QUEUE_STEP_MS = QUEUE_PITCH * BASE_MS_PER_UNIT;   // one place up the line, at walking pace
+const QUEUE_GAP_MS = 110;                           // before the person behind follows
 const idx = (g, c, r) => r * g.W + c;
 const inBoard = (g, c, r) => c >= 0 && c < g.W && r >= 0 && r < g.H && !g.hole[idx(g, c, r)];
 const isFree = (g, c, r) => inBoard(g, c, r) && g.occ[idx(g, c, r)] < 0;
@@ -206,7 +209,7 @@ function load(n) {
   g.colours = new Set(raw.queue).size;
   g.time = raw.time; g.left = raw.time;
   g.seated = 0; g.phase = "play"; g.moves = 0; g.walkCells = null;
-  g.sel = null; g.drag = null; g.anim = [];
+  g.sel = null; g.drag = null; g.anim = []; g.qstep = null;
   S = g;
   S.boarding = false; S.launching = false;
   fitCanvas(g);
@@ -214,6 +217,59 @@ function load(n) {
   onNewLevel();                 // each shell clears its own end-of-level card
   onHud(); draw();
   autoBoard();
+}
+
+/* ---------------- the line at the stop ---------------- */
+/** The distance one person still has to walk, in places.
+
+    Reading it back mid-walk is what lets the next shuffle start from wherever
+    this one had got to: passengers leave every BASE_GAP_MS, which is less than
+    a step takes, so the line is usually still moving when the next place opens
+    and somebody can be carrying two or three places at once.
+
+    Hence `from` setting the duration rather than dividing a fixed one: the pace
+    is what has to stay put, and a walk of three places takes three times as
+    long. Timed the other way, the same code covered a quarter of a place in one
+    frame - the jump this was written to remove, only smeared over four frames.
+    Flat, too, and not eased: a queue shuffling up is a dozen little walks that
+    run into each other, and easing each one out and in again puts a stutter at
+    every join. What sells it as walking is the legs, which the draw runs off
+    this same distance. */
+function placesBack(st, now) {
+  const t = (now - st.t0) / (st.from * QUEUE_STEP_MS / SPEED);
+  return t <= 0 ? st.from : t >= 1 ? 0 : st.from * (1 - t);
+}
+
+/** Everyone left in the line steps up one place.
+
+    The line used to be drawn straight off the queue index, so the moment the
+    head of it walked away, all six behind them slid forward a full place inside
+    one frame. Now each keeps the distance they are still carrying and walks it
+    off, and they start one after another - the person behind you does not move
+    until you have. */
+function shuffleUp(g) {
+  const now = performance.now(), was = g.qstep;
+  //  was[i + 1] is this same person a moment ago: the line has already shifted,
+  //  so what is now place i held place i + 1 when that state was written.
+  g.qstep = g.queue.map((_, i) => {
+    const carry = was && was[i + 1] ? placesBack(was[i + 1], now) : 0;
+    return {
+      from: carry + 1,
+      // Standing still, you wait for the person in front to move off first. Still
+      // walking, you carry straight on - stopping to take your turn again is how
+      // a walk of two places turns into two stutters.
+      t0: carry > 1e-3 ? now : now + i * QUEUE_GAP_MS / SPEED,
+    };
+  });
+  if (g.qraf) return;                 // one loop is enough; it reads whatever is current
+  g.qraf = true;
+  const tick = () => {
+    if (S !== g || !g.qstep) { g.qraf = false; return; }
+    const now2 = performance.now();
+    if (g.qstep.some(st => placesBack(st, now2) > 1e-3)) { draw(); requestAnimationFrame(tick); }
+    else { g.qstep = null; g.qraf = false; draw(); }
+  };
+  requestAnimationFrame(tick);
 }
 
 /* ---------------- rendering ---------------- */
@@ -837,11 +893,29 @@ function draw() {
   }
 
   // the stop
-  const laneX = cellW(g.W - 1) + SX * 2.0;
+  const laneX = cellW(g.W - 1) + SX * 2.0, qnow = performance.now();
   for (let i = 0; i < Math.min(g.queue.length, 7); i++) {
-    const wz = cellZ(g.door) + i * 1.15;
+    const st = g.qstep && g.qstep[i];
+    const back = st ? placesBack(st, qnow) : 0;       // places still to walk
+    // Waiting your turn is not walking: until t0 comes round you are carrying the
+    // whole place and standing still, and drawing that as a walk frame turns the
+    // back half of the line to face away for as long as anyone is boarding.
+    const walking = back > 1e-3 && qnow >= st.t0;
+    const pos = i + back, wz = cellZ(g.door) + pos * QUEUE_PITCH;
     const nm = SPRITE[colName(g.queue[i])] || "grey";
-    push(laneX, wz, () => { shadow(laneX, wz, .3); blit("idle_" + nm, laneX, 0, wz, i ? Math.max(.4, 1 - i * .11) : 1); });
+    // Faded by where they stand rather than by which place they hold, so someone
+    // coming forward brightens as they arrive instead of on the frame they shift.
+    const a = Math.max(.4, 1 - pos * .11);
+    push(laneX, wz, () => {
+      shadow(laneX, wz, .3);
+      if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
+      // Stepping up: away from the camera, and the legs cycle on the distance
+      // covered, the same way they do for someone out on the floor.
+      ctx.globalAlpha = a;
+      blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
+               laneX, 0, wz);
+      ctx.globalAlpha = 1;
+    });
   }
   for (const a of g.anim)
     push(a.x, a.z, () => {
@@ -1152,6 +1226,7 @@ function autoBoard(instant) {
     if (!spot) return done();
     const seat = spot.seat, slot = spot.k;
     S.queue.shift();
+    if (!instant) shuffleUp(S);          // the rest of the line steps up
     seat.pending++;
     (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
     const cell = cellsOf(seat)[slot];
@@ -1163,6 +1238,7 @@ function autoBoard(instant) {
       seat.locked = seat.pending > 0;
       if (seat.claim) seat.claim.delete(slot);
       seat.occ[slot] = ci; S.seated++;
+      onSeated();
     };
     if (instant) { sitDown(); launch(); return; }
     const path = walkPath(S, seat, slot, spot.entry) || [cell];
@@ -1255,6 +1331,7 @@ let onSay = () => {};
 let onFinish = () => {};
 let onNewLevel = () => {};
 let onSeatMoved = () => {};
+let onSeated = () => {};         // a passenger has just taken a place
 let onOverlay = () => {};        // coach marks: drawn last, over everything
 function say(msg) { onSay(msg); }
 function bump() { cv.animate([{ filter: "none" }, { filter: "brightness(1.15)" }, { filter: "none" }], { duration: 200 }); }
