@@ -1,0 +1,466 @@
+<title>Seat Away Level Curve</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --bg:        #eef1f5;
+  --panel:     #fcfcfb;
+  --panel-2:   #f6f7f6;
+  --line:      #d8dde5;
+  --line-soft: #e7ebf0;
+  --ink:       #12161c;
+  --ink-2:     #4a525e;
+  --ink-3:     #7c8593;
+  --s1:        #2a78d6;
+  --s2:        #eb6834;
+  --s1-fill:   rgba(42,120,214,.14);
+  --grid:      #e4e8ee;
+  --chip:      #e8edf5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:        #101211;
+    --panel:     #1a1a19;
+    --panel-2:   #212220;
+    --line:      #33352f;
+    --line-soft: #282925;
+    --ink:       #f2f3ef;
+    --ink-2:     #b6b9ae;
+    --ink-3:     #85887e;
+    --s1:        #3987e5;
+    --s2:        #d95926;
+    --s1-fill:   rgba(57,135,229,.18);
+    --grid:      #2a2b27;
+    --chip:      #25272a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:        #101211;
+  --panel:     #1a1a19;
+  --panel-2:   #212220;
+  --line:      #33352f;
+  --line-soft: #282925;
+  --ink:       #f2f3ef;
+  --ink-2:     #b6b9ae;
+  --ink-3:     #85887e;
+  --s1:        #3987e5;
+  --s2:        #d95926;
+  --s1-fill:   rgba(57,135,229,.18);
+  --grid:      #2a2b27;
+  --chip:      #25272a;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Newsreader, Georgia, serif;
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 56px 24px 96px; }
+
+h1, h2, h3 { font-family: Archivo, "Helvetica Neue", Arial, sans-serif; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 700; letter-spacing: -.025em; line-height: 1.04; }
+h2 { font-size: 23px; font-weight: 600; letter-spacing: -.012em; }
+h3 { font-size: 16px; font-weight: 600; letter-spacing: -.005em; }
+
+.eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; margin: 18px 0 0; }
+p { margin: 0; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+header { display: flex; flex-direction: column; gap: 10px; padding-bottom: 40px; }
+
+/* ---- stat tiles ---- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; margin-bottom: 40px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 4px; }
+.tile .v { font-family: Archivo, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.tile .k { font-family: "JetBrains Mono", monospace; font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); }
+.tile .sub { font-size: 13.5px; color: var(--ink-2); font-family: Archivo, sans-serif; }
+
+/* ---- panels ---- */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 22px 24px 18px; }
+.panels { display: flex; flex-direction: column; gap: 20px; }
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 4px; }
+.panel-note { font-size: 14.5px; color: var(--ink-2); max-width: 64ch; margin: 6px 0 16px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+
+.legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11.5px; letter-spacing: .06em; color: var(--ink-2); text-transform: uppercase; }
+.swatch { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.axis-text { font-family: "JetBrains Mono", monospace; font-size: 10.5px; fill: var(--ink-3); }
+.axis-title { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .12em; fill: var(--ink-3); text-transform: uppercase; }
+.dlabel { font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; }
+
+.tip {
+  position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -100%);
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px;
+  padding: 8px 10px; font-family: "JetBrains Mono", monospace; font-size: 11.5px; line-height: 1.5;
+  color: var(--ink); white-space: nowrap; z-index: 5; box-shadow: 0 4px 14px rgba(0,0,0,.10);
+  font-variant-numeric: tabular-nums;
+}
+.tip.on { opacity: 1; }
+.tip b { font-weight: 700; }
+.tip i { font-style: normal; color: var(--ink-3); }
+
+/* ---- table ---- */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-family: "JetBrains Mono", monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+th { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; position: sticky; top: 0; background: var(--panel); }
+td:first-child, th:first-child { text-align: left; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--panel-2); }
+
+.sec { margin-top: 48px; display: flex; flex-direction: column; gap: 14px; }
+.sec > .eyebrow { margin-bottom: -6px; }
+
+.grammar { font-family: "JetBrains Mono", monospace; font-size: 12.5px; line-height: 1.85; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 18px 20px; overflow-x: auto; color: var(--ink-2); }
+.grammar b { color: var(--ink); font-weight: 700; }
+.grammar em { color: var(--s1); font-style: normal; }
+
+footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 13.5px; font-family: Archivo, sans-serif; display: flex; flex-direction: column; gap: 6px; }
+
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Teardown &middot; com.color.seat.away &middot; 1&nbsp;303 level assets</p>
+    <h1>Seat Away Level Curve</h1>
+    <p class="lede">Every <span class="mono">LevelCfModel</span> asset in the shipped APK, decoded from raw bytes and
+      plotted. 600 campaign levels, 400 difficulty variants, 93 challenge boards &mdash; what the designers actually
+      dialled, level by level.</p>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="panels">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Colours in play</h2>
+        <div class="legend"><span><i class="swatch" style="background:var(--s1)"></i>dots = each level &middot; line = 15-level average</span></div>
+      </div>
+      <p class="panel-note">The real difficulty dial. Colour count is what makes a board hard to hold in your head &mdash;
+        it climbs fast to five, then flattens for four hundred levels. Six and seven show up only as rare spikes.</p>
+      <div class="chart" id="c-colours"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Board size vs. how much of it is used</h2>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--s2)"></i>Grid cells</span>
+          <span><i class="swatch" style="background:var(--s1)"></i>Occupied seats</span>
+        </div>
+      </div>
+      <p class="panel-note">The grid grows in hard steps &mdash; 18 cells, then 24, 28, 32, 40, 60, 77 &mdash; but the seats placed on it
+        track it loosely. The gap between the two lines is the free space you get to manoeuvre in.</p>
+      <div class="chart" id="c-size"></div>
+    </section>
+
+    <div class="two">
+      <section class="panel">
+        <div class="panel-head"><h2>Time limit</h2></div>
+        <p class="panel-note">Level 1 gets 300&nbsp;s. By level 23 it is under 90&nbsp;s, then it settles into a 90&ndash;165&nbsp;s working band and stays there.</p>
+        <div class="chart" id="c-time"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Grids used</h2></div>
+        <p class="panel-note">Campaign levels by board shape. 5&times;8 carries more than half the game.</p>
+        <div class="chart" id="c-grid"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head"><h2>When each mechanic first appears</h2></div>
+      <p class="panel-note">The teaching order, read straight off the data. Everything structural lands inside the first
+        45 levels; after that the game only turns existing dials. Two mechanics are held back deliberately &mdash; rotated
+        benches until 351, three-seat benches until 355.</p>
+      <div class="chart" id="c-intro"></div>
+    </section>
+  </div>
+
+  <section class="sec">
+    <p class="eyebrow">Table view</p>
+    <h2>Campaign in blocks of fifty</h2>
+    <p class="panel-note" style="margin-bottom:0">Median per block, so a single outlier level cannot move a row.</p>
+    <div class="tablewrap"><table id="t-blocks"></table></div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Method</p>
+    <h2>The binary grammar</h2>
+    <p class="panel-note" style="margin-bottom:0">Field names came out of <span class="mono">global-metadata.dat</span>;
+      element strides were brute-forced and only one candidate consumes all 1&nbsp;303 assets byte-exactly.</p>
+      <div class="grammar">
+<b>LevelCfModel</b>
+  int    timeLimit          <em>345 &rarr; 30 s</em>
+  int    difficultLevel
+  float  camSize, camWinSize
+  int    mapSizeW, mapSizeH  <em>3&times;6 &rarr; 7&times;11</em>
+  List&lt;<b>MapPosCfModel</b>&gt;      <em>2 ints</em>   index, enabled          <i>&larr; 0 = hole</i>
+  List&lt;<b>SeatObjectCfModel</b>&gt;  <em>6 ints</em>   index, posX, posY, sizeW, direct, colour
+  List&lt;<b>UserObjectCfModel</b>&gt;  <em>4 ints</em>   index, size, colour, hidden
+  List&lt;int&gt; listGateRow             4 ints, &minus;1 = no gate
+  List&lt;<b>PosLinkCfModel</b>&gt;     jagged   index, n, links[n]      <i>&larr; grid adjacency</i>
+</div>
+  </section>
+
+  <footer>
+    <div>Decoded from <span class="mono">assets/bin/Data/data.unity3d</span> &mdash; Unity 6000.3.9f1, IL2CPP.
+      Seat colour <span class="mono">0</span> is the grey wildcard bench; guest colours run <span class="mono">1&ndash;8</span>.</div>
+    <div>1&nbsp;093 unique level names &mdash; 600 campaign, 400 variants, 93 challenge.</div>
+  </footer>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+
+/* ---------- helpers ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+const med = a => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const roll = (a, w) => a.map((_, i) => {
+  const lo = Math.max(0, i - (w >> 1)), hi = Math.min(a.length, i + (w >> 1) + 1);
+  let s = 0; for (let k = lo; k < hi; k++) s += a[k];
+  return s / (hi - lo);
+});
+
+/* ---------- stat tiles ---------- */
+const maxC = Math.max(...D.colours);
+const tiles = [
+  ["1 093", "level assets", "600 campaign + 400 variants + 93 challenge"],
+  ["18 &rarr; 77", "seats per board", "3&times;6 grid up to 7&times;11"],
+  [maxC, "colours, peak", "first reached at level " + D.intro["7 colours"][0]],
+  ["345 &rarr; 30 s", "time limit", "under 90 s from level 23"],
+  ["45", "levels to teach it", "all but two mechanics introduced by here"],
+];
+document.getElementById("tiles").innerHTML = tiles.map(t =>
+  `<div class="tile"><span class="v">${t[0]}</span><span class="k">${t[1]}</span><span class="sub">${t[2]}</span></div>`
+).join("");
+
+/* ---------- line chart ---------- */
+function lineChart(host, opt) {
+  const W = opt.W || 1000, H = opt.h || 300;
+  const m = opt.m || { l: 46, r: 58, t: 14, b: 42 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const fs = 1;                              // viewBox units are rendered px, so no text rescaling
+  const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opt.aria });
+  const xs = D.n, xmin = xs[0], xmax = xs[xs.length - 1];
+  const ymax = opt.ymax, ymin = opt.ymin || 0;
+  const X = v => m.l + (v - xmin) / (xmax - xmin) * iw;
+  const Y = v => m.t + ih - (v - ymin) / (ymax - ymin) * ih;
+  const px = v => (v / fs) + "px";
+  const txt = (x, y, cls, anchor, str, size) => {
+    const t = el("text", { x: x, y: y, class: cls, "text-anchor": anchor, style: "font-size:" + px(size) });
+    t.textContent = str; svg.appendChild(t); return t;
+  };
+
+  (opt.yticks || []).forEach(t => {
+    svg.appendChild(el("line", { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), class: "gridline" }));
+    txt(m.l - 8, Y(t) + 3.5 / fs, "axis-text", "end", opt.yfmt ? opt.yfmt(t) : t, 10.5);
+  });
+  (opt.xticks || []).forEach(t => txt(X(t), m.t + ih + 18 / fs, "axis-text", "middle", t, 10.5));
+  txt(m.l + iw / 2, H - 2, "axis-title", "middle", "Campaign level", 10);
+
+  opt.series.forEach(s => {
+    if (s.dots) {
+      const g = el("g", { fill: s.color, opacity: s.op == null ? .3 : s.op });
+      s.v.forEach((v, i) => g.appendChild(el("circle", { cx: X(xs[i]), cy: Y(v), r: (s.r || 1.4) / fs })));
+      svg.appendChild(g); return;
+    }
+    if (s.area) {
+      let d = "M " + X(xs[0]) + " " + Y(ymin);
+      s.v.forEach((v, i) => d += " L " + X(xs[i]) + " " + Y(v));
+      d += " L " + X(xs[xs.length - 1]) + " " + Y(ymin) + " Z";
+      svg.appendChild(el("path", { d: d, fill: s.area, stroke: "none" }));
+    }
+    let d = "";
+    s.v.forEach((v, i) => d += (i ? " L " : "M ") + X(xs[i]) + " " + Y(v));
+    svg.appendChild(el("path", { d: d, fill: "none", stroke: s.color, "stroke-width": (s.w || 2) / fs,
+      "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  });
+
+  // direct labels, nudged apart when they collide
+  const labs = opt.series.filter(s => s.label)
+    .map(s => ({ s: s, y: Y(s.v[s.v.length - 1]) })).sort((a, b) => a.y - b.y);
+  labs.forEach((L, i) => { if (i && L.y - labs[i - 1].y < 13 / fs) L.y = labs[i - 1].y + 13 / fs; });
+  labs.forEach(L => {
+    const t = el("text", { x: m.l + iw + 8, y: L.y + 4 / fs, class: "dlabel", fill: L.s.color,
+      style: "font-size:" + px(11) });
+    t.textContent = L.s.label; svg.appendChild(t);
+  });
+
+  const cross = el("line", { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: "var(--ink-3)",
+    "stroke-width": 1 / fs, "stroke-dasharray": (3 / fs) + " " + (3 / fs), opacity: 0 });
+  svg.appendChild(cross);
+  const marks = opt.series.filter(s => !s.dots);
+  const dots = marks.map(s => {
+    const c = el("circle", { r: 4.5 / fs, fill: s.color, stroke: "var(--panel)", "stroke-width": 2 / fs, opacity: 0 });
+    svg.appendChild(c); return c;
+  });
+  host.appendChild(svg);
+  const tip = document.createElement("div"); tip.className = "tip"; host.appendChild(tip);
+
+  svg.addEventListener("pointermove", ev => {
+    const r = svg.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) / r.width * W;
+    let i = Math.round((mx - m.l) / iw * (xmax - xmin));
+    i = Math.max(0, Math.min(xs.length - 1, i));
+    cross.setAttribute("x1", X(xs[i])); cross.setAttribute("x2", X(xs[i])); cross.setAttribute("opacity", 1);
+    marks.forEach((s, k) => {
+      dots[k].setAttribute("cx", X(xs[i])); dots[k].setAttribute("cy", Y(s.v[i])); dots[k].setAttribute("opacity", 1);
+    });
+    tip.className = "tip on";
+    tip.innerHTML = "<i>Level</i> <b>" + xs[i] + "</b><br>" + opt.tiplines.map(t =>
+      "<i>" + t.name + "</i> <b>" + t.fmt(D[t.key][i]) + "</b>").join("<br>");
+    tip.style.left = (X(xs[i]) / W * r.width) + "px";
+    tip.style.top = (Y(marks[0].v[i]) / H * r.height - 12) + "px";
+  });
+  svg.addEventListener("pointerleave", () => {
+    cross.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); tip.className = "tip";
+  });
+}
+
+const XT = [1, 100, 200, 300, 400, 500, 600];
+const XT_S = [1, 200, 400, 600];
+
+lineChart(document.getElementById("c-colours"), {
+  h: 300, ymax: 8, ymin: 0, yticks: [0, 2, 4, 6, 8], xticks: XT,
+  aria: "Colour count per campaign level with a 15-level rolling average",
+  series: [
+    { name: "colours", v: D.colours, color: "var(--s1)", dots: true, r: 1.6, op: .30 },
+    { name: "15-level avg", v: roll(D.colours, 15), color: "var(--s1)", w: 2.5, label: "colours" }
+  ],
+  tiplines: [{ name: "colours", key: "colours", fmt: v => v }]
+});
+
+lineChart(document.getElementById("c-size"), {
+  h: 320, ymax: 80, ymin: 0, yticks: [0, 20, 40, 60, 80], xticks: XT,
+  aria: "Grid cells and occupied seats per campaign level",
+  series: [
+    { name: "grid cells", v: D.cells, color: "var(--s2)", dots: true, r: 1.6, op: .32 },
+    { name: "grid cells", v: roll(D.cells, 15), color: "var(--s2)", w: 2.2, label: "cells" },
+    { name: "seats", v: roll(D.slots, 15), color: "var(--s1)", w: 2.5, area: "var(--s1-fill)", label: "seats" }
+  ],
+  tiplines: [{ name: "cells", key: "cells", fmt: v => v }, { name: "seats", key: "slots", fmt: v => v }]
+});
+
+lineChart(document.getElementById("c-time"), {
+  W: 392, h: 214, m: { l: 40, r: 14, t: 12, b: 38 },
+  ymax: 360, ymin: 0, yticks: [0, 90, 180, 270, 360], xticks: XT_S,
+  yfmt: v => v + "s",
+  aria: "Time limit per campaign level with a 15-level rolling average",
+  series: [
+    { name: "time limit", v: D.time, color: "var(--s1)", dots: true, r: 1.5, op: .30 },
+    { name: "avg", v: roll(D.time, 15), color: "var(--s1)", w: 2.2 }
+  ],
+  tiplines: [{ name: "time limit", key: "time", fmt: v => v + " s" }]
+});
+
+/* ---------- horizontal bars ---------- */
+function barChart(host, rows, opt) {
+  const W = opt.W || 1000, fs = 1,
+        rowH = opt.rowH || 26, m = { l: opt.l || 92, r: opt.r || 60, t: 8, b: 26 };
+  const H = m.t + m.b + rows.length * rowH;
+  const iw = W - m.l - m.r;
+  const xmax = opt.xmax || Math.max(...rows.map(r => r.v));
+  const X = v => m.l + v / xmax * iw;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opt.aria });
+  (opt.xticks || []).forEach(t => {
+    svg.appendChild(el("line", { x1: X(t), x2: X(t), y1: m.t, y2: m.t + rows.length * rowH, class: "gridline" }));
+    const tx = el("text", { x: X(t), y: H - 8, class: "axis-text", "text-anchor": "middle", style: "font-size:" + (10.5 / fs) + "px" });
+    tx.textContent = opt.xfmt ? opt.xfmt(t) : t; svg.appendChild(tx);
+  });
+  host.appendChild(svg);
+  const tip = document.createElement("div"); tip.className = "tip"; host.appendChild(tip);
+
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH, h = rowH - 9;
+    const lab = el("text", { x: m.l - 10, y: y + h / 2 + 4 / fs, class: "axis-text", "text-anchor": "end", style: "font-size:" + (10.5 / fs) + "px" });
+    lab.textContent = r.k; svg.appendChild(lab);
+    if (opt.lollipop) {
+      svg.appendChild(el("line", { x1: m.l, x2: X(r.v), y1: y + h / 2, y2: y + h / 2,
+        stroke: "var(--grid)", "stroke-width": 2 / fs, "stroke-linecap": "round" }));
+      svg.appendChild(el("circle", { cx: X(r.v), cy: y + h / 2, r: 5 / fs, fill: "var(--s1)",
+        stroke: "var(--panel)", "stroke-width": 2 / fs }));
+    } else {
+      svg.appendChild(el("rect", { x: m.l, y, width: Math.max(X(r.v) - m.l, 2), height: h,
+        rx: 3, fill: "var(--s1)" }));
+    }
+    const val = el("text", { x: X(r.v) + 10, y: y + h / 2 + 4 / fs, class: "dlabel", fill: "var(--ink-2)", style: "font-size:" + (11 / fs) + "px" });
+    val.textContent = opt.vfmt ? opt.vfmt(r) : r.v; svg.appendChild(val);
+    const hit = el("rect", { x: 0, y, width: W, height: rowH, fill: "transparent" });
+    hit.addEventListener("pointerenter", ev => {
+      const rect = svg.getBoundingClientRect();
+      tip.className = "tip on";
+      tip.innerHTML = `<i>${r.k}</i><br><b>${r.tip}</b>`;
+      tip.style.left = Math.min(X(r.v) / W * rect.width + 30, rect.width - 20) + "px";
+      tip.style.top = ((y + h / 2) / H * rect.height - 6) + "px";
+    });
+    hit.addEventListener("pointerleave", () => tip.className = "tip");
+    svg.appendChild(hit);
+  });
+}
+
+const gridCounts = {};
+D.grid.forEach(g => gridCounts[g] = (gridCounts[g] || 0) + 1);
+const gridRows = D.gridOrder.filter(g => gridCounts[g]).map(g => ({
+  k: g, v: gridCounts[g], tip: gridCounts[g] + " campaign levels &middot; " + g.split("x").reduce((a, b) => a * b) + " cells"
+}));
+barChart(document.getElementById("c-grid"), gridRows, {
+  W: 392, l: 44, r: 40, rowH: 18, xticks: [0, 100, 200, 300], aria: "Campaign levels by grid shape",
+  vfmt: r => r.v,
+});
+
+const introRows = Object.entries(D.intro).filter(([, v]) => v[0] !== null)
+  .sort((a, b) => a[1][0] - b[1][0])
+  .map(([k, v]) => ({ k, v: v[0], tip: "first at level " + v[0] + " &middot; used by " + v[1] + " levels" }));
+barChart(document.getElementById("c-intro"), introRows, {
+  l: 128, rowH: 23, lollipop: true, xmax: 380,
+  xticks: [1, 50, 100, 150, 200, 250, 300, 350],
+  aria: "First campaign level at which each mechanic appears",
+  vfmt: r => "L" + r.v,
+});
+
+/* ---------- block table ---------- */
+const blocks = [];
+for (let s = 0; s < 600; s += 50) {
+  const idx = D.n.map((n, i) => i).filter(i => D.n[i] > s && D.n[i] <= s + 50);
+  const pick = k => idx.map(i => D[k][i]);
+  blocks.push({
+    range: (s + 1) + "–" + (s + 50),
+    colours: med(pick("colours")), seats: med(pick("slots")), cells: med(pick("cells")),
+    grey: med(pick("grey")), time: med(pick("time")),
+    wide: pick("wide").filter(v => v > 0).length,
+    special: pick("rot").filter(v => v > 0).length + pick("big").filter(v => v > 0).length
+      + pick("hidden").filter(v => v > 0).length,
+  });
+}
+document.getElementById("t-blocks").innerHTML =
+  "<thead><tr><th>Levels</th><th>Colours</th><th>Seats</th><th>Cells</th><th>Grey seats</th>"
+  + "<th>Time</th><th>With wide bench</th><th>With a twist</th></tr></thead><tbody>"
+  + blocks.map(b => `<tr><td>${b.range}</td><td>${b.colours}</td><td>${b.seats}</td><td>${b.cells}</td>`
+    + `<td>${b.grey}</td><td>${b.time}s</td><td>${b.wide}</td><td>${b.special}</td></tr>`).join("")
+  + "</tbody>";
+</script>

@@ -1,0 +1,497 @@
+{
+ "venues": [
+  {
+   "i": 0,
+   "n": "1. Stage Harmony",
+   "d": "Stage Harmony",
+   "t": 0,
+   "v": 0,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 1,
+   "n": "2. Circus Shack",
+   "d": "Circus Shack",
+   "t": 1,
+   "v": 0,
+   "b": [
+    10,
+    15,
+    15,
+    20
+   ],
+   "s": false
+  },
+  {
+   "i": 2,
+   "n": "3. Mermaid Melodies",
+   "d": "Mermaid Melodies",
+   "t": 1,
+   "v": 0,
+   "b": [
+    35,
+    48,
+    61,
+    75
+   ],
+   "s": false
+  },
+  {
+   "i": 3,
+   "n": "4. Illusionist's Stage",
+   "d": "Illusionist's Stage",
+   "t": 1,
+   "v": 0,
+   "b": [
+    45,
+    63,
+    80,
+    105
+   ],
+   "s": false
+  },
+  {
+   "i": 4,
+   "n": "5. Got Talent",
+   "d": "Got Talent",
+   "t": 1,
+   "v": 0,
+   "b": [
+    65,
+    91,
+    119,
+    147
+   ],
+   "s": false
+  },
+  {
+   "i": 5,
+   "n": "6. European Showdown",
+   "d": "European Showdown",
+   "t": 1,
+   "v": 0,
+   "b": [
+    89,
+    113,
+    135,
+    162
+   ],
+   "s": false
+  },
+  {
+   "i": 6,
+   "n": "7. The Voice",
+   "d": "The Voice",
+   "t": 1,
+   "v": 0,
+   "b": [
+    116,
+    139,
+    177,
+    205
+   ],
+   "s": false
+  },
+  {
+   "i": 7,
+   "n": "8. Shoreline Dance",
+   "d": "Shoreline Dance",
+   "t": 1,
+   "v": 0,
+   "b": [
+    132,
+    161,
+    190,
+    219
+   ],
+   "s": false
+  },
+  {
+   "i": 8,
+   "n": "9. Animal Circus",
+   "d": "Animal Circus",
+   "t": 1,
+   "v": 0,
+   "b": [
+    167,
+    200,
+    233,
+    266
+   ],
+   "s": false
+  },
+  {
+   "i": 9,
+   "n": "10. Summer Party",
+   "d": "Summer Party",
+   "t": 1,
+   "v": 0,
+   "b": [
+    202,
+    235,
+    268,
+    301
+   ],
+   "s": false
+  },
+  {
+   "i": 10,
+   "n": "11. Haunted Citadel",
+   "d": "Haunted Citadel",
+   "t": 1,
+   "v": 0,
+   "b": [
+    241,
+    276,
+    311,
+    346
+   ],
+   "s": false
+  },
+  {
+   "i": 11,
+   "n": "12. Christmas Gala",
+   "d": "Christmas Gala",
+   "t": 1,
+   "v": 0,
+   "b": [
+    284,
+    323,
+    362,
+    401
+   ],
+   "s": true
+  }
+ ],
+ "chairs": [
+  {
+   "i": 0,
+   "n": "Stage Harmony",
+   "d": "Stage Harmony",
+   "t": 0,
+   "v": 0,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 1,
+   "n": "Mermaid Melodies",
+   "d": "Mermaid Melodies",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 2,
+   "n": "Illusionist's Stage",
+   "d": "Illusionist's Stage",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 3,
+   "n": "Got Talent",
+   "d": "Got Talent",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 4,
+   "n": "European Showdown",
+   "d": "European Showdown",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 5,
+   "n": "The Voice",
+   "d": "The Voice",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 6,
+   "n": "Shoreline Dance",
+   "d": "Shoreline Dance",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 7,
+   "n": "Animal Circus",
+   "d": "Animal Circus",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 8,
+   "n": "Summer Party",
+   "d": "Summer Party",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 9,
+   "n": "Haunted Citadel",
+   "d": "Haunted Citadel",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 10,
+   "n": "Christmas",
+   "d": "Christmas",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": true
+  }
+ ],
+ "grounds": [
+  {
+   "i": 0,
+   "n": "Stage Harmony",
+   "d": "Stage Harmony",
+   "t": 0,
+   "v": 0,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 1,
+   "n": "Mermaid Melodies",
+   "d": "Mermaid Melodies",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 2,
+   "n": "Illusionist's Stage",
+   "d": "Illusionist's Stage",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 3,
+   "n": "Got Talent",
+   "d": "Got Talent",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 4,
+   "n": "European Showdown",
+   "d": "European Showdown",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 5,
+   "n": "The Voice",
+   "d": "The Voice",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 6,
+   "n": "Shoreline Dance",
+   "d": "Shoreline Dance",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 7,
+   "n": "Animal Circus",
+   "d": "Animal Circus",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 8,
+   "n": "Summer Party",
+   "d": "Summer Party",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 9,
+   "n": "Haunted Citadel",
+   "d": "Haunted Citadel",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 10,
+   "n": "Christmas",
+   "d": "Christmas",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": true
+  }
+ ],
+ "humans": [
+  {
+   "i": 0,
+   "n": "Skin Human 0",
+   "d": "Skin Human 0",
+   "t": 0,
+   "v": 0,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 1,
+   "n": "Skin Human 1",
+   "d": "Skin Human 1",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 2,
+   "n": "Skin Human 2",
+   "d": "Skin Human 2",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 3,
+   "n": "Skin Human 3",
+   "d": "Skin Human 3",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 4,
+   "n": "Skin Human 4",
+   "d": "Skin Human 4",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 5,
+   "n": "Skin Human 5",
+   "d": "Skin Human 5",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 6,
+   "n": "Skin Human 6",
+   "d": "Skin Human 6",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 7,
+   "n": "Skin Human 7",
+   "d": "Skin Human 7",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 8,
+   "n": "Skin Human 8",
+   "d": "Skin Human 8",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 9,
+   "n": "Skull",
+   "d": "Skull",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 10,
+   "n": "Vampire",
+   "d": "Vampire",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 11,
+   "n": "Skin Human 11",
+   "d": "Skin Human 11",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 12,
+   "n": "Skin Human 12",
+   "d": "Skin Human 12",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": false
+  },
+  {
+   "i": 13,
+   "n": "Santa",
+   "d": "Santa",
+   "t": 2,
+   "v": 500,
+   "b": [],
+   "s": true
+  }
+ ]
+}

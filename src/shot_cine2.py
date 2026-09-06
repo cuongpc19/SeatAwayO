@@ -1,0 +1,25 @@
+from PIL import Image
+from playwright.sync_api import sync_playwright
+with sync_playwright() as pw:
+    br = pw.chromium.launch()
+    pg = br.new_page(viewport={"width": 1440, "height": 900}, device_scale_factor=2)
+    errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
+    pg.goto("http://127.0.0.1:8080/game.html?theme=cinema")
+    pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.evaluate("startLevel(10)"); pg.wait_for_timeout(2200)
+    print("still loaded:", pg.evaluate("!!(MOVIE && MOVIE.complete && MOVIE.naturalWidth)"))
+    pg.screenshot(path="cine_desk.png")
+    pg.close()
+    pg = br.new_page(viewport={"width": 430, "height": 860}, device_scale_factor=2)
+    pg.goto("http://127.0.0.1:8080/game.html?theme=cinema")
+    pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.evaluate("startLevel(30)"); pg.wait_for_timeout(2200)
+    pg.screenshot(path="cine_phone.png")
+    print("errors:", errs[:3] or "none")
+    br.close()
+a = Image.open("cine_desk.png"); b = Image.open("cine_phone.png")
+k = .40
+A = a.resize((int(a.width*k), int(a.height*k))); B = b.resize((int(b.width*k), int(b.height*k)))
+sh = Image.new("RGB", (A.width + B.width + 10, max(A.height, B.height)), (8, 8, 11))
+sh.paste(A, (0, 0)); sh.paste(B, (A.width + 10, 0)); sh.save("cine_final.png"); print(sh.size)

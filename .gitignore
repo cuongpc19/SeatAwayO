@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build output. `python build.py` (in src/) welds the engine, the boards and the
+# base64 atlases into two single-file pages, ~2.6 MB each — a rebuild would add
+# another copy of both to history every commit, so neither is tracked. Build with:
+#   cd src && python build.py
+/game.html
+/level_player.html
+
+# Reference material. The phone capture of the original game is the spec for the
+# mechanic, and vid/ is just that video decoded into frames — both regenerable,
+# both far too heavy for the repo.
+/Manythings/
+/vid/
+
+# Screenshot runs. Every src/shot_*.py writes its captures next to itself; they
+# are throwaway evidence for one change, not sources.
+/src/*.png
+/shot_*.png
+
+# Logs
+*.log
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Environment / secrets
+.env
+.env.*
+!.env.example

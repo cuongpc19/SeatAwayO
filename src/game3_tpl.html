@@ -1,0 +1,1018 @@
+<title>Seat Away Level Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --bg: #e9edf2; --panel: #fff; --line: #d5dbe4;
+  --ink: #12161c; --ink-2: #4d5561; --ink-3: #838c99;
+  --accent: #2a78d6; --bad: #d64545;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #14171b; --panel: #1d2127; --line: #2f353e;
+    --ink: #f0f2f5; --ink-2: #b3bac4; --ink-3: #7e8794;
+    --accent: #3987e5; --bad: #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14171b; --panel: #1d2127; --line: #2f353e;
+  --ink: #f0f2f5; --ink-2: #b3bac4; --ink-3: #7e8794;
+  --accent: #3987e5; --bad: #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font-family: Archivo, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1020px; margin: 0 auto; padding: 26px 20px 60px; display: flex; flex-direction: column; gap: 14px; }
+h1 { margin: 0; font-size: 29px; font-weight: 800; letter-spacing: -.03em; }
+.sub { color: var(--ink-2); font-size: 14.5px; margin: 5px 0 0; max-width: 62ch; line-height: 1.55; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+.hud { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; box-shadow: var(--shadow); }
+.stat .k { font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.stat .v { font-size: 20px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat .v.warn { color: var(--bad); }
+.timebar { height: 4px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.timebar i { display: block; height: 100%; background: var(--accent); }
+.timebar i.warn { background: var(--bad); }
+
+.queue { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px;
+         box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; }
+.queue .lbl { font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: .14em;
+              text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.chips { display: flex; gap: 6px; align-items: center; overflow: hidden; }
+.chip { width: 24px; height: 24px; border-radius: 50%; flex: none; border: 2px solid rgba(255,255,255,.5); }
+.chip.next { width: 34px; height: 34px; box-shadow: 0 0 0 3px var(--accent); }
+.qmore { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-3); }
+
+.stage { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+         box-shadow: var(--shadow); background: #f4f4f3; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
+.overlay { position: absolute; inset: 0; display: none; place-items: center; background: rgba(12,16,22,.55); }
+.overlay.on { display: grid; }
+.card { background: var(--panel); border-radius: 14px; padding: 24px 28px; text-align: center; min-width: 260px; }
+.card h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
+.card p { margin: 0 0 16px; color: var(--ink-2); font-size: 14px; }
+
+button { font-family: Archivo, sans-serif; font-size: 13.5px; font-weight: 600; border-radius: 9px;
+         border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 8px 15px; cursor: pointer; }
+button:hover { border-color: var(--ink-3); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.controls .spacer { flex: 1; }
+.hint { color: var(--ink-3); font-size: 12.5px; }
+
+.rules { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 15px 17px; box-shadow: var(--shadow); }
+.rules h3 { margin: 0 0 7px; font-size: 13.5px; font-weight: 700; }
+.rules ol { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; line-height: 1.65; }
+.rules b { color: var(--ink); font-weight: 600; }
+.note { color: var(--ink-3); font-size: 12px; line-height: 1.6; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 700px) { .hud { grid-template-columns: repeat(3, 1fr); } h1 { font-size: 24px; } }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Seat Away Level Player</h1>
+    <p class="sub">Every campaign board the APK ships &mdash; <b>633</b> of them under 600 level names, because 171 names
+      carry two or three different layouts. Decoded straight from the bundle: same grid, same seats, same colours,
+      same passenger list, same clock. Nothing here is generated.</p>
+  </div>
+
+  <div class="hud">
+    <div class="stat"><div class="k">Campaign level</div><div class="v mono" id="s-level">1</div></div>
+    <div class="stat"><div class="k">Seated</div><div class="v mono" id="s-seated">0 / 0</div></div>
+    <div class="stat"><div class="k">Grid</div><div class="v mono" id="s-grid">3&times;6</div></div>
+    <div class="stat"><div class="k">Colours</div><div class="v mono" id="s-col">1</div></div>
+    <div class="stat"><div class="k">Time</div><div class="v mono" id="s-time">5:00</div>
+      <div class="timebar"><i id="s-bar" style="width:100%"></i></div></div>
+  </div>
+
+  <div class="queue">
+    <span class="lbl">At the stop</span>
+    <div class="chips" id="q-chips"></div>
+    <span class="qmore" id="q-more"></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="board" width="1760" height="1080" aria-label="Bus floor"></canvas>
+    <div class="overlay" id="ov">
+      <div class="card">
+        <h2 id="ov-title">Level complete</h2>
+        <p id="ov-text">Everyone found a seat.</p>
+        <div class="controls" style="justify-content:center">
+          <button class="primary" id="ov-next">Next level</button>
+          <button id="ov-retry">Retry</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="b-retry">Restart</button>
+    <button id="b-prev">&larr; Prev</button>
+    <button id="b-next">Next &rarr;</button>
+    <button id="b-jump">Go to level&hellip;</button>
+    <button id="b-door-up">Door &uarr;</button>
+    <button id="b-door-dn">Door &darr;</button>
+    <button id="b-door-auto">Door auto</button>
+    <button id="b-speed">Speed 1&times;</button>
+    <button id="b-guides">Guides off</button>
+    <button id="b-trace">Trace off</button>
+    <span class="spacer"></span>
+    <pre id="trace" hidden style="grid-column:1/-1;margin:.5rem 0 0;padding:.5rem .6rem;background:#11161d;color:#9fd4ff;font:11px/1.45 ui-monospace,monospace;border-radius:6px;overflow-x:auto;white-space:pre;max-height:9.5em"></pre>
+    <span class="hint" id="hint">Press and hold a seat, drag it clear of the aisle, let go.</span>
+  </div>
+
+  <div class="rules">
+    <h3>How it plays</h3>
+    <ol>
+      <li><b>Moving seats is your only move.</b> Press a seat anywhere on it &mdash; the seat itself or the
+        passenger sitting on it &mdash; and it follows the pointer until you let go. Passengers board on their own,
+        one at a time, the moment the one at the front can walk to a seat that will take them.</li>
+      <li>They come in through the <b>door</b> on the right and walk across empty floor only &mdash; seats block the way.
+        A coloured seat takes only its own colour; a <b>grey seat</b> takes anyone.</li>
+      <li>A seat can only be entered over its cushion or from either side. Nobody climbs in over the backrest, so
+        the tile behind a seat is no use for boarding it.</li>
+      <li>A seat with somebody already on it still slides, passenger and all &mdash; but a seat someone is
+        currently walking to is pinned until they sit down.</li>
+      <li>The empty floor never grows, and in a real board it is broken into pockets. Sliding seats to join those
+        pockets up is the whole puzzle. Seat everyone before the clock runs out.</li>
+    </ol>
+    <p class="note">A blue tint on floor the queue can reach, a white ring on the seat they are heading for, the
+      walking route and a dashed ring on a door-blocking seat are coaching overlays added here &mdash; the shipped
+      game draws none of them, so they are off by default. Picking a seat up only glows that seat's own tile.</p>
+    <p class="note" id="method"></p>
+  </div>
+</div>
+
+<script>
+const LEVELS = /*__LEVELS__*/;
+const META = /*__META__*/;
+const ATLAS_SRC = "data:image/png;base64,/*__ATLAS__*/";
+const WMETA = /*__WMETA__*/;
+const WALK_SRC = "data:image/png;base64,/*__WALK__*/";
+
+const NAMES = ["grey", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "lime", "teal", "brown", "navy"];
+const CSS = { grey: "#969ca8", red: "#e83e48", orange: "#fa822a", yellow: "#fac42e", green: "#4ac65c",
+              cyan: "#2aced6", blue: "#2e92f2", purple: "#a25cea", pink: "#f470b0",
+              lime: "#a8d94a", teal: "#25a89b", brown: "#b0784a", navy: "#3b56a8" };
+const SPRITE = { grey: "grey", red: "red", orange: "orange", yellow: "yellow", green: "green",
+                 cyan: "cyan", blue: "blue", purple: "purple", pink: "pink",
+                 lime: "green", teal: "cyan", brown: "orange", navy: "blue" };
+const colName = i => NAMES[i] || "grey";
+
+const SX = 1.60, SZ = 1.60;
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/* ---------------- projection (matches how the atlas was baked) ---------------- */
+function rotM(yaw, pitch) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(pitch), sx = Math.sin(pitch);
+  return [[cy, 0, sy], [sx * sy, cx, -sx * cy], [-cx * sy, sx, cx * cy]];
+}
+const R = rotM(META.yaw, META.pitch);
+const view = (x, y, z) => [R[0][0]*x + R[0][1]*y + R[0][2]*z,
+                           R[1][0]*x + R[1][1]*y + R[1][2]*z,
+                           R[2][0]*x + R[2][1]*y + R[2][2]*z];
+const BX = view(1, 0, 0), BZ = view(0, 0, 1);
+
+/* ---------------- model ---------------- */
+let S = null;
+let DOOR_ROW = null;       // null = pick it automatically, see load()
+let INSTANT = false;       // headless play-throughs skip the walk animation
+let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
+                           // mid-walk would let the old chain seat people into
+                           // the new board. Every load stamps a fresh token.
+let GUIDES = false;        // the coaching overlays - none of these are in the real game
+let SPEED = 1;             // 1 = normal, 2 = double
+const BASE_MS_PER_UNIT = 260;                       // ms per grid unit walked
+const BASE_GAP_MS = 260;                            // pause between passengers
+const STRIDE = 0.52;                                // world units per animation frame
+const HOP_MS = 300;                                 // the little jump onto the seat
+const idx = (g, c, r) => r * g.W + c;
+const inBoard = (g, c, r) => c >= 0 && c < g.W && r >= 0 && r < g.H && !g.hole[idx(g, c, r)];
+const isFree = (g, c, r) => inBoard(g, c, r) && g.occ[idx(g, c, r)] < 0;
+
+/** The grid cells a seat covers. SeatDirect 0 and 2 lie along x, 1 and 3 along z. */
+function cellsOf(b) {
+  const a = [];
+  for (let k = 0; k < b.len; k++) a.push(b.dir & 1 ? [b.c, b.r + k] : [b.c + k, b.r]);
+  return a;
+}
+/** Which way the seat faces, as a grid step. 0 up, 1 right, 2 down, 3 left. */
+const FACING = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+/** The three ways into a seat: over the cushion, or from either side. Never over
+    the backrest, so the step directly behind the seat is not one of them. */
+function entryDirs(b) {
+  const [fx, fz] = FACING[b.dir];
+  return DIRS.filter(([dc, dr]) => !(dc === -fx && dr === -fz));
+}
+
+/** Floor tiles from which a passenger could take seat `b`'s k-th place.
+    Each place is entered on its own - nobody walks through one seat to reach
+    the next place along. */
+function cellEntries(g, b, k) {
+  const own = new Set(cellsOf(b).map(([c, r]) => c + "," + r));
+  const [c, r] = cellsOf(b)[k];
+  const out = [];
+  for (const [dc, dr] of entryDirs(b)) {
+    const nc = c + dc, nr = r + dr;
+    if (!inBoard(g, nc, nr) || own.has(nc + "," + nr)) continue;
+    out.push([nc, nr]);
+  }
+  return out;
+}
+function entryCells(g, b) {
+  const seen = new Set(), out = [];
+  for (let k = 0; k < b.len; k++)
+    for (const [c, r] of cellEntries(g, b, k)) {
+      const key = c + "," + r;
+      if (seen.has(key)) continue;
+      seen.add(key); out.push([c, r]);
+    }
+  return out;
+}
+
+function place(g, b, c, r) {
+  for (const [cc, rr] of cellsOf(b)) g.occ[idx(g, cc, rr)] = -1;
+  b.c = c; b.r = r;
+  for (const [cc, rr] of cellsOf(b)) g.occ[idx(g, cc, rr)] = b.id;
+}
+function fits(g, b, c, r) {
+  const save = [b.c, b.r];
+  b.c = c; b.r = r;
+  const cs = cellsOf(b);
+  b.c = save[0]; b.r = save[1];
+  for (const [cc, rr] of cs) {
+    if (!inBoard(g, cc, rr)) return false;
+    // The doorway is NOT reserved. Keeping it clear was my own invention and it
+    // quietly walled off the board: on a 4-wide grid the door cell is often the
+    // only link between the top row and the right-hand column, so seats had two
+    // legal cells where they should have had a dozen. A seat parked in the door
+    // is the normal starting state of this game - clearing it is the puzzle.
+    const id = g.occ[idx(g, cc, rr)];
+    if (id >= 0 && id !== b.id) return false;
+  }
+  return true;
+}
+function reachRegion(g) {
+  const seen = new Uint8Array(g.W * g.H);
+  if (!isFree(g, g.W - 1, g.door)) return seen;
+  seen[idx(g, g.W - 1, g.door)] = 1;
+  const st = [[g.W - 1, g.door]];
+  while (st.length) {
+    const [c, r] = st.pop();
+    for (const [dc, dr] of DIRS) {
+      const nc = c + dc, nr = r + dr;
+      if (isFree(g, nc, nr) && !seen[idx(g, nc, nr)]) { seen[idx(g, nc, nr)] = 1; st.push([nc, nr]); }
+    }
+  }
+  return seen;
+}
+function touches(g, b, region) {
+  for (const [c, r] of entryCells(g, b)) if (region[idx(g, c, r)]) return true;
+  return false;
+}
+const freeSlots = b => b.occ.reduce((n, v) => n + (v == null ? 1 : 0), 0);
+const accepts = (b, ci) =>
+  freeSlots(b) > (b.pending || 0) && (b.colour === 0 || b.colour === ci);
+function canSeat(g, b, ci, region) { return accepts(b, ci) && touches(g, b, region || reachRegion(g)); }
+
+/** Where this seat can slide to, one cell at a time through the empty floor. */
+function placements(g, b) {
+  if (b.locked) return [];
+  const seen = new Set([b.c + "," + b.r]), out = [], q = [[b.c, b.r]];
+  while (q.length) {
+    const [c, r] = q.shift();
+    for (const [dc, dr] of DIRS) {
+      const nc = c + dc, nr = r + dr, k = nc + "," + nr;
+      if (seen.has(k)) continue;
+      if (g.walkCells && g.walkCells.has(k)) continue;   // somebody is crossing it
+      const home = [b.c, b.r];
+      b.c = c; b.r = r;
+      const ok = fits(g, b, nc, nr);
+      b.c = home[0]; b.r = home[1];
+      if (!ok) continue;
+      seen.add(k); out.push([nc, nr]); q.push([nc, nr]);
+    }
+  }
+  return out;
+}
+
+function load(n) {
+  const raw = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, n - 1))];
+  const W = raw.w, H = raw.h;
+  const hole = new Uint8Array(W * H);
+  for (const i of raw.holes) hole[i] = 1;
+  const occ = new Int16Array(W * H).fill(-1);
+  const seats = raw.seats.map((s, i) => ({
+    id: i, c: s[0], r: s[1], len: s[2], colour: s[3],
+    dir: s[4] | 0,                                  // SeatDirect 0..3, straight from the APK
+    occ: new Array(s[2]).fill(null),                // one place per cell
+    pending: 0, locked: false,
+  }));
+  const g = { W, H, hole, occ, seats, door: 0, level: n, name: raw.id || raw.name,
+              token: ++LOAD_TOKEN };
+  for (const b of seats) for (const [c, r] of cellsOf(b)) occ[idx(g, c, r)] = b.id;
+
+  // The level data never records the door. In the recording it sits on the right
+  // wall just past the front-most seats, so take the first free right-edge cell
+  // counting from the front of the bus; the Door buttons override this.
+  if (DOOR_ROW != null) {
+    g.door = Math.max(0, Math.min(H - 1, DOOR_ROW));
+  } else {
+    let pick = -1;
+    for (let r = 0; r < H; r++) if (isFree(g, W - 1, r)) { pick = r; break; }
+    g.door = pick < 0 ? 0 : pick;
+  }
+
+  g.queue = raw.queue.slice();
+  g.total = g.queue.length;
+  g.colours = new Set(raw.queue).size;
+  g.time = raw.time; g.left = raw.time;
+  g.seated = 0; g.phase = "play"; g.moves = 0; g.walkCells = null;
+  g.sel = null; g.drag = null; g.anim = [];
+  S = g;
+  S.boarding = false;
+  fitCanvas(g);
+  LAY = layout();
+  document.getElementById("ov").classList.remove("on");
+  hud(); draw();
+  autoBoard();
+}
+
+/* ---------------- rendering ---------------- */
+const cv = document.getElementById("board"), ctx = cv.getContext("2d");
+let atlas = new Image(), walkAtlas = new Image(), LAY = null;
+let loaded = 0, ready = false;
+let ALPHA = null;                   // per-pixel opacity of the seat atlas
+function buildAlpha() {
+  const cv2 = document.createElement("canvas");
+  cv2.width = atlas.naturalWidth; cv2.height = atlas.naturalHeight;
+  const c2 = cv2.getContext("2d", { willReadFrequently: true });
+  c2.drawImage(atlas, 0, 0);
+  const d = c2.getImageData(0, 0, cv2.width, cv2.height).data;
+  const a = new Uint8Array(cv2.width * cv2.height);
+  for (let i = 0, j = 3; i < a.length; i++, j += 4) a[i] = d[j];
+  ALPHA = { w: cv2.width, h: cv2.height, a };
+}
+const onLoad = () => { if (++loaded === 2) { buildAlpha(); ready = true; draw(); } };
+atlas.onload = onLoad; walkAtlas.onload = onLoad;
+atlas.src = ATLAS_SRC; walkAtlas.src = WALK_SRC;
+
+/** World extents of everything we draw: the bus, plus the stop beside it. */
+function extents(g) {
+  const pad = 1.4;
+  const x0 = -(g.W - 1) / 2 * SX, z0 = -(g.H - 1) / 2 * SZ;
+  const pts = [];
+  for (const [cc, rr] of [[-pad, -pad], [g.W - 1 + pad + 2.6, -pad],
+                          [-pad, g.H - 1 + pad], [g.W - 1 + pad + 2.6, g.H - 1 + pad]])
+    pts.push(view(x0 + cc * SX, 0, z0 + rr * SZ));
+  pts.push(view(x0, 2.2, z0 - pad * SZ));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => -p[1]);
+  return { x0, z0, minX: Math.min(...xs), maxX: Math.max(...xs),
+           minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+/** Boards are tall and narrow; a fixed wide canvas would strand them in a sea of
+    background. Give the canvas the board's own aspect instead. */
+function fitCanvas(g) {
+  const e = extents(g);
+  const aspect = (e.maxX - e.minX) / (e.maxY - e.minY);
+  const TARGET = 1250000;
+  let w = Math.round(Math.sqrt(TARGET * aspect));
+  let h = Math.round(TARGET / Math.max(w, 1));
+  w = Math.max(620, Math.min(1900, w));
+  h = Math.max(520, Math.min(1560, h));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+}
+
+function layout() {
+  const g = S, e = extents(g);
+  const s = Math.min((cv.width - 30) / (e.maxX - e.minX), (cv.height - 30) / (e.maxY - e.minY));
+  const usedW = (e.maxX - e.minX) * s, usedH = (e.maxY - e.minY) * s;
+  return { s,
+           ox: (cv.width - usedW) / 2 - e.minX * s,
+           oy: (cv.height - usedH) / 2 - e.minY * s,
+           x0: e.x0, z0: e.z0 };
+}
+
+function P(x, y, z) {
+  const v = view(x, y, z);
+  return [LAY.ox + v[0] * LAY.s, LAY.oy - v[1] * LAY.s, v[2]];
+}
+const cellW = (c) => LAY.x0 + c * SX;
+const cellZ = (r) => LAY.z0 + r * SZ;
+
+/** Where a seat's sprite is centred: long seats span several cells. */
+function seatCentre(b) {
+  const n = (b.len - 1) / 2;
+  return b.dir & 1 ? [cellW(b.c), cellZ(b.r) + n * SZ]
+                   : [cellW(b.c) + n * SX, cellZ(b.r)];
+}
+const seatFrame = b => "s" + b.len + "_" + b.dir + "_" + (SPRITE[colName(b.colour)] || "grey");
+const riderFrame = (b, ci) => "r" + b.dir + "_" + (SPRITE[colName(ci)] || "grey");
+
+/** Frames carry their own size and origin: [x, y, w, h, pivotX, pivotY]. */
+function blit(frame, wx, wy, wz, alpha) {
+  const f = META.frames[frame]; if (!f) return;
+  const [px, py] = P(wx, wy, wz);
+  const k = LAY.s / META.scale;
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.drawImage(atlas, f[0], f[1], f[2], f[3],
+                px - f[4] * k, py - f[5] * k, f[2] * k, f[3] * k);
+  ctx.globalAlpha = 1;
+}
+/** One frame of the walk cycle: facing d/r/u/l, phase 0-3. */
+function blitWalk(colour, facing, phase, wx, wy, wz) {
+  const f = WMETA.frames["w" + facing + phase + "_" + colour];
+  if (!f) return blit("idle_" + colour, wx, wy, wz, 1);
+  const [px, py] = P(wx, wy, wz);
+  const k = LAY.s / WMETA.scale * .74;
+  ctx.drawImage(walkAtlas, f[0], f[1], WMETA.tile, WMETA.tile,
+                px - WMETA.pivot[0] * k, py - WMETA.pivot[1] * k,
+                WMETA.tile * k, WMETA.tile * k);
+}
+
+function quad(pts, fill) {
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+}
+function tileQuad(c, r, y) {
+  return [P(cellW(c) - SX / 2, y, cellZ(r) - SZ / 2), P(cellW(c) + SX / 2, y, cellZ(r) - SZ / 2),
+          P(cellW(c) + SX / 2, y, cellZ(r) + SZ / 2), P(cellW(c) - SX / 2, y, cellZ(r) + SZ / 2)];
+}
+function shadow(wx, wz, rx) {
+  const [px, py] = P(wx, 0, wz);
+  ctx.save(); ctx.globalAlpha = .16; ctx.fillStyle = "#12203a";
+  ctx.beginPath(); ctx.ellipse(px, py, rx * LAY.s, rx * LAY.s * .42, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.restore();
+}
+
+function draw() {
+  if (!S) return;
+  const g = S;
+  fitCanvas(g);
+  LAY = layout();
+  if (!ready) return;
+  const grad = ctx.createLinearGradient(0, 0, 0, cv.height);
+  grad.addColorStop(0, "#fdfdfc"); grad.addColorStop(1, "#ececeb");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // bus shell
+  const pad = 1.05;
+  quad([P(cellW(-pad), 0, cellZ(-pad)), P(cellW(g.W - 1 + pad), 0, cellZ(-pad)),
+        P(cellW(g.W - 1 + pad), 0, cellZ(g.H - 1 + pad)), P(cellW(-pad), 0, cellZ(g.H - 1 + pad))], "#f8bf1a");
+  const inner = .78;
+  quad([P(cellW(-inner), .002, cellZ(-inner)), P(cellW(g.W - 1 + inner), .002, cellZ(-inner)),
+        P(cellW(g.W - 1 + inner), .002, cellZ(g.H - 1 + inner)), P(cellW(-inner), .002, cellZ(g.H - 1 + inner))], "#d2452c");
+
+  // floor
+  for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
+    if (g.hole[idx(g, c, r)]) continue;
+    quad(tileQuad(c, r, .006), (r + c) % 2 ? "#95948c" : "#545354");
+  }
+  // doorway: an opening in the wall, the floor under it stays plain
+  const dq = [P(cellW(g.W - 1) + SX * .5, .01, cellZ(g.door) - SZ * .42),
+              P(cellW(g.W - 1) + SX * 1.02, .01, cellZ(g.door) - SZ * .42),
+              P(cellW(g.W - 1) + SX * 1.02, .01, cellZ(g.door) + SZ * .42),
+              P(cellW(g.W - 1) + SX * .5, .01, cellZ(g.door) + SZ * .42)];
+  quad(dq, "#7fd2f2");
+
+  const region = reachRegion(g);
+  const nextCol = g.queue.length ? g.queue[0] : -1;
+  const doorBlocked = !isFree(g, g.W - 1, g.door);
+  g.nextSeat = g.queue.length ? pickSeat(g, g.queue[0]) : null;
+
+  // Lighting up every legal destination floods the board, so the only thing that
+  // marks a picked-up seat is a glow on its own tile.
+  if (!g.sel) {
+    for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++)
+      if (GUIDES && region[idx(g, c, r)]) {
+        ctx.save(); ctx.globalAlpha = .22;
+        quad(tileQuad(c, r, .012), "#bfe9ff");
+        ctx.restore();
+      }
+  }
+
+  for (const a of g.anim) {
+    if (!GUIDES || !a.route) continue;
+    ctx.save(); ctx.globalAlpha = .30;
+    for (const [c, r] of a.route) quad(tileQuad(c, r, .014), "#ffffff");
+    ctx.restore();
+  }
+
+  const items = [];
+  const push = (wx, wz, fn, bias) => items.push({ z: view(wx, 0, wz)[2] + (bias || 0), fn });
+
+  const held = HELD && HELD.moved ? HELD.seat : null;
+  const gdx = held ? HELD.dx : 0, gdz = held ? HELD.dz : 0;
+
+  for (const b of g.seats) {
+    if (b === held) continue;                 // drawn last, riding the cursor
+    const [sx, sz] = seatCentre(b);
+    push(sx, sz, () => { shadow(sx, sz, .45 * b.len); blit(seatFrame(b), sx, 0, sz, 1); });
+    if (GUIDES && doorBlocked && b.id === g.occ[idx(g, g.W - 1, g.door)]) {
+      const cs = cellsOf(b), mid = cs[Math.floor(cs.length / 2)];
+      push(cellW(mid[0]), cellZ(mid[1]), () => {
+        const [px, py] = P(cellW(mid[0]), .02, cellZ(mid[1]));
+        ctx.save(); ctx.strokeStyle = "#ffcf3d"; ctx.lineWidth = Math.max(3, LAY.s * .075);
+        ctx.setLineDash([LAY.s * .18, LAY.s * .12]);
+        ctx.beginPath(); ctx.ellipse(px, py, SX * .5 * LAY.s, SX * .5 * LAY.s * .42, 0, 0, Math.PI * 2);
+        ctx.stroke(); ctx.restore();
+      }, -.05);
+    }
+    if (GUIDES && g.nextSeat && b === g.nextSeat.seat) {
+      const cs = cellsOf(b), mid = cs[Math.floor(cs.length / 2)];
+      push(cellW(mid[0]), cellZ(mid[1]), () => {
+        const [px, py] = P(cellW(mid[0]), .02, cellZ(mid[1]));
+        ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = Math.max(2, LAY.s * .055);
+        ctx.beginPath(); ctx.ellipse(px, py, SX * .46 * LAY.s, SX * .46 * LAY.s * .42, 0, 0, Math.PI * 2);
+        ctx.stroke(); ctx.restore();
+      }, -.05);
+    }
+    b.occ.forEach((ci, i) => {
+      if (ci == null) return;
+      const [c, r] = cellsOf(b)[i];
+      push(cellW(c), cellZ(r), () => blit(riderFrame(b, ci), cellW(c), .05, cellZ(r) - .04), .3);
+    });
+  }
+
+  // the stop
+  const laneX = cellW(g.W - 1) + SX * 2.0;
+  for (let i = 0; i < Math.min(g.queue.length, 7); i++) {
+    const wz = cellZ(g.door) + i * 1.15;
+    const nm = SPRITE[colName(g.queue[i])] || "grey";
+    push(laneX, wz, () => { shadow(laneX, wz, .3); blit("idle_" + nm, laneX, 0, wz, i ? Math.max(.4, 1 - i * .11) : 1); });
+  }
+  for (const a of g.anim)
+    push(a.x, a.z, () => {
+      shadow(a.x, a.z, .3);
+      blitWalk(SPRITE[colName(a.ci)] || "grey", a.facing || "d", a.phase || 0, a.x, a.y || 0, a.z);
+    }, 1.5);
+
+  items.sort((p, q) => p.z - q.z);
+  for (const it of items) it.fn();
+
+  if (held) {
+    const A = .72;                          // lighter than a seat that is put down
+    const [sx, sz] = seatCentre(held);
+    shadow(sx + gdx, sz + gdz, .45 * held.len);
+    blit(seatFrame(held), sx + gdx, 0, sz + gdz, A);
+    held.occ.forEach((ci, i) => {
+      if (ci == null) return;
+      const [c, r] = cellsOf(held)[i];
+      blit(riderFrame(held, ci), cellW(c) + gdx, .05, cellZ(r) + gdz - .04, A);
+    });
+  }
+
+  if (g.sel) {
+    for (const [c, r] of cellsOf(g.sel)) {
+      ctx.save(); ctx.globalAlpha = .30;
+      quad(tileQuad(c, r, .016), "#ffe9a8"); ctx.restore();
+    }
+  }
+
+}
+
+/* ---------------- input ---------------- */
+const seatAt = (g, c, r) => { const id = g.occ[idx(g, c, r)]; return id < 0 ? null : g.seats[id]; };
+
+function toCanvas(clientX, clientY) {
+  const rect = cv.getBoundingClientRect();
+  return [(clientX - rect.left) / rect.width * cv.width,
+          (clientY - rect.top) / rect.height * cv.height];
+}
+/** Where the cursor is on the floor, in world units - not snapped to a tile. */
+function pickWorld(clientX, clientY) {
+  const [px, py] = toCanvas(clientX, clientY);
+  const o = P(0, 0, 0);
+  const a = BX[0] * LAY.s, b = BZ[0] * LAY.s, c2 = -BX[1] * LAY.s, d = -BZ[1] * LAY.s;
+  const det = a * d - b * c2;
+  if (!det) return null;
+  const dx = px - o[0], dy = py - o[1];
+  return [(dx * d - b * dy) / det, (a * dy - dx * c2) / det];
+}
+
+function pickCell(clientX, clientY) {
+  const [px, py] = toCanvas(clientX, clientY);
+  const o = P(0, 0, 0);
+  const a = BX[0] * LAY.s, b = BZ[0] * LAY.s, c2 = -BX[1] * LAY.s, d = -BZ[1] * LAY.s;
+  const det = a * d - b * c2;
+  if (!det) return null;
+  const dx = px - o[0], dy = py - o[1];
+  const wx = (dx * d - b * dy) / det, wz = (a * dy - dx * c2) / det;
+  const col = Math.round((wx - LAY.x0) / SX), row = Math.round((wz - LAY.z0) / SZ);
+  if (col < 0 || col >= S.W || row < 0 || row >= S.H) return null;
+  return [col, row];
+}
+
+/** A seat sprite - and the passenger on it - is drawn well above its floor tile,
+    so hit-testing the tile means you have to aim at the ground under the seat.
+    Test the drawn box instead and take the frontmost one. */
+/** Does a drawn sprite actually cover this canvas point? Mirrors blit() exactly,
+    then asks the atlas whether that pixel is opaque - a box around the sprite is
+    far too generous under this camera and grabs the seat behind. */
+function spriteHit(frame, wx, wy, wz, X, Y) {
+  const f = META.frames[frame]; if (!f || !ALPHA) return false;
+  const [px, py] = P(wx, wy, wz);
+  const k = LAY.s / META.scale;
+  const u = Math.round(f[0] + (X - (px - f[4] * k)) / k);
+  const v = Math.round(f[1] + (Y - (py - f[5] * k)) / k);
+  if (u < f[0] || u >= f[0] + f[2] || v < f[1] || v >= f[1] + f[3]) return false;
+  return ALPHA.a[v * ALPHA.w + u] > 24;
+}
+
+function pickSeatAt(clientX, clientY) {
+  const [X, Y] = toCanvas(clientX, clientY);
+  let best = null, bestZ = -Infinity;
+  const take = (b, z) => { if (z > bestZ) { bestZ = z; best = b; } };
+  for (const b of S.seats) {
+    const [sx, sz] = seatCentre(b);
+    if (spriteHit(seatFrame(b), sx, 0, sz, X, Y)) take(b, view(sx, 0, sz)[2]);
+    b.occ.forEach((ci, i) => {                  // a passenger counts as their seat
+      if (ci == null) return;
+      const [c, r] = cellsOf(b)[i];
+      if (spriteHit(riderFrame(b, ci), cellW(c), .05, cellZ(r) - .04, X, Y))
+        take(b, view(cellW(c), 0, cellZ(r))[2] + .3);
+    });
+  }
+  if (best) return best;
+  const cell = pickCell(clientX, clientY);          // fall back to the floor tile
+  return cell ? seatAt(S, cell[0], cell[1]) : null;
+}
+
+/* ---------------- picking a seat up and putting it down ----------------
+   One state, one gesture: press a seat, it follows the pointer, release to drop
+   it. There is deliberately no sticky selection - carrying one over from the
+   last press is what made it feel like the old seat was still in hand.        */
+
+let HELD = null;   // { seat, w0, dx, dz, moved }
+
+/** Where the held seat is hovering, in fractional cells. */
+function dropAt() {
+  const b = HELD.seat;
+  return [(cellW(b.c) + HELD.dx - LAY.x0) / SX, (cellZ(b.r) + HELD.dz - LAY.z0) / SZ];
+}
+/** The legal destination nearest the cursor. Demanding an exact cell made tight
+    boards feel like the seat refused to move: on most of them a seat has only one
+    or two places to go, and rounding to the wrong one dropped it back home. */
+function dropCell() {
+  if (!HELD) return null;
+  const [cf, rf] = dropAt();
+  let best = null, bestD = SNAP * SNAP;
+  for (const [c, r] of HELD.targets) {
+    const d = (c - cf) * (c - cf) + (r - rf) * (r - rf);
+    if (d < bestD) { bestD = d; best = [c, r]; }
+  }
+  return best;
+}
+const SNAP = 1.4;                 // how far from a legal cell a drop still counts
+function releaseHeld() { HELD = null; S.sel = null; S.dragTargets = null; }
+
+/* ---- gesture recorder ----------------------------------------------------
+   A drag that misbehaves under a real mouse leaves no trace in a headless test,
+   so every gesture is written down: what was under the pointer, what state the
+   seat was in, and what the drop resolved to. Shown on screen, and posted to the
+   dev server when one is listening.                                          */
+const TRACE = [];
+let TRACING = new URLSearchParams(location.search).has("trace");
+function trace(o) {
+  if (!TRACING) return;
+  o.t = Math.round(performance.now());
+  TRACE.push(o); if (TRACE.length > 40) TRACE.shift();
+  const el = document.getElementById("trace");
+  if (el) el.textContent = TRACE.slice(-7).reverse()
+    .map(x => Object.entries(x).filter(([k]) => k !== "t")
+      .map(([k, v]) => k + "=" + JSON.stringify(v)).join(" ")).join(String.fromCharCode(10));
+  try {
+    if (location.protocol.startsWith("http"))
+      fetch("/log", { method: "POST", body: JSON.stringify(o), keepalive: true });
+  } catch (e) {}
+}
+
+cv.addEventListener("pointerdown", ev => {
+  if (!S || S.phase !== "play") return;
+  const seat = pickSeatAt(ev.clientX, ev.clientY);
+  trace({ ev: "down", level: S.level, seat: seat ? seat.id : null,
+          at: seat ? [seat.c, seat.r] : null, len: seat ? seat.len : null,
+          locked: seat ? !!seat.locked : null,
+          occ: seat ? seat.occ.filter(v => v != null).length : null,
+          places: seat ? placements(S, seat).length : null,
+          walkers: S.anim.length, ptype: ev.pointerType, btn: ev.buttons });
+  if (!seat) { trace({ ev: "refused", reason: "no seat under pointer" }); releaseHeld(); draw(); return; }
+  if (seat.locked) { trace({ ev: "refused", seat: seat.id, reason: "locked" }); bump(); say("Somebody is already walking to that seat."); releaseHeld(); draw(); return; }
+  const targets = placements(S, seat);
+  if (!targets.length) {                      // boxed in on every side
+    trace({ ev: "refused", seat: seat.id, reason: "no placements" });
+    bump(); say("No room beside that seat right now - shift a neighbour and try again.");
+    releaseHeld(); draw(); return;
+  }
+  const w = pickWorld(ev.clientX, ev.clientY);
+  HELD = { seat, w0: w, dx: 0, dz: 0, moved: false,
+           x: ev.clientX, y: ev.clientY, targets };
+  S.sel = seat;
+  try { cv.setPointerCapture(ev.pointerId); } catch (e) {}
+  draw();
+});
+
+cv.addEventListener("pointermove", ev => {
+  if (!HELD) return;
+  // A pointerup delivered outside the canvas used to be missed, leaving the seat
+  // stuck to a cursor with no button down. No buttons means the gesture is over.
+  if (ev.buttons === 0) { endDrag(ev); return; }
+  if (!HELD.moved && Math.hypot(ev.clientX - HELD.x, ev.clientY - HELD.y) > 3) HELD.moved = true;
+  const w = pickWorld(ev.clientX, ev.clientY);
+  if (w && HELD.w0) { HELD.dx = w[0] - HELD.w0[0]; HELD.dz = w[1] - HELD.w0[1]; }
+  draw();
+});
+
+function endDrag(ev) {
+  if (!HELD) return;
+  const h = HELD;
+  let cell = h.moved ? dropCell() : null;
+  if (cell && (h.seat.locked || !placements(S, h.seat)
+        .some(([c, r]) => c === cell[0] && r === cell[1]))) {
+    cell = null;                       // somebody set off for it mid-drag
+    say("Somebody started walking to that seat - it has to stay put.");
+    bump();
+  }
+  trace({ ev: "up", seat: h.seat.id, moved: h.moved,
+          from: [h.seat.c, h.seat.r], hover: dropAt().map(v => +v.toFixed(2)),
+          targets: h.targets.length, drop: cell, why: ev && ev.type });
+  releaseHeld();
+  if (cell) {
+    place(S, h.seat, cell[0], cell[1]);
+    S.moves++;
+    hud(); draw();
+    autoBoard();                       // whoever can now reach a seat gets on
+  } else {
+    draw();
+  }
+}
+cv.addEventListener("pointerup", endDrag);
+addEventListener("pointerup", endDrag);          // also when released off-canvas
+cv.addEventListener("pointercancel", () => { releaseHeld(); draw(); });
+addEventListener("pointercancel", () => { if (HELD) { releaseHeld(); draw(); } });
+addEventListener("blur", () => { if (HELD) { releaseHeld(); draw(); } });
+
+/** Walking distance from the door to a cell, through empty floor only. */
+function floorDist(g) {
+  const N = g.W * g.H, d = new Int32Array(N).fill(-1);
+  if (!isFree(g, g.W - 1, g.door)) return d;
+  const start = idx(g, g.W - 1, g.door);
+  d[start] = 0;
+  const q = [[g.W - 1, g.door]];
+  while (q.length) {
+    const [c, r] = q.shift();
+    for (const [dc, dr] of DIRS) {
+      const nc = c + dc, nr = r + dr;
+      if (!isFree(g, nc, nr) || d[idx(g, nc, nr)] >= 0) continue;
+      d[idx(g, nc, nr)] = d[idx(g, c, r)] + 1;
+      q.push([nc, nr]);
+    }
+  }
+  return d;
+}
+
+/** The nearest place a passenger can actually take: a seat, which of its places,
+    and the floor tile they step in from. */
+function pickSeat(g, ci) {
+  const d = floorDist(g);
+  let best = null, bestD = Infinity;
+  for (const seat of g.seats) {
+    if (!accepts(seat, ci)) continue;
+    for (let k = 0; k < seat.len; k++) {
+      if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
+      for (const [nc, nr] of cellEntries(g, seat, k)) {
+        const dist = d[idx(g, nc, nr)];
+        if (dist >= 0 && dist < bestD) { bestD = dist; best = { seat, k, entry: [nc, nr] }; }
+      }
+    }
+  }
+  return best;
+}
+
+/** The tiles a passenger walks: door -> corridor -> the place itself. Rebuilt
+    from the same BFS that decides reachability, so the route on screen is the
+    route the rules used. */
+function walkPath(g, seat, k, entry) {
+  const d = floorDist(g);
+  const path = [entry.slice()];
+  let [c, r] = entry;
+  while (d[idx(g, c, r)] > 0) {
+    for (const [dc, dr] of DIRS) {
+      const nc = c + dc, nr = r + dr;
+      if (!inBoard(g, nc, nr)) continue;
+      if (d[idx(g, nc, nr)] === d[idx(g, c, r)] - 1) { c = nc; r = nr; path.push([c, r]); break; }
+    }
+  }
+  path.reverse();
+  path.push(cellsOf(seat)[k]);
+  return path;
+}
+
+/** Passengers board on their own, one after another, for as long as somebody
+    can reach a seat. The player never taps a seat - they only slide seats. */
+function autoBoard(instant) {
+  instant = instant || INSTANT;
+  if (!S || S.phase !== "play") return;
+  if (S.boarding && !instant) return;
+  const token = S.token;
+  const stale = () => !S || S.token !== token;
+  const step = () => {
+    if (stale()) return;
+    if (S.phase !== "play") { S.boarding = false; return; }
+    if (!S.queue.length) { S.boarding = false; if (S.seated >= S.total) finish(true); return; }
+    const ci = S.queue[0];
+    const spot = pickSeat(S, ci);
+    if (!spot) { S.boarding = false; hud(); draw(); return; }
+    const seat = spot.seat, slot = spot.k;
+    S.queue.shift();
+    seat.pending++;
+    (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
+    const cell = cellsOf(seat)[slot];
+    seat.locked = true;             // no dragging a seat out from under a walker
+    const sitDown = () => {
+      seat.pending--; seat.locked = false;
+      if (seat.claim) seat.claim.delete(slot);
+      seat.occ[slot] = ci; S.seated++;
+    };
+    if (instant) { sitDown(); step(); return; }
+    const path = walkPath(S, seat, slot, spot.entry) || [cell];
+    const pts = [[cellW(S.W - 1) + SX * 2.0, cellZ(S.door)]];        // waiting at the stop
+    for (const [c, r] of path) pts.push([cellW(c), cellZ(r)]);
+    pts[pts.length - 1] = [cellW(cell[0]), cellZ(cell[1]) - .04];    // settle onto the seat
+
+    // The last step is not a walk - it is a little hop up onto the seat, so split
+    // it off and animate it separately.
+    const hopTo = pts.pop();
+    const hopFrom = pts[pts.length - 1];
+
+    let total = 0;
+    const seg = [];
+    for (let i = 1; i < pts.length; i++) {
+      const L = Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+      seg.push(L); total += L;
+    }
+    const a = { ci, x: pts[0][0], z: pts[0][1], y: 0, route: path, facing: "d", phase: 0 };
+    S.anim.push(a);
+    S.walkCells = new Set(path.map(([c, r]) => c + "," + r));
+
+    const faceOf = (dx, dz) => (Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? "r" : "l") : (dz > 0 ? "d" : "u"));
+
+    const hop = () => {
+      const dx = hopTo[0] - hopFrom[0], dz = hopTo[1] - hopFrom[1];
+      a.facing = faceOf(dx, dz);
+      const h0 = performance.now(), hd = HOP_MS / SPEED;
+      const tickHop = now => {
+        if (stale()) return;
+        const t = Math.min(1, (now - h0) / hd);
+        const e = t * t * (3 - 2 * t);                  // ease in and out of the jump
+        a.x = hopFrom[0] + dx * e;
+        a.z = hopFrom[1] + dz * e;
+        a.y = Math.sin(t * Math.PI) * .42;              // up and over
+        a.phase = t < .5 ? 1 : 3;                       // legs tucked, then out to land
+        draw();
+        if (t < 1) requestAnimationFrame(tickHop);
+        else {
+          S.anim.splice(S.anim.indexOf(a), 1);
+          S.walkCells = null;
+          sitDown();
+          hud(); draw();
+          setTimeout(step, BASE_GAP_MS / SPEED);
+        }
+      };
+      requestAnimationFrame(tickHop);
+    };
+
+    if (total < 1e-6) { hop(); S.boarding = true; return; }
+
+    const dur = Math.max(520, total * BASE_MS_PER_UNIT) / SPEED;
+    const t0 = performance.now();
+    const tick2 = now => {
+      if (stale()) return;
+      const t = Math.min(1, (now - t0) / dur);
+      let want = t * total, i = 0;
+      while (i < seg.length - 1 && want > seg[i]) { want -= seg[i]; i++; }
+      const f = seg[i] ? Math.min(1, want / seg[i]) : 1;
+      a.x = pts[i][0] + (pts[i+1][0] - pts[i][0]) * f;
+      a.z = pts[i][1] + (pts[i+1][1] - pts[i][1]) * f;
+      const dx = pts[i+1][0] - pts[i][0], dz = pts[i+1][1] - pts[i][1];
+      if (Math.abs(dx) > 1e-6 || Math.abs(dz) > 1e-6) a.facing = faceOf(dx, dz);
+      a.phase = Math.floor((t * total) / STRIDE) % WMETA.phases;   // legs cycle with distance
+      a.y = Math.abs(Math.sin(t * Math.PI * Math.max(2, seg.length))) * .10;
+      draw();
+      if (t < 1) requestAnimationFrame(tick2); else hop();
+    };
+    S.boarding = true;
+    requestAnimationFrame(tick2);
+  };
+  step();
+}
+
+let sayUntil = 0;
+function say(msg) {
+  document.getElementById("hint").textContent = msg;
+  sayUntil = performance.now() + 2600;      // hud() leaves the hint alone until then
+}
+function bump() { cv.animate([{ filter: "none" }, { filter: "brightness(1.15)" }, { filter: "none" }], { duration: 200 }); }
+
+function finish(won) {
+  S.phase = won ? "win" : "lose";
+  document.getElementById("ov-title").textContent = won ? "Level complete" : "Out of time";
+  document.getElementById("ov-text").textContent = won
+    ? "Everyone seated with " + fmt(S.left) + " left, in " + S.moves + " seat moves."
+    : "The bus pulled away with " + S.queue.length + " still at the stop.";
+  document.getElementById("ov-next").style.display = won ? "" : "none";
+  document.getElementById("ov").classList.add("on");
+}
+
+/* ---------------- hud ---------------- */
+function fmt(sec) { sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+function hud() {
+  if (!S) return;
+  const m = /Level_0*(\d+)(?:_(\d+))?(?:#(\d+))?/.exec(S.name);
+  document.getElementById("s-level").textContent = m
+    ? m[1] + (m[2] ? "-" + m[2] : "") + (m[3] ? "\u00b7" + m[3] : "")
+    : S.level;
+  document.getElementById("s-seated").textContent = S.seated + " / " + S.total;
+  document.getElementById("s-grid").textContent = S.W + "×" + S.H;
+  document.getElementById("s-col").textContent = S.colours;
+  document.getElementById("s-time").textContent = fmt(S.left);
+  const pct = Math.max(0, S.left / S.time) * 100;
+  const bar = document.getElementById("s-bar");
+  bar.style.width = pct + "%";
+  bar.classList.toggle("warn", pct < 22);
+  document.getElementById("s-time").classList.toggle("warn", pct < 22);
+  document.getElementById("q-chips").innerHTML = S.queue.slice(0, 9).map((ci, i) =>
+    `<span class="chip ${i === 0 ? "next" : ""}" style="background:${CSS[colName(ci)]}"></span>`).join("");
+  document.getElementById("q-more").textContent = S.queue.length > 9 ? "+" + (S.queue.length - 9) : "";
+  const blocked = !isFree(S, S.W - 1, S.door);
+  const reach = reachRegion(S).reduce((a, v) => a + v, 0);
+  const freeTotal = S.W * S.H - S.hole.reduce((a, v) => a + v, 0) - S.seats.reduce((a, b) => a + b.len, 0);
+  if (!sayUntil || performance.now() > sayUntil)
+   document.getElementById("hint").textContent = blocked
+    ? "A seat is parked in the doorway - drag it clear so people can get on."
+    : (S.queue.length && !S.nextSeat
+        ? "Nobody at the front can reach a seat they fit - slide seats to open a path."
+        : "Press and hold a seat, drag it clear of the aisle, let go. Passengers board on their own.");
+  document.getElementById("method").textContent =
+    "Board " + S.name + ", exactly as shipped: same grid, seats, colours, passenger list and clock. "
+    + "The level data never records the door, so it sits at a fixed spot on the right wall (row "
+    + S.door + " of " + S.H + ", adjustable with the Door buttons) and, as in the game, a seat is often "
+    + "parked in front of it. Right now " + reach + " of the " + freeTotal + " empty floor tiles connect to the door"
+    + (blocked ? " - none, because the doorway itself is blocked." : ".");
+}
+document.getElementById("b-retry").onclick = () => load(S.level);
+document.getElementById("ov-retry").onclick = () => load(S.level);
+document.getElementById("ov-next").onclick = () => load(S.level + 1);
+document.getElementById("b-prev").onclick = () => load(S.level - 1);
+document.getElementById("b-next").onclick = () => load(S.level + 1);
+document.getElementById("b-door-up").onclick = () => { DOOR_ROW = Math.max(0, S.door - 1); load(S.level); };
+document.getElementById("b-door-dn").onclick = () => { DOOR_ROW = Math.min(S.H - 1, S.door + 1); load(S.level); };
+document.getElementById("b-door-auto").onclick = () => { DOOR_ROW = null; load(S.level); };
+document.getElementById("b-guides").onclick = ev => {
+  GUIDES = !GUIDES;
+document.getElementById("b-trace").onclick = e => {
+  TRACING = !TRACING;
+  e.target.textContent = "Trace " + (TRACING ? "on" : "off");
+  document.getElementById("trace").hidden = !TRACING;
+};
+  ev.target.textContent = GUIDES ? "Guides on" : "Guides off";
+  draw();
+};
+document.getElementById("b-speed").onclick = ev => {
+  SPEED = SPEED === 1 ? 2 : SPEED === 2 ? 0.5 : 1;
+  ev.target.textContent = "Speed " + (SPEED === 0.5 ? "\u00bd" : SPEED) + "\u00d7";
+};
+document.getElementById("b-jump").onclick = () => {
+  const v = prompt("Board 1-" + LEVELS.length + " (633 boards, 600 names):", S.level);
+  const n = parseInt(v, 10);
+  if (n >= 1 && n <= LEVELS.length) load(n);
+};
+addEventListener("resize", draw);
+
+let last = performance.now();
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (S && S.phase === "play") {
+    S.left -= dt;
+    if (S.left <= 0) { S.left = 0; finish(false); }
+    hud();
+  }
+  requestAnimationFrame(tick);
+}
+load(1);
+requestAnimationFrame(tick);
+</script>

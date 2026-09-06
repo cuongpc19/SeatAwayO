@@ -1,0 +1,71 @@
+"""The coaching on boards 1 and 2: does it appear when the board needs it,
+point at a move that actually works, and get out of the way once it is made?"""
+import pathlib
+from playwright.sync_api import sync_playwright
+url = pathlib.Path("../game.html").resolve().as_uri()
+
+STATE = """() => ({
+  shown: !document.getElementById('coach').hidden,
+  title: document.getElementById('coach-title').textContent,
+  text:  document.getElementById('coach-text').textContent,
+  tut:   TUT && { seat: TUT.seat.id, at: [TUT.seat.c, TUT.seat.r], to: TUT.to },
+  door:  S.door, doorFree: isFree(S, S.W - 1, S.door),
+  queue: S.queue.length, seated: S.seated + '/' + S.total, phase: S.phase })"""
+
+def drag(pg, seat_id, to):
+    p = pg.evaluate("""([id, to]) => {
+      const b = S.seats[id];
+      const box = cv.getBoundingClientRect(), kx = cv.width/box.width, ky = cv.height/box.height;
+      const n = (b.len - 1) / 2;
+      const ctr = (c, r) => b.dir & 1 ? [cellW(c), cellZ(r) + n*SZ] : [cellW(c) + n*SX, cellZ(r)];
+      const [ax, az] = ctr(b.c, b.r), [bx, bz] = ctr(to[0], to[1]);
+      const A = P(ax, 0, az), B = P(bx, 0, bz);
+      return { from: [box.left+A[0]/kx, box.top+A[1]/ky],
+               to:   [box.left+B[0]/kx, box.top+B[1]/ky] }; }""", [seat_id, to])
+    pg.mouse.move(*p["from"]); pg.mouse.down()
+    pg.mouse.move(p["to"][0], p["to"][1], steps=12); pg.mouse.up()
+
+SETTLED = "() => !S || S.phase !== 'play' || (!S.anim.length && !S.boarding)"
+
+def settle(pg):
+    """Wait for the board to stop moving - a coach mark never shows mid-walk."""
+    pg.wait_for_function(SETTLED, timeout=15000)
+    pg.wait_for_timeout(250)
+
+def report(tag, s):
+    print("  %-22s coach=%s  %r / %r" % (tag, s["shown"], s["title"], s["text"][:58] + "..."))
+    print("  %-22s TUT=%s  door row %s %s  queue %s  seated %s"
+          % ("", s["tut"], s["door"], "free" if s["doorFree"] else "BLOCKED",
+             s["queue"], s["seated"]))
+
+with sync_playwright() as pw:
+    br = pw.chromium.launch(); pg = br.new_page(viewport={"width": 420, "height": 860})
+    errs = []
+    pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
+    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
+    pg.goto(url); pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
+    pg.evaluate("save.unlocked = 2; persist()")
+
+    for lvl in (1, 2):
+        print("=== level %d ===" % lvl)
+        pg.evaluate("n => startLevel(n)", lvl)
+        settle(pg)                            # let whoever can board, board
+        s = pg.evaluate(STATE)
+        report("before the move:", s)
+        if not s["tut"]:
+            print("   NO COACH - nothing to follow"); continue
+        drag(pg, s["tut"]["seat"], s["tut"]["to"])
+        settle(pg)
+        a = pg.evaluate(STATE)
+        report("after the move:", a)
+        print("  %-22s %s" % ("coach cleared:", not a["shown"]))
+        print("  %-22s %s" % ("result:", a["phase"]))
+
+    # it must stay out of every other level
+    pg.evaluate("save.unlocked = 12; persist()")
+    pg.evaluate("startLevel(6)"); settle(pg)
+    o = pg.evaluate(STATE)
+    print("=== level 6 (not taught) ===")
+    print("  coach shown:", o["shown"], " TUT:", o["tut"])
+    print("errors:", errs or "none")
+    br.close()

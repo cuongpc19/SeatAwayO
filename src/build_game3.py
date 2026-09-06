@@ -1,0 +1,10 @@
+import pathlib
+ART = pathlib.Path("../art")
+tpl = open("game3_tpl.html", encoding="utf-8").read()
+out = (tpl.replace("/*__LEVELS__*/", open("lv/boards_campaign.json", encoding="utf-8").read())
+          .replace("/*__META__*/", open(ART / "seat_atlas.json", encoding="utf-8").read())
+          .replace("/*__ATLAS__*/", open(ART / "seat_atlas_b64.txt", encoding="utf-8").read().strip())
+          .replace("/*__WMETA__*/", open(ART / "walk_atlas.json", encoding="utf-8").read())
+          .replace("/*__WALK__*/", open(ART / "walk_atlas_b64.txt", encoding="utf-8").read().strip()))
+open("../level_player.html", "w", encoding="utf-8").write(out)
+print("../level_player.html %.0f KB" % (len(out) / 1024))

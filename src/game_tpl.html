@@ -1,0 +1,667 @@
+<title>Bench Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --bg:      #e9edf2;
+  --panel:   #ffffff;
+  --line:    #d5dbe4;
+  --ink:     #12161c;
+  --ink-2:   #4d5561;
+  --ink-3:   #838c99;
+  --accent:  #2a78d6;
+  --good:    #1f9d55;
+  --bad:     #d64545;
+  --shadow:  0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:     #14171b;
+    --panel:  #1d2127;
+    --line:   #2f353e;
+    --ink:    #f0f2f5;
+    --ink-2:  #b3bac4;
+    --ink-3:  #7e8794;
+    --accent: #3987e5;
+    --good:   #35b26b;
+    --bad:    #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:     #14171b;
+  --panel:  #1d2127;
+  --line:   #2f353e;
+  --ink:    #f0f2f5;
+  --ink-2:  #b3bac4;
+  --ink-3:  #7e8794;
+  --accent: #3987e5;
+  --good:   #35b26b;
+  --bad:    #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1000px; margin: 0 auto; padding: 28px 20px 64px; display: flex; flex-direction: column; gap: 16px; }
+
+.masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.03em; }
+.sub { color: var(--ink-2); font-size: 14.5px; margin: 4px 0 0; max-width: 58ch; line-height: 1.5; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+/* ---- hud ---- */
+.hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); }
+.stat .k { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.stat .v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat .v.warn { color: var(--bad); }
+
+.timebar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 7px; }
+.timebar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .25s linear; }
+.timebar i.warn { background: var(--bad); }
+
+/* ---- queue ---- */
+.queue { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow);
+         display: flex; align-items: center; gap: 14px; }
+.queue .lbl { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.chips { display: flex; gap: 7px; align-items: center; overflow: hidden; }
+.chip { width: 26px; height: 26px; border-radius: 50%; flex: none; border: 2px solid rgba(255,255,255,.55); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.chip.next { width: 36px; height: 36px; box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0,0,0,.2); }
+.chip.dim { opacity: .38; }
+.qmore { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-3); }
+
+/* ---- board ---- */
+.stage { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: #8fd0ec; }
+canvas { display: block; width: 100%; height: auto; touch-action: manipulation; cursor: pointer; }
+
+.overlay { position: absolute; inset: 0; display: none; place-items: center; background: rgba(12,16,22,.55); backdrop-filter: blur(3px); }
+.overlay.on { display: grid; }
+.card { background: var(--panel); border-radius: 14px; padding: 26px 30px; text-align: center; min-width: 268px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.card h2 { margin: 0 0 6px; font-size: 25px; font-weight: 800; letter-spacing: -.02em; }
+.card p { margin: 0 0 18px; color: var(--ink-2); font-size: 14.5px; }
+
+button {
+  font-family: Archivo, sans-serif; font-size: 14px; font-weight: 600; letter-spacing: -.005em;
+  border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 9px 16px; cursor: pointer;
+}
+button:hover { border-color: var(--ink-3); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { filter: brightness(1.08); }
+.controls { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+.controls .spacer { flex: 1; }
+.hint { color: var(--ink-3); font-size: 13px; }
+
+.rules { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; box-shadow: var(--shadow); }
+.rules h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.rules ol { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; line-height: 1.65; }
+.rules b { color: var(--ink); font-weight: 600; }
+.note { color: var(--ink-3); font-size: 12.5px; line-height: 1.6; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 620px) { .hud { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 25px; } }
+</style>
+
+<div class="wrap">
+  <div class="masthead">
+    <div>
+      <h1>Bench Rush</h1>
+      <p class="sub">A seat-sorting puzzle built from original art, on the pacing curve decoded from 600 shipped levels
+        of a colour-seat game. Boards are generated fresh every run &mdash; the curve is reused, no level layout is.</p>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="stat"><div class="k">Level</div><div class="v mono" id="s-level">1</div></div>
+    <div class="stat"><div class="k">Seated</div><div class="v mono" id="s-seated">0 / 0</div></div>
+    <div class="stat"><div class="k">Colours</div><div class="v mono" id="s-colours">1</div></div>
+    <div class="stat"><div class="k">Time</div><div class="v mono" id="s-time">0:00</div>
+      <div class="timebar"><i id="s-bar" style="width:100%"></i></div></div>
+  </div>
+
+  <div class="queue">
+    <span class="lbl">Queue</span>
+    <div class="chips" id="q-chips"></div>
+    <span class="qmore" id="q-more"></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="board" width="1800" height="1100" aria-label="Puzzle board"></canvas>
+    <div class="overlay" id="ov">
+      <div class="card">
+        <h2 id="ov-title">Level clear</h2>
+        <p id="ov-text">Everybody got a seat.</p>
+        <div class="controls" style="justify-content:center">
+          <button class="primary" id="ov-next">Next level</button>
+          <button id="ov-retry">Retry</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="b-retry">Restart level</button>
+    <button id="b-skip">Skip ahead 10</button>
+    <button id="b-hint">Hint</button>
+    <button id="b-jump">Jump to level&hellip;</button>
+    <span class="spacer"></span>
+    <span class="hint" id="hint">Click a bench to seat the next guest.</span>
+  </div>
+
+  <div class="rules">
+    <h3>How it plays</h3>
+    <ol>
+      <li>The guest ringed in the queue goes next. Click a bench to sit them down.</li>
+      <li>A <b>coloured bench</b> only takes guests of its colour. A <b>grey bench</b> takes anyone &mdash; but it
+        locks to the first colour that sits on it.</li>
+      <li>Every bench seats <b>two</b> guests (a wide bench, four). Fill it and the whole bench clears out.</li>
+      <li>Clear the board before the clock runs out. If the next guest has nowhere legal to sit, the run ends &mdash;
+        every board is generated with a guaranteed solution, and <b>Hint</b> will point at it.</li>
+    </ol>
+    <p class="note">Board size, colour count, seat count, grey-bench share, wide-bench share and the clock all come from
+      the decoded pacing table &mdash; medians taken every 20 campaign levels, interpolated. The original game&rsquo;s exact
+      rule set is not recoverable from level data, so the rules above are this prototype&rsquo;s own; the difficulty
+      dials are the measured ones.</p>
+  </div>
+</div>
+
+<script>
+const PACING = /*__PACING__*/;
+const ATLAS_SRC = "data:image/png;base64,/*__ATLAS__*/";
+const META = /*__META__*/;
+
+/* ================= palette ================= */
+const COLOURS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"];
+const CSS = { red: "#e83e48", orange: "#fa822a", yellow: "#fac42e", green: "#4ac65c",
+              cyan: "#2ace d6".replace(" ", ""), blue: "#2e92f2", purple: "#a25cea",
+              pink: "#f470b0", grey: "#969ca8" };
+
+/* ================= projection ================= */
+const SX = 1.88, SZ = 1.78;
+function rot(yaw, pitch) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(pitch), sx = Math.sin(pitch);
+  // rotX(pitch) * rotY(yaw)
+  return [
+    [cy, 0, sy],
+    [sx * sy, cx, -sx * cy],
+    [-cx * sy, sx, cx * cy],
+  ];
+}
+const R = rot(META.yaw, META.pitch);
+function view(x, y, z) {
+  return [R[0][0] * x + R[0][1] * y + R[0][2] * z,
+          R[1][0] * x + R[1][1] * y + R[1][2] * z,
+          R[2][0] * x + R[2][1] * y + R[2][2] * z];
+}
+// screen basis for the ground plane, used to invert clicks back to a cell
+const BX = view(1, 0, 0), BZ = view(0, 0, 1);
+
+/* ================= level generation ================= */
+function lerp(a, b, t) { return a + (b - a) * t; }
+function anchorAt(L) {
+  const A = PACING.anchors;
+  if (L <= A[0].level) return A[0];
+  if (L >= A[A.length - 1].level) return A[A.length - 1];
+  for (let i = 1; i < A.length; i++) {
+    if (L <= A[i].level) {
+      const t = (L - A[i - 1].level) / (A[i].level - A[i - 1].level);
+      const p = A[i - 1], q = A[i];
+      return {
+        grid: t < .5 ? p.grid : q.grid,
+        colours: Math.round(lerp(p.colours, q.colours, t)),
+        slots: Math.round(lerp(p.slots, q.slots, t)),
+        greyPct: lerp(p.greyPct, q.greyPct, t),
+        widePct: lerp(p.widePct, q.widePct, t),
+        time: Math.round(lerp(p.time, q.time, t)),
+      };
+    }
+  }
+  return A[A.length - 1];
+}
+
+// deterministic per-level RNG so a level can be retried exactly
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+}
+
+// Grid follows the measured unlock order rather than the noisy per-block median,
+// with the bigger boards appearing at roughly the share they hold in the campaign
+// (5x8 59%, 6x10 15%, 4x8 9%, 7x11 4%).
+function gridFor(L, rand) {
+  if (L < 8) return [3, 6];
+  if (L < 11) return [4, 6];
+  if (L < 12) return [4, 7];
+  if (L < 14) return [4, 8];
+  const r = rand();
+  if (L >= 21 && r < .04) return [7, 11];
+  if (L >= 15 && r < .19) return [6, 10];
+  if (r < .28) return [4, 8];
+  return [5, 8];
+}
+
+function params(L, rand) {
+  const a = anchorAt(L);
+  const U = PACING.unlocks;
+  let colours = a.colours;
+  if (L < 4) colours = 1; else if (L < 5) colours = 2; else if (L < 13) colours = Math.min(colours, 3);
+  colours = Math.max(1, Math.min(COLOURS.length, colours));
+  const grid = gridFor(L, rand);
+  let slots = a.slots;
+  if (L < 14) slots = Math.max(2, Math.round(2 + (L - 1) * 1.5));
+  slots = 2 * Math.max(1, Math.min(Math.round(slots / 2), Math.floor(grid[0] * grid[1] * .42)));
+  return {
+    w: grid[0], h: grid[1], colours, slots,
+    greyPct: L < U.grey ? 0 : a.greyPct,
+    widePct: L < U.wide ? 0 : a.widePct,
+    time: Math.max(40, L < 6 ? 240 : a.time),
+  };
+}
+
+function makeLevel(L) {
+  const rand = rng(L * 2654435761 + 17), p = params(L, rand);
+  const W = p.w, H = p.h;
+  const occupied = new Uint8Array(W * H);
+  const benches = [];
+  const cells = [];
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) cells.push([c, r]);
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  let placed = 0;
+  for (const [c, r] of cells) {
+    if (placed >= p.slots) break;
+    if (occupied[r * W + c]) continue;
+    let wide = 1;
+    if (rand() < p.widePct && c + 1 < W && !occupied[r * W + c + 1] && placed + 4 <= p.slots) wide = 2;
+    for (let k = 0; k < wide; k++) occupied[r * W + c + k] = 1;
+    benches.push({ id: benches.length, c, r, w: wide, cap: wide * 2,
+                   colour: null, locked: false, occ: [], pending: 0 });
+    placed += wide * 2;
+  }
+  // colour the benches, then build the queue that exactly satisfies them
+  const pool = COLOURS.slice(0, p.colours);
+  const entries = [];
+  let greyBudget = Math.round(placed * p.greyPct);
+  for (const b of benches) {
+    const wantGrey = greyBudget >= b.cap && rand() < 0.55;
+    const colour = pool[Math.floor(rand() * pool.length)];
+    if (wantGrey) { b.colour = "grey"; greyBudget -= b.cap; } else { b.colour = colour; }
+    for (let k = 0; k < b.cap; k++)
+      entries.push({ colour: wantGrey ? colour : b.colour, bid: b.id });
+  }
+  for (let i = entries.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [entries[i], entries[j]] = [entries[j], entries[i]];
+  }
+  const queue = entries.map(e => e.colour), plan = entries.map(e => e.bid);
+  return { level: L, W, H, benches, queue, plan, total: queue.length, colours: p.colours,
+           time: p.time, left: p.time, seated: 0, phase: "play", anim: [], t0: performance.now() };
+}
+
+/* ================= state ================= */
+let S = makeLevel(1);
+let atlas = new Image();
+let ready = false;
+atlas.onload = () => { ready = true; draw(); };
+atlas.src = ATLAS_SRC;
+
+const cv = document.getElementById("board");
+const ctx = cv.getContext("2d");
+
+function benchAt(c, r) {
+  return S.benches.find(b => b.r === r && c >= b.c && c < b.c + b.w && !b.gone);
+}
+function taken(b) { return b.occ.length + b.pending; }
+function legal(b, colour) {
+  if (!b || b.gone || taken(b) >= b.cap) return false;
+  if (b.colour === "grey") return !b.locked || b.lockColour === colour;
+  return b.colour === colour;
+}
+function anyLegal(colour) { return S.benches.some(b => legal(b, colour)); }
+
+/* ================= layout ================= */
+function layout() {
+  const pad = 1.5;
+  const x0 = -(S.W - 1) / 2 * SX, z0 = -(S.H - 1) / 2 * SZ;
+  const pts = [];
+  for (const [cx, cz] of [[-pad, -pad], [S.W - 1 + pad, -pad], [-pad, S.H - 1 + pad], [S.W - 1 + pad, S.H - 1 + pad]])
+    pts.push(view(x0 + cx * SX, 0, z0 + cz * SZ));
+  const laneX = x0 + (S.W - 1) * SX + 2.7;
+  pts.push(view(laneX + .55, 0, z0 + (S.H - 1) * SZ + 2.1));
+  pts.push(view(laneX + .55, 2.4, z0 - pad * SZ));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => -p[1]);
+  const spanX = Math.max(...xs) - Math.min(...xs), spanY = Math.max(...ys) - Math.min(...ys);
+  const availW = cv.width - 40, availH = cv.height - 40;
+  const s = Math.min(availW / spanX, availH / spanY, META.scale * 2.2);
+  const ox = 20 - Math.min(...xs) * s, oy = 20 - Math.min(...ys) * s;
+  return { s, ox, oy, x0, z0, laneX };
+}
+let LAY = null;
+function P(x, y, z) {
+  const v = view(x, y, z);
+  return [LAY.ox + v[0] * LAY.s, LAY.oy - v[1] * LAY.s, v[2]];
+}
+let SEAT_DX = .33, SEAT_DZ = -.05, SEAT_SC = 1;
+// Guests pair up per bench cell. A cell holding one guest seats them centred -
+// a lone guest shoved to one side reads as standing beside the bench, not on it.
+function seatPos(b, i, occ) {
+  const cell = Math.floor(i / 2), sub = i % 2;
+  const n = occ == null ? b.cap : occ;
+  const inCell = Math.max(0, Math.min(2, n - cell * 2));   // guests landing in this cell
+  const dx = inCell <= 1 ? 0 : (sub ? SEAT_DX : -SEAT_DX);
+  return [LAY.x0 + (b.c + cell) * SX + dx, LAY.z0 + b.r * SZ + SEAT_DZ];
+}
+function cellPos(c, r, w) {
+  return [LAY.x0 + (c + (w ? (w - 1) / 2 : 0)) * SX, 0, LAY.z0 + r * SZ];
+}
+
+/* ================= drawing ================= */
+function blit(frame, wx, wy, wz, alpha, scaleMul) {  // scaleMul shrinks seated guests
+  const f = META.frames[frame]; if (!f) return;
+  const [px, py] = P(wx, wy, wz);
+  const k = LAY.s / META.scale * (scaleMul || 1);
+  const w = META.tile * k, h = META.tile * k;
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.drawImage(atlas, f[0], f[1], META.tile, META.tile,
+                px - META.pivot[0] * k, py - META.pivot[1] * k, w, h);
+  ctx.globalAlpha = 1;
+}
+function quad(a, b, c, d, fill) {
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]);
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+}
+function shadow(wx, wz, rx) {
+  const [px, py] = P(wx, 0, wz);
+  ctx.save(); ctx.globalAlpha = .17; ctx.fillStyle = "#0f1a2e";
+  ctx.beginPath();
+  ctx.ellipse(px, py, rx * LAY.s, rx * LAY.s * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.restore();
+}
+
+function draw() {
+  if (!ready) return;
+  LAY = layout();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const g = ctx.createLinearGradient(0, 0, 0, cv.height);
+  g.addColorStop(0, "#a8dcf2"); g.addColorStop(1, "#8ecfe8");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // grass apron
+  const pad = 1.5;
+  const gq = [[-pad - .3, -pad - .4], [S.W - 1 + pad + 2.3, -pad - .4], [S.W - 1 + pad + 2.3, S.H - 1 + pad + .5], [-pad - .3, S.H - 1 + pad + .5]]
+    .map(([c, r]) => P(LAY.x0 + c * SX, 0, LAY.z0 + r * SZ));
+  quad(gq[0], gq[1], gq[2], gq[3], "#6fbe6a");
+
+  // queue lane
+  const lq = [[-0.85, -pad], [0.85, -pad], [0.85, S.H - 1 + pad + .3], [-0.85, S.H - 1 + pad + .3]]
+    .map(([dx, r]) => P(LAY.laneX + dx * SX * .5, 0.004, LAY.z0 + r * SZ));
+  quad(lq[0], lq[1], lq[2], lq[3], "#d9cda3");
+
+  // checkerboard plot
+  for (let r = 0; r < S.H; r++) for (let c = 0; c < S.W; c++) {
+    const p0 = P(LAY.x0 + (c - .5) * SX, .006, LAY.z0 + (r - .5) * SZ);
+    const p1 = P(LAY.x0 + (c + .5) * SX, .006, LAY.z0 + (r - .5) * SZ);
+    const p2 = P(LAY.x0 + (c + .5) * SX, .006, LAY.z0 + (r + .5) * SZ);
+    const p3 = P(LAY.x0 + (c - .5) * SX, .006, LAY.z0 + (r + .5) * SZ);
+    quad(p0, p1, p2, p3, (r + c) % 2 ? "#a08050" : "#b28f5e");
+  }
+
+  // highlight benches that can take the next guest
+  const next = S.queue[0];
+  if (next && S.phase === "play") {
+    for (const b of S.benches) {
+      if (!legal(b, next)) continue;
+      const [wx, , wz] = cellPos(b.c, b.r, b.w);
+      const [px, py] = P(wx, 0.01, wz);
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,.92)"; ctx.lineWidth = Math.max(2, LAY.s * .05);
+      ctx.beginPath();
+      ctx.ellipse(px, py, SX * .52 * b.w * LAY.s, SX * .52 * LAY.s * .42, 0, 0, Math.PI * 2);
+      ctx.stroke(); ctx.restore();
+    }
+  }
+
+  if (S.hint != null) {
+    const b = S.benches[S.hint];
+    if (b && !b.gone) {
+      const [wx, , wz] = cellPos(b.c, b.r, b.w);
+      const [px, py] = P(wx, 0.012, wz);
+      ctx.save();
+      ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = Math.max(3, LAY.s * .09);
+      ctx.beginPath();
+      ctx.ellipse(px, py, SX * .62 * b.w * LAY.s, SX * .62 * LAY.s * .42, 0, 0, Math.PI * 2);
+      ctx.stroke(); ctx.restore();
+    }
+  }
+
+  // collect drawables, painter-sorted by view depth
+  const items = [];
+  const push = (wx, wy, wz, fn, bias) => items.push({ z: view(wx, wy, wz)[2] + (bias || 0), fn });
+
+  // fence posts
+  for (let c = -1; c <= S.W; c++) for (const r of [-1, S.H]) {
+    const wx = LAY.x0 + c * SX, wz = LAY.z0 + r * SZ;
+    push(wx, 0, wz, () => blit("post", wx, 0, wz, 1, 1.05));
+  }
+  for (let r = 0; r < S.H; r++) for (const c of [-1, S.W]) {
+    const wx = LAY.x0 + c * SX, wz = LAY.z0 + r * SZ;
+    push(wx, 0, wz, () => blit("post", wx, 0, wz, 1, 1.05));
+  }
+
+  // benches + seated guests
+  for (const b of S.benches) {
+    if (b.gone) continue;
+    const [wx, , wz] = cellPos(b.c, b.r, b.w);
+    const tint = b.colour === "grey" && b.locked ? b.lockColour : b.colour;
+    for (let k = 0; k < b.w; k++) {
+      const sx = LAY.x0 + (b.c + k) * SX;
+      push(sx, 0, wz, () => { shadow(sx, wz, .55); blit("bench_" + tint, sx, 0, wz, 1); });
+    }
+    for (let i = 0; i < b.cap; i++) {
+      const who = b.occ[i];
+      if (!who) continue;
+      const [gx, gz] = seatPos(b, i, b.occ.length);
+      push(gx, 0, gz, () => blit((b.clearing ? "cheer_" : "sit_") + who, gx, 0.06, gz, 1, SEAT_SC), 0.3);
+    }
+    if (b.colour === "grey" && b.locked) {
+      push(wx, 0, wz, () => {
+        const [px, py] = P(wx, 1.15, wz);
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.strokeStyle = "rgba(0,0,0,.15)";
+        ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.arc(px, py, LAY.s * .17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = CSS[b.lockColour]; ctx.beginPath();
+        ctx.arc(px, py, LAY.s * .11, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }, 0.6);
+    }
+  }
+
+  // queue on the lane
+  const shown = Math.min(S.queue.length, 7);
+  for (let i = 0; i < shown; i++) {
+    const wz = LAY.z0 + (S.H - 1) * SZ + 1.7 - i * 1.38;
+    const colour = S.queue[i];
+    const frame = (i === 0 ? "idle_" : "idle_") + colour;
+    push(LAY.laneX, 0, wz, () => {
+      shadow(LAY.laneX, wz, .34);
+      blit(frame, LAY.laneX, 0, wz, i === 0 ? 1 : Math.max(.35, 1 - i * .1));
+    });
+  }
+
+  // walking guest
+  for (const a of S.anim) {
+    push(a.x, 0, a.z, () => { shadow(a.x, a.z, .34); blit("walk_" + a.colour, a.x, a.y || 0, a.z); }, 1.2);
+  }
+
+  items.sort((p, q) => p.z - q.z);
+  for (const it of items) it.fn();
+}
+
+/* ================= interaction ================= */
+function pick(clientX, clientY) {
+  const r = cv.getBoundingClientRect();
+  const px = (clientX - r.left) / r.width * cv.width;
+  const py = (clientY - r.top) / r.height * cv.height;
+  // invert the ground-plane projection: [px,py] = origin + x*BX' + z*BZ'
+  const o = P(0, 0, 0);
+  const a = BX[0] * LAY.s, b = BZ[0] * LAY.s;
+  const c = -BX[1] * LAY.s, d = -BZ[1] * LAY.s;
+  const det = a * d - b * c;
+  if (!det) return null;
+  const dx = px - o[0], dy = py - o[1];
+  const wx = (dx * d - b * dy) / det, wz = (a * dy - dx * c) / det;
+  const col = Math.round((wx - LAY.x0) / SX), row = Math.round((wz - LAY.z0) / SZ);
+  if (col < 0 || col >= S.W || row < 0 || row >= S.H) return null;
+  return benchAt(col, row);
+}
+
+function seat(b) {
+  if (S.phase !== "play" || !S.queue.length) return;
+  const colour = S.queue[0];
+  if (!legal(b, colour)) { flash(); return; }
+  S.queue.shift();
+  S.plan.shift();
+  if (b.colour === "grey" && !b.locked) { b.locked = true; b.lockColour = colour; }
+  const startZ = LAY.z0 + (S.H - 1) * SZ + 1.6;
+  const slot = taken(b);
+  b.pending++;
+  const [sx, sz] = seatPos(b, slot, slot + 1);
+  const a = { colour, x: LAY.laneX, z: startZ, tx: sx, tz: sz, t: 0 };
+  S.anim.push(a);
+  const dur = 340;
+  const t0 = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - t0) / dur);
+    a.x = lerp(LAY.laneX, a.tx, t);
+    a.z = lerp(startZ, a.tz, t);
+    a.y = Math.sin(t * Math.PI) * 0.32;
+    draw();
+    if (t < 1) requestAnimationFrame(step);
+    else {
+      S.anim.splice(S.anim.indexOf(a), 1);
+      b.pending--;
+      b.occ.push(colour);
+      S.seated++;
+      if (b.occ.length >= b.cap) {
+        b.clearing = true;
+        draw();
+        setTimeout(() => { b.gone = true; b.clearing = false; check(); draw(); }, 520);
+      } else { check(); }
+      hud(); draw();
+    }
+  };
+  requestAnimationFrame(step);
+  hud();
+}
+
+function hintBench() {
+  if (!S.queue.length) return null;
+  const c = S.queue[0];
+  const want = S.benches[S.plan[0]];
+  if (legal(want, c)) return want;
+  return S.benches.find(b => legal(b, c)) || null;
+}
+let hintUntil = 0;
+function showHint() {
+  const b = hintBench();
+  if (!b) return;
+  hintUntil = performance.now() + 1400;
+  S.hint = b.id;
+  draw();
+  setTimeout(() => { if (performance.now() >= hintUntil) { S.hint = null; draw(); } }, 1450);
+}
+function flash() {
+  cv.animate([{ filter: "none" }, { filter: "saturate(.4) brightness(1.12)" }, { filter: "none" }],
+    { duration: 220 });
+}
+
+function check() {
+  if (S.phase !== "play") return;
+  if (S.benches.every(b => b.gone)) { finish(true); return; }
+  if (S.queue.length && !anyLegal(S.queue[0]) && !S.anim.length) {
+    const pending = S.benches.some(b => !b.gone && b.clearing);
+    if (!pending) finish(false, "The next guest has nowhere legal to sit.");
+  }
+}
+
+function finish(won, why) {
+  S.phase = won ? "win" : "lose";
+  document.getElementById("ov-title").textContent = won ? "Level clear" : "Run over";
+  document.getElementById("ov-text").textContent = won
+    ? "Everybody got a seat with " + fmt(S.left) + " to spare."
+    : (why || "Out of time.");
+  document.getElementById("ov-next").style.display = won ? "" : "none";
+  document.getElementById("ov").classList.add("on");
+}
+
+cv.addEventListener("click", ev => {
+  const b = pick(ev.clientX, ev.clientY);
+  if (b) seat(b); else flash();
+});
+
+/* ================= hud & loop ================= */
+function fmt(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+}
+function hud() {
+  document.getElementById("s-level").textContent = S.level;
+  document.getElementById("s-seated").textContent = S.seated + " / " + S.total;
+  document.getElementById("s-colours").textContent = S.colours;
+  document.getElementById("s-time").textContent = fmt(S.left);
+  const pct = Math.max(0, S.left / S.time) * 100;
+  const bar = document.getElementById("s-bar");
+  bar.style.width = pct + "%";
+  bar.classList.toggle("warn", pct < 22);
+  document.getElementById("s-time").classList.toggle("warn", pct < 22);
+
+  const chips = document.getElementById("q-chips");
+  chips.innerHTML = S.queue.slice(0, 8).map((c, i) =>
+    `<span class="chip ${i === 0 ? "next" : ""} ${i > 4 ? "dim" : ""}" style="background:${CSS[c]}"></span>`).join("");
+  document.getElementById("q-more").textContent = S.queue.length > 8 ? "+" + (S.queue.length - 8) : "";
+}
+
+function load(L) {
+  S = makeLevel(L);
+  document.getElementById("ov").classList.remove("on");
+  hud(); draw();
+}
+document.getElementById("b-retry").onclick = () => load(S.level);
+document.getElementById("ov-retry").onclick = () => load(S.level);
+document.getElementById("ov-next").onclick = () => load(S.level + 1);
+document.getElementById("b-hint").onclick = showHint;
+document.getElementById("b-skip").onclick = () => load(S.level + 10);
+document.getElementById("b-jump").onclick = () => {
+  const v = prompt("Jump to campaign level (1-600):", S.level);
+  const n = parseInt(v, 10);
+  if (n >= 1 && n <= 600) load(n);
+};
+addEventListener("resize", () => draw());
+
+let last = performance.now();
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (S.phase === "play") {
+    S.left -= dt;
+    if (S.left <= 0) { S.left = 0; finish(false, "Out of time."); }
+    hud();
+  }
+  requestAnimationFrame(tick);
+}
+hud();
+requestAnimationFrame(tick);
+</script>

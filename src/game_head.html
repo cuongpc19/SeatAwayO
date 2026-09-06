@@ -1,0 +1,320 @@
+<title>Seat Away</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
+
+<style>
+/* One committed visual world - a sunny depot at midday - so there is no dark
+   variant. Every colour is stated outright rather than inherited from the host. */
+:root {
+  color-scheme: light;
+  --sky-hi: #9cc3d4; --sky-lo: #5b7f93;
+  --livery: #f8bf1a; --livery-dk: #d99c14;
+  --trim: #d8452c; --trim-dk: #a83220;
+  --ink: #22283c; --ink-soft: #4b5570;
+  --panel: #fffaf0; --panel-dk: #ede2cd;
+  --chip: #2b3452; --chip-lip: #1a2138;
+  --gold: #ffd75e; --gold-dk: #e0a71d;
+  --hud: #4a7ad0; --hud-dk: #33599a;
+  --go: #3fb95a; --go-dk: #2c8b41;
+  --no: #d8556a; --no-dk: #a63c4e;
+  --disp: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body: Nunito, "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--ink); color: var(--ink);
+  font-family: var(--body); overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#app {
+  width: 100%; min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-hi), var(--sky-lo));
+}
+/* the bars run edge to edge; their contents stay a readable width */
+.topbar { width: 100%; max-width: 46rem; margin-inline: auto; }
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.on { display: flex; }
+
+/* ---------- home ---------- */
+#home { align-items: center; justify-content: center; gap: 1.1rem; padding: 2rem 1.25rem; text-align: center; }
+#levels .grid, #home > * { max-width: 46rem; margin-inline: auto; width: 100%; }
+#home > .logo, #home > .blurb, #home > .btn, #home > .stat-row { width: auto; }
+.logo {
+  font-family: var(--disp); font-weight: 800; font-size: clamp(2.6rem, 13vw, 4rem);
+  line-height: .95; color: var(--livery); letter-spacing: -.01em;
+  text-shadow: 0 3px 0 var(--livery-dk), 0 7px 0 var(--trim-dk), 0 12px 22px rgba(0,0,0,.35);
+}
+.logo span { display: block; color: #fff; font-size: .42em; letter-spacing: .22em;
+  text-shadow: 0 2px 0 rgba(0,0,0,.28); margin-top: .35em; }
+.blurb { color: #eaf3f7; font-weight: 700; max-width: 30ch; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.btn {
+  font-family: var(--disp); font-weight: 800; font-size: 1.28rem; letter-spacing: .03em;
+  color: #fff; border: 0; border-radius: 18px; padding: .82rem 2.1rem; cursor: pointer;
+  background: linear-gradient(180deg, var(--go), var(--go-dk));
+  box-shadow: 0 5px 0 var(--go-dk), 0 10px 18px rgba(0,0,0,.28);
+  text-shadow: 0 2px 0 rgba(0,0,0,.28); transition: transform .06s, box-shadow .06s;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--go-dk), 0 4px 10px rgba(0,0,0,.28); }
+.btn.blue { background: linear-gradient(180deg, #4a7fd0, #33599a); box-shadow: 0 5px 0 #33599a, 0 10px 18px rgba(0,0,0,.28); }
+.btn.blue:active { box-shadow: 0 1px 0 #33599a, 0 4px 10px rgba(0,0,0,.28); }
+.btn.ghost { background: rgba(255,255,255,.16); box-shadow: 0 4px 0 rgba(0,0,0,.22); font-size: 1rem; padding: .6rem 1.4rem; }
+.stat-row { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
+.badge {
+  background: rgba(12,20,34,.42); color: #fff; font-weight: 800; font-size: .82rem;
+  padding: .4rem .85rem; border-radius: 999px; letter-spacing: .04em;
+}
+.badge b { color: var(--gold); }
+
+/* ---------- top bar ---------- */
+#play { position: relative; }
+#play .topbar { position: relative; z-index: 2; }
+.topbar {
+  display: grid; grid-template-columns: auto 1fr auto; gap: .6rem; align-items: center;
+  padding: .7rem .8rem .55rem;
+}
+.icon-btn {
+  width: 42px; height: 42px; border: 0; border-radius: 13px; cursor: pointer;
+  background: rgba(12,20,34,.4); color: #fff; font-size: 1.15rem; line-height: 1;
+  display: grid; place-items: center; box-shadow: 0 3px 0 rgba(0,0,0,.25);
+}
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.meter { display: flex; flex-direction: column; gap: .28rem; }
+.meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem;
+  font-family: var(--disp); font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.meter-top .lvl { font-size: 1.05rem; letter-spacing: .05em; }
+
+/* ---------- the play HUD ----------
+   Three pills across the top, boosters along the bottom, and the same at every
+   width. The readings used to move out to rails beside the room once the window
+   got wide, so the game read as two different games depending on the screen. */
+.hud-side { display: flex; align-items: center; gap: .5rem; }
+.hud-side.end { justify-content: flex-end; }
+.pill {
+  display: flex; align-items: center; gap: .4rem;
+  background: var(--hud); color: #fff; border-radius: 999px;
+  padding: .32rem .9rem; font-family: var(--disp); font-weight: 800;
+  box-shadow: 0 3px 0 var(--hud-dk), 0 5px 12px rgba(0,0,0,.22);
+}
+.pill-lab { font-size: .76rem; letter-spacing: .09em; text-transform: uppercase; opacity: .92; }
+.pill-val { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.pill-val.warn { color: var(--gold); }
+/* the clock is the one reading the player actually watches, so it is the only
+   pill given two lines and the big type */
+.pill-time { flex-direction: column; gap: 0; justify-self: center; padding: .22rem 1.15rem .3rem; }
+.pill-time .pill-lab { font-size: .7rem; }
+.pill-time .pill-val { font-size: 1.5rem; line-height: 1.05; }
+.pill-gold .disc {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--gold) 55%, var(--gold-dk));
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.12);
+}
+/* the clock says how much time is left, the bar says how much of it has gone:
+   the same fact twice, but the bar is the one you read without looking */
+.hud-sub {
+  width: 100%; max-width: 46rem; margin-inline: auto; padding: 0 .9rem;
+  position: relative; z-index: 2; display: flex; flex-direction: column; gap: .28rem;
+}
+.hud-counts {
+  display: flex; justify-content: space-between;
+  font: 800 .74rem/1 var(--body); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.bar { height: 9px; border-radius: 99px; background: rgba(10,18,30,.45); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, #7fe08f, #3fb95a); transition: width .25s linear; }
+.bar i.warn { background: linear-gradient(90deg, #ffd75e, #e8663f); }
+
+/* ---------- stage ---------- */
+#play { background: #98a1ab; }
+.stage { position: absolute; inset: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; touch-action: none; }
+
+/* boosters, under the room */
+.boosters { position: absolute; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
+  z-index: 3; display: flex; gap: .6rem; }
+.boost {
+  display: flex; flex-direction: column; align-items: center; gap: .1rem; cursor: pointer;
+  border: 0; border-radius: 15px; padding: .5rem .85rem; min-width: 5.2rem;
+  background: rgba(14,20,30,.55); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.28);
+}
+.boost:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.28); }
+.boost .ico { font-size: 1.25rem; line-height: 1.1; }
+.boost .lab { font: 800 .72rem/1 var(--body); letter-spacing: .06em; text-transform: uppercase; }
+.boost .cost { font: 800 .78rem/1.2 var(--disp); color: var(--gold); }
+.boost.armed { outline: 2px solid var(--gold); outline-offset: 2px; }
+.boost.broke .cost { color: #f2867a; }
+.boost[hidden] { display: none; }
+
+/* ---------- tutorial coach mark ----------
+   The pointing is done on the canvas, in the room's own projection; this is
+   only the words that go with it. It sits where the boosters will later live -
+   they unlock at level 14, long after the last coached board. */
+.coach {
+  position: absolute; left: 50%; bottom: 1.2rem; transform: translateX(-50%);
+  z-index: 4; width: min(23rem, calc(100% - 1.8rem));
+  display: flex; flex-direction: column; gap: .18rem; text-align: center;
+  background: rgba(14,20,30,.82); border: 2px solid rgba(255,215,94,.6);
+  border-radius: 18px; padding: .65rem 1.1rem; color: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4); pointer-events: none;
+  animation: coach-in .3s cubic-bezier(.34,1.4,.64,1) both;
+}
+.coach[hidden] { display: none; }      /* an author `display` outranks the UA rule */
+.coach b { font-family: var(--disp); font-weight: 800; font-size: 1rem;
+           letter-spacing: .03em; color: var(--gold); }
+.coach span { font-weight: 700; font-size: .84rem; line-height: 1.45; color: #eaf3f7; }
+@keyframes coach-in {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(.95); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .coach { animation: none; } }
+
+/* a message has to live somewhere now the hint bar is gone */
+.toast {
+  position: absolute; left: 50%; bottom: 5.6rem; transform: translateX(-50%);
+  margin: 0; z-index: 3; max-width: 24rem; text-align: center;
+  background: rgba(14,20,30,.72); color: #fff; font-weight: 700; font-size: .88rem;
+  padding: .55rem 1rem; border-radius: 999px; pointer-events: none;
+  opacity: 0; transition: opacity .2s;
+}
+.toast.on { opacity: 1; }
+
+
+/* ---------- level grid ---------- */
+#levels { padding: 1rem; overflow-y: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .5rem; }
+.cellbtn {
+  aspect-ratio: 1; border: 0; border-radius: 14px; cursor: pointer; font-family: var(--disp);
+  font-weight: 800; font-size: 1rem; color: #fff; position: relative;
+  background: linear-gradient(180deg, #6d84a8, #4c5f7d); box-shadow: 0 3px 0 rgba(0,0,0,.28);
+}
+.cellbtn.done { background: linear-gradient(180deg, var(--go), var(--go-dk)); }
+.cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); cursor: not-allowed; }
+.cellbtn .s { position: absolute; inset: auto 0 3px 0; font-size: .55rem; letter-spacing: .1em; color: var(--gold); }
+
+/* ---------- result card ---------- */
+#card { position: absolute; inset: 0; display: none; place-items: center; z-index: 20; }
+#card.on { display: grid; }
+.dim { position: absolute; inset: 0; background: rgba(13,10,42,.78); }
+.rays {
+  position: absolute; width: 160%; aspect-ratio: 1; border-radius: 50%; mix-blend-mode: screen;
+  background: repeating-conic-gradient(rgba(255,215,94,.34) 0 8deg, rgba(255,215,94,0) 8deg 16deg);
+  animation: spin 26s linear infinite; pointer-events: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.card {
+  position: relative; width: min(400px, 86vw); border-radius: 30px; overflow: hidden;
+  background: var(--panel); box-shadow: 0 18px 44px rgba(0,0,0,.5);
+  border: 5px solid var(--panel-dk); text-align: center;
+}
+.card .head {
+  background: linear-gradient(180deg, var(--go), var(--go-dk)); padding: 1rem 1rem .9rem;
+  font-family: var(--disp); font-weight: 800; font-size: 1.75rem; color: #fff;
+  letter-spacing: .04em; text-shadow: 0 3px 0 rgba(0,0,0,.28);
+}
+.card.lose .head { background: linear-gradient(180deg, var(--no), var(--no-dk)); }
+.card .body { padding: 1.1rem 1.3rem 1.4rem; display: flex; flex-direction: column; gap: .9rem; align-items: center; }
+.stars { display: flex; gap: .5rem; align-items: center; justify-content: center; height: 74px; }
+.star { width: 52px; height: 52px; transform: scale(.1); }
+.star.big { width: 68px; height: 68px; }
+.star.pop { animation: pop .34s cubic-bezier(.34,1.56,.64,1) forwards; }
+@keyframes pop { to { transform: scale(1); } }
+.card .sum { font-weight: 700; color: var(--ink-soft); line-height: 1.5; }
+.card .sum b { color: var(--ink); }
+.coins { font-family: var(--disp); font-weight: 800; font-size: 1.5rem; color: var(--gold-dk);
+  display: flex; align-items: center; gap: .45rem; }
+.coins .disc { width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe89a, var(--gold) 60%, var(--gold-dk));
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.card .row { display: flex; gap: .6rem; width: 100%; }
+.card .row .btn { flex: 1; font-size: 1.1rem; padding: .75rem 1rem; }
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; width: 9px; height: 14px; border-radius: 2px; top: -20px;
+  animation: fall linear infinite; }
+@keyframes fall { to { transform: translateY(120vh) rotate(720deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .rays, .confetti i { animation: none; }
+  .star.pop { animation: none; transform: scale(1); }
+}
+</style>
+
+<div id="app">
+  <section id="home" class="screen on">
+    <div class="logo">Seat Away<span>find everyone a seat</span></div>
+    <p class="blurb">Seats slide, people don&rsquo;t. Clear a path from the door and the queue
+      seats itself &mdash; but only from the front or the sides of a seat, never over its back.</p>
+    <button class="btn" id="h-play">PLAY</button>
+    <div class="stat-row">
+      <span class="badge" id="h-hearts">Lives <b>5</b></span>
+      <span class="badge">Level <b id="h-level">1</b></span>
+      <span class="badge">Stars <b id="h-stars">0</b></span>
+      <span class="badge">Gold <b id="h-coins">0</b></span>
+    </div>
+    <button class="btn ghost" id="h-levels">CHOOSE A LEVEL</button>
+  </section>
+
+  <section id="levels" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" id="l-back" aria-label="Back">&larr;</button>
+      <div class="meter"><div class="meter-top"><span class="lvl">CHOOSE A LEVEL</span></div></div>
+      <span></span>
+    </div>
+    <div class="grid" id="l-grid"></div>
+  </section>
+
+  <section id="play" class="screen">
+    <div class="stage"><canvas id="board" width="1200" height="900" aria-label="The room"></canvas></div>
+
+    <!-- level, clock and gold across the top; boosters along the bottom -->
+    <div class="topbar">
+      <div class="hud-side">
+        <button class="icon-btn" id="g-home" aria-label="Home">&#9776;</button>
+        <div class="pill"><span class="pill-lab">Level</span><span class="pill-val" id="g-level">1</span></div>
+      </div>
+      <div class="pill pill-time">
+        <span class="pill-lab">Time</span>
+        <span class="pill-val" id="g-clock">5:00</span>
+      </div>
+      <div class="hud-side end">
+        <div class="pill pill-gold"><span class="pill-val" id="g-coins">0</span><i class="disc"></i></div>
+        <button class="icon-btn" id="g-retry" aria-label="Restart">&#8635;</button>
+      </div>
+    </div>
+    <div class="hud-sub">
+      <div class="bar"><i id="g-bar"></i></div>
+      <div class="hud-counts"><span id="g-seated">0 / 0 seated</span><span id="g-left">0 waiting</span></div>
+    </div>
+
+    <div class="boosters" id="boosters">
+      <button class="boost" id="b-time" hidden>
+        <span class="ico">&#9201;</span><span class="lab">+15s</span><span class="cost" id="b-time-cost">300</span>
+      </button>
+      <button class="boost" id="b-jump" hidden>
+        <span class="ico">&#8607;</span><span class="lab">Jump</span><span class="cost" id="b-jump-cost">600</span>
+      </button>
+    </div>
+    <div class="coach" id="coach" hidden role="status">
+      <b id="coach-title"></b><span id="coach-text"></span>
+    </div>
+    <p class="toast" id="hint" role="status"></p>
+  </section>
+
+  <div id="card">
+    <div class="dim"></div>
+    <div class="rays" id="c-rays"></div>
+    <div class="confetti" id="c-confetti"></div>
+    <div class="card" id="c-card">
+      <div class="head" id="c-title">LEVEL CLEAR!</div>
+      <div class="body">
+        <div class="stars" id="c-stars"></div>
+        <p class="sum" id="c-sum"></p>
+        <div class="coins" id="c-coins"><span class="disc"></span><span>+0</span></div>
+        <div class="row">
+          <button class="btn blue" id="c-home">HOME</button>
+          <button class="btn" id="c-next">NEXT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

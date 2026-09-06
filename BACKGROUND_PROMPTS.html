@@ -1,0 +1,358 @@
+<title>Background Prompt Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+:root {
+  --deck: #eceef1; --panel: #ffffff; --sunk: #e2e6ea; --line: #d2d8df;
+  --ink: #1d2229; --ink-2: #4d5765; --ink-3: #7c8794;
+  --acc: #b8860b; --acc-ink: #6d500a; --warn: #b3392a;
+  --code-bg: #1c2129; --code-ink: #dfe5ec; --code-dim: #8d9aab;
+  --disp: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --deck: #14181d; --panel: #1c2128; --sunk: #232a32; --line: #2f3944;
+    --ink: #e6eaf0; --ink-2: #a9b4c2; --ink-3: #78838f;
+    --acc: #f8bf1a; --acc-ink: #ffd75e; --warn: #f0776a;
+    --code-bg: #10141a; --code-ink: #dfe5ec; --code-dim: #7f8c9c;
+  }
+}
+:root[data-theme="dark"] {
+  --deck: #14181d; --panel: #1c2128; --sunk: #232a32; --line: #2f3944;
+  --ink: #e6eaf0; --ink-2: #a9b4c2; --ink-3: #78838f;
+  --acc: #f8bf1a; --acc-ink: #ffd75e; --warn: #f0776a;
+  --code-bg: #10141a; --code-ink: #dfe5ec; --code-dim: #7f8c9c;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--deck); color: var(--ink);
+  font: 400 17px/1.65 var(--body);
+}
+main { max-width: 60rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+h1 {
+  font: 800 clamp(2rem, 6vw, 3rem)/1.05 var(--disp); margin: 0 0 .4rem;
+  letter-spacing: -.022em; text-wrap: balance;
+}
+.lede { color: var(--ink-2); font-size: 1.12rem; max-width: 60ch; margin: 0 0 2rem; }
+h2 {
+  font: 800 1.55rem/1.2 var(--disp); margin: 3.2rem 0 .3rem;
+  letter-spacing: -.015em; text-wrap: balance;
+}
+h3 { font: 600 1.05rem/1.3 var(--disp); margin: 1.6rem 0 .5rem; letter-spacing: -.005em; }
+p { max-width: 66ch; }
+.eyebrow {
+  font: 600 .7rem/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--acc-ink); margin: 0 0 .5rem;
+}
+hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 0; }
+
+/* theme nav */
+nav {
+  position: sticky; top: 0; z-index: 5; margin: 0 -1.25rem 2.5rem; padding: .7rem 1.25rem;
+  background: color-mix(in srgb, var(--deck) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  display: flex; gap: .45rem; flex-wrap: wrap; align-items: center;
+}
+nav b { font: 600 .74rem/1 var(--mono); letter-spacing: .1em; color: var(--ink-3);
+  text-transform: uppercase; margin-right: .3rem; }
+nav a {
+  font: 600 .86rem/1 var(--body); text-decoration: none; color: var(--ink-2);
+  padding: .42rem .8rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel);
+}
+nav a:hover { color: var(--ink); border-color: var(--acc); }
+nav a:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+/* prompt blocks */
+.block { margin: .8rem 0 1.4rem; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--code-bg); }
+.block header {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: .55rem .75rem .55rem .9rem; border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.block header span { font: 600 .72rem/1 var(--mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--code-dim); }
+.block pre {
+  margin: 0; padding: .9rem; overflow-x: auto;
+  font: 400 13.5px/1.62 var(--mono); color: var(--code-ink); white-space: pre-wrap;
+}
+.copy {
+  font: 600 .74rem/1 var(--body); color: var(--code-dim); cursor: pointer;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px; padding: .38rem .7rem; white-space: nowrap;
+}
+.copy:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+.copy.done { color: #6fd08a; border-color: #6fd08a; }
+.copy:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+/* tables */
+.scroll { overflow-x: auto; margin: 1rem 0 1.5rem; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); }
+th { font: 600 .72rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: .88rem;
+  color: var(--ink-2); }
+td.peak { color: var(--acc-ink); font-weight: 600; white-space: nowrap; }
+td.peak em { font-style: normal; font-size: .78em; letter-spacing: .02em; opacity: .8; }
+
+/* diagram */
+.strips { display: grid; grid-template-columns: 15fr 55fr 30fr; gap: 4px; margin: 1.2rem 0;
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.strips div { padding: 1.6rem .6rem; text-align: center; background: var(--sunk); }
+.strips div b { display: block; font: 800 .95rem/1.3 var(--disp); }
+.strips div span { font: 400 .78rem/1.4 var(--body); color: var(--ink-2); }
+.strips .mid { background: color-mix(in srgb, var(--acc) 16%, var(--panel)); }
+
+/* swatches */
+.sw { display: flex; flex-wrap: wrap; gap: .4rem; margin: .9rem 0 1.4rem; }
+.sw i {
+  width: 4.6rem; height: 2.6rem; border-radius: 8px; display: grid; place-items: end center;
+  font: 600 .62rem/1 var(--mono); color: rgba(0,0,0,.62); padding-bottom: .28rem;
+  font-style: normal; border: 1px solid rgba(0,0,0,.14);
+}
+.note { border-left: 3px solid var(--acc); background: var(--panel); padding: .8rem 1rem;
+  margin: 1.2rem 0; border-radius: 0 10px 10px 0; }
+.note p { margin: 0; max-width: none; }
+ol.checks { padding-left: 1.15rem; max-width: 66ch; }
+ol.checks li { margin: .55rem 0; }
+ol.checks b { font-weight: 600; }
+code { font: 400 .88em var(--mono); background: var(--sunk); padding: .1em .35em;
+  border-radius: 5px; }
+</style>
+
+<main>
+<p class="eyebrow">Seat Away &middot; art direction</p>
+<h1>Background Prompt Sheet</h1>
+<p class="lede">Prompts for the world around the seating grid. The grid, the seats and
+the people are drawn by code and appear in none of these images &mdash; the generator only
+makes the room they sit in. Four themes, none of them the bus the original shipped with.</p>
+
+<nav>
+  <b>Themes</b>
+  <a href="#stadium">Stadium</a>
+  <a href="#cinema">Cinema</a>
+  <a href="#concert">Concert</a>
+  <a href="#classroom">Classroom</a>
+  <a href="#shared">Shared block</a>
+  <a href="#checks">Checks</a>
+</nav>
+
+<h2 style="margin-top:0">Three tiles, not one picture</h2>
+<p>Boards are not one shape. Across the 600 campaign levels:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dimension</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr></thead>
+  <tbody>
+    <tr><td>Columns</td><td class="num">9</td><td class="num">111</td>
+      <td class="num peak">362 <em>most levels</em></td><td class="num">93</td><td class="num">25</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="scroll">
+<table>
+  <thead><tr><th>Dimension</th><th>6</th><th>7</th><th>8</th><th>10</th><th>11</th></tr></thead>
+  <tbody>
+    <tr><td>Rows</td><td class="num">25</td><td class="num">40</td>
+      <td class="num peak">409 <em>most levels</em></td><td class="num">89</td><td class="num">37</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Width &divide; height runs from <b>0.45 to 0.67</b>. One plate stretched from 5&times;10 to 7&times;6
+tears its own perspective, so generate three tiles the code composes at any size.</p>
+
+<div class="strips">
+  <div><b>LEFT</b><span>512&times;2048<br>tiles vertically<br>scenery only</span></div>
+  <div class="mid"><b>FLOOR</b><span>1024&times;1024<br>seamless both ways<br>seats stand here</span></div>
+  <div><b>RIGHT</b><span>512&times;2048<br>tiles vertically<br>the queue waits here</span></div>
+</div>
+
+<div class="note"><p>The door is always on the <b>right</b> edge of the grid and everyone
+enters from there. That makes the right strip the busy one &mdash; and the one that must stay
+walkable and visually quiet down its middle.</p></div>
+
+<h2 id="shared">Shared technical block</h2>
+<p>Paste this into every prompt, after the theme text.</p>
+
+<div class="block">
+  <header><span>append to every prompt</span><button class="copy">Copy</button></header>
+<pre>Top-down game background, camera 76 degrees above the horizon, axis-aligned,
+no rotation, no vanishing point drift - almost a floor plan but with a slight
+forward tilt. Stylised 3D cartoon render, glossy rounded plastic shapes, soft
+ambient occlusion, one soft key light from the upper left, no hard shadows.
+Clean mobile-puzzle look. Flat even lighting across the whole tile so it can
+repeat without a visible seam.
+
+MUTED, LOW-SATURATION palette only - greys, warm neutrals, muted teal, deep
+navy, dusty wood. The gameplay pieces on top are bright saturated red #e83e48,
+orange #fa822a, yellow #fac42e, green #4ac65c, cyan #2aced6, blue #2e92f2,
+purple #a25cea, pink #f470b0, so the background must never use those at full
+strength or the pieces stop reading.
+
+No text, no letters, no numbers, no logos, no watermark, no UI, no characters,
+no chairs or benches in the central area, no strong diagonal lines, no lens
+blur, no vignette, no border frame.</pre>
+</div>
+
+<h3>The colours the background must stay away from</h3>
+<div class="sw">
+  <i style="background:#e83e48">e83e48</i><i style="background:#fa822a">fa822a</i>
+  <i style="background:#fac42e">fac42e</i><i style="background:#4ac65c">4ac65c</i>
+  <i style="background:#2aced6">2aced6</i><i style="background:#2e92f2">2e92f2</i>
+  <i style="background:#a25cea">a25cea</i><i style="background:#f470b0">f470b0</i>
+  <i style="background:#969ca8">969ca8</i>
+</div>
+
+<hr>
+<h2 id="stadium">Stadium</h2>
+<p>The grid is a block of terracing; the queue files down the vomitory.</p>
+
+<div class="block">
+  <header><span>Floor &middot; 1024&times;1024 seamless</span><button class="copy">Copy</button></header>
+<pre>Seamless top-down tile of a football stadium terrace deck: pale concrete steps
+running in even horizontal bands, worn tread edges, faint drainage channel,
+scuffed paint, small bolt plates where seat frames anchor. Muted concrete grey
+with a warm dusty tint. Nothing else on it.</pre>
+</div>
+<div class="block">
+  <header><span>Left &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: the edge of a floodlit football pitch - deep
+muted green turf with a mown stripe pattern, a chalk touchline, a low
+advertising hoarding in blank dark navy, a narrow running track in
+desaturated brick red.</pre>
+</div>
+<div class="block">
+  <header><span>Right &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: a stadium concourse aisle - non-slip concrete
+with a yellow-grey nosing strip along each step, a steel handrail running the
+length, a shallow puddle of light from an overhead lamp. Open and walkable,
+nothing standing in the middle.</pre>
+</div>
+
+<hr>
+<h2 id="cinema">Cinema</h2>
+<p>The grid is the seating block; the queue comes up the side aisle from the screen.</p>
+
+<div class="block">
+  <header><span>Floor &middot; 1024&times;1024 seamless</span><button class="copy">Copy</button></header>
+<pre>Seamless top-down tile of a cinema auditorium floor: dark patterned carpet
+with a small repeating geometric weave, deep muted burgundy and charcoal, tiny
+recessed floor lights, faint tread wear. Low contrast so it stays quiet.</pre>
+</div>
+<div class="block">
+  <header><span>Left &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: the base of a cinema screen wall - heavy
+pleated acoustic curtain in deep muted red, a black masking border, a strip of
+cool spill light on the floor in front of it.</pre>
+</div>
+<div class="block">
+  <header><span>Right &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: a cinema side aisle - dark carpet with a line
+of small blue step lights along the wall, a brushed metal handrail, a soft pool
+of warm light from a wall sconce. Clear down the middle.</pre>
+</div>
+
+<hr>
+<h2 id="concert">Concert</h2>
+<p>The grid is a seated tier; the queue comes in past the sound desk.</p>
+
+<div class="block">
+  <header><span>Floor &middot; 1024&times;1024 seamless</span><button class="copy">Copy</button></header>
+<pre>Seamless top-down tile of a concert hall parquet floor: narrow oak boards in a
+herringbone pattern, warm mid-brown, satin varnish with a soft sheen, faint
+scuffs. Muted, no strong grain contrast.</pre>
+</div>
+<div class="block">
+  <header><span>Left &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: the front edge of a concert stage - dark matte
+stage deck, a row of small warm footlights, taped cable runs, a strip of dark
+pit floor. Deep neutral tones.</pre>
+</div>
+<div class="block">
+  <header><span>Right &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: a venue walkway - matte black rubber flooring
+with a fine ribbed texture, gaffer-taped cable route in dull silver, a low
+barrier post at intervals, soft magenta-tinged spill from the rig above kept
+very desaturated.</pre>
+</div>
+
+<hr>
+<h2 id="classroom">Classroom</h2>
+<p>The grid is the desks; the queue comes in through the door at the side.</p>
+
+<div class="block">
+  <header><span>Floor &middot; 1024&times;1024 seamless</span><button class="copy">Copy</button></header>
+<pre>Seamless top-down tile of a school classroom floor: pale beige linoleum in
+large squares, warm and slightly worn, faint scuff arcs from chair legs, soft
+speckle in the surface. Bright but low saturation.</pre>
+</div>
+<div class="block">
+  <header><span>Left &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: the front of a classroom - the top edge of a
+green chalkboard tray with chalk dust, a low bookshelf in pale birch, a rolled
+map cylinder, a potted plant. Warm neutral wood tones.</pre>
+</div>
+<div class="block">
+  <header><span>Right &middot; 512&times;2048 vertical tile</span><button class="copy">Copy</button></header>
+<pre>Vertical strip seen from above: a classroom side aisle - the same beige lino, a
+row of low cubby lockers in soft muted teal along the wall, a couple of hooks
+with bags, sunlight falling in a soft rectangle from a window. Walkable, clear
+in the middle.</pre>
+</div>
+
+<hr>
+<h2 id="checks">Checking a tile before you use it</h2>
+<ol class="checks">
+  <li><b>Seam.</b> Duplicate the tile and butt the copies together. A visible join
+    means regenerate &mdash; do not paper over it by blurring the edge.</li>
+  <li><b>Saturation.</b> Drop a <code>#e83e48</code> square and a <code>#2aced6</code>
+    square on it. If either stops popping, the background is too loud.</li>
+  <li><b>Tilt.</b> Verticals must stay vertical. Any converging lines and it will not
+    sit under the seats.</li>
+  <li><b>Emptiness.</b> The floor tile has to survive a seat on every cell. Anything
+    eye-catching on it becomes clutter the moment the board is full.</li>
+</ol>
+
+<h2>What changes in the code</h2>
+<p><code>drawRoom()</code> in <code>src/engine.js</code> paints the station
+procedurally today. Swapping in images replaces three calls:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Today</th><th>Becomes</th></tr></thead>
+  <tbody>
+    <tr><td><code>ballast()</code> pattern fill</td><td>Floor tile as a repeating pattern</td></tr>
+    <tr><td>Sleeper and rail slabs</td><td>Left strip, tiled down the z axis</td></tr>
+    <tr><td>Platform, safety line, studs</td><td>Right strip, tiled down the z axis</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note"><p>The carriage walls, the doorway and the floor checker stay
+procedural. They have to line up with the grid to the pixel, and a generated image
+cannot be trusted to do that.</p></div>
+</main>
+
+<script>
+for (const btn of document.querySelectorAll(".copy")) {
+  btn.addEventListener("click", async () => {
+    const text = btn.closest(".block").querySelector("pre").textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {                       // clipboard refused: select it so Ctrl+C works
+      const r = document.createRange();
+      r.selectNodeContents(btn.closest(".block").querySelector("pre"));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = "Select + copy"; return;
+    }
+    btn.textContent = "Copied"; btn.classList.add("done");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+  });
+}
+</script>
