@@ -3021,21 +3021,25 @@ const has = f => Math.max(save.unlocked, CUR || 0) >= unlockedAt(f);
 /* ---- saved progress ---------------------------------------------------- */
 /* ⚠ This name is fixed from launch on. CrazyGames' Progress Save backs up
    localStorage verbatim, so renaming the key later restores the old name into a
-   game that reads the new one and every player loses everything. Marble Sort
-   moved `ms_` to `bf_` before anyone had played, which is the only time it is
-   free; this rename onto the game's own name is the same window, spent now.
+   game that reads the new one and every player loses everything. The window in
+   which a rename is free is before anyone has played, and this build spends it.
 
-   OLD_KEYS is read only when the current key holds nothing, and what it finds
-   is written straight back under the new name. It exists because both renames
-   happened while the game was being playtested on real phones, not because
-   migrating is cheap: delete it at launch, when nothing older than SAVE_KEY is
-   left anywhere to find.
+   The name carries the repo, not the game's title, because localStorage is
+   keyed by origin and pays no attention to path. Both builds are served from
+   https://cuongpc19.github.io - /SeatAway/ and /SeatAwayO/ - so they share one
+   storage area, and any name the two have in common is one save played by two
+   different games. `seatmatch.save.v1` was exactly that: the older deploy is
+   still reading and writing it.
 
-   A reset has to clear all three. Clearing only SAVE_KEY would leave an old key
-   standing for the next load to find, which would resurrect the save the reset
-   was asked to destroy. */
-const SAVE_KEY = "seatmatch.save.v1";
-const OLD_KEYS = ["takeaseat.save.v1", "seataway.save.v2"];
+   OLD_KEYS is empty on purpose, and stays empty. Adopting a key is the same
+   mistake in slower motion - it would copy the older game's progress into this
+   one on first load, and levels do not mean the same thing across the two, so
+   an `unlocked` from over there is a number this campaign never earned.
+
+   Keeping it empty also settles the other direction: a reset here clears this
+   key alone, and cannot reach into a save that belongs to the other build. */
+const SAVE_KEY = "seatawayo.save.v1";
+const OLD_KEYS = [];
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
   seenBoosters: [],                // which unlock notices have been shown
