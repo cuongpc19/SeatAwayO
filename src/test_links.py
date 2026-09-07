@@ -62,6 +62,13 @@ with sync_playwright() as pw:
     check(s["stars"].get("3") == 3, "and it is the three-star card: stars %s" % s["stars"])
     # kept in the address bar on purpose: refreshing to see it again is the whole use
     check(s["search"] == "?level=3&win=1", "win survives in the address bar: %r" % s["search"])
+    # ⚠ Paid once. The board is still boarding when the win is handed over, so
+    # the walker who was already on their way used to land afterwards, find the
+    # queue empty and everyone seated, and end the level a second time.
+    s = open_at(pg, "?reset=1&level=3&win=1", wait=2300)
+    gold = pg.evaluate("CF.goldWin")
+    check(s["coins"] == gold, "one win pays once: %d coins for a purse of %d" % (s["coins"], gold))
+
     s = open_at(pg, "?level=3&win=0", wait=800)
     check(not pg.evaluate("document.getElementById('card').classList.contains('on')"),
           "?win=0 writes the flag off")

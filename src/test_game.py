@@ -74,5 +74,23 @@ with sync_playwright() as pw:
           "| lose styling:", pg.evaluate("document.getElementById('c-card').classList.contains('lose')"),
           "| stars:", pg.evaluate("document.querySelectorAll('#c-stars .star').length"))
     print("  summary             :", " ".join(pg.locator("#c-sum").inner_text().split()))
+    # A level ends once. `done()` fires when the last walker sits down, which can
+    # be after the clock has already run out - and that used to pay the purse and
+    # unlock the next level on top of a loss that had just taken a life.
+    pg.evaluate("startLevel(4)"); pg.wait_for_timeout(300)
+    pg.evaluate("S.seated = S.total - 1; S.queue.length = 0")
+    before = pg.evaluate("({coins: save.coins, hearts: save.hearts, unlocked: save.unlocked})")
+    pg.evaluate("finish(false); finish(true)"); pg.wait_for_timeout(400)
+    after = pg.evaluate("({coins: save.coins, hearts: save.hearts, unlocked: save.unlocked, "
+                        "phase: S.phase})")
+    paid = after["coins"] - before["coins"]
+    print("\nout of time on the last walker:")
+    print("  phase                :", after["phase"], "  (must stay lose)")
+    print("  paid                 :", paid, " lives", before["hearts"], "->", after["hearts"],
+          " unlocked", before["unlocked"], "->", after["unlocked"])
+    assert after["phase"] == "lose", "a win landed on top of a loss"
+    assert paid == 0, "the loss paid a purse of %d" % paid
+    assert after["unlocked"] == before["unlocked"], "the loss unlocked the next level"
+
     print("errors:", errs[:4] or "none")
     br.close()

@@ -1790,6 +1790,13 @@ function say(msg) { onSay(msg); }
 function bump() { cv.animate([{ filter: "none" }, { filter: "brightness(1.15)" }, { filter: "none" }], { duration: 200 }); }
 
 function finish(won) {
+  /* ⚠ A level ends once. `done()` has no phase test of its own - it fires when
+     the last walker sits down, which can be after the clock has already run out
+     and taken the level with it. That paid the purse and unlocked the next level
+     on top of a loss that had just cost a life and broken the streak. The guard
+     belongs here rather than in `done()` because every ending comes through this
+     door: the clock, the last seat, and ?win=1. */
+  if (!S || S.phase !== "play") return;
   S.phase = won ? "win" : "lose";
   onFinish(won);
 }
