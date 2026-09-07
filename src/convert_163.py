@@ -8,7 +8,11 @@ both axes running backwards, so
 
     slot = row * W + col,  row 0 at max z (the door), col 0 at max x
 
-and that inverts cleanly to a grid coordinate.
+and that inverts cleanly to a grid coordinate.  The emitted grid runs its
+columns the other way, low x first, so that max x - the wall every panel hangs
+its door on - is column W-1, which is the only column the engine will put a
+door in.  Getting that backwards puts the door against the far wall on every
+board in the campaign.
 
 A bench covers one cell, not several
 ------------------------------------
@@ -40,6 +44,7 @@ import collections, json, os
 
 LEVELS = "lv/levels_163.json"
 PANELS = "lv/panels_163.json"
+DOORS = "lv/doors_163.json"
 OUT = "lv/boards_163.json"
 
 SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
@@ -50,14 +55,23 @@ MIN_SECONDS = 60
 # true of the binary levels, where riders ran 1..8 and 0 could only mean grey.
 # 1.63.1 renumbered from zero, so its colour 0 is an ordinary colour worn by
 # 40% of the seats and 36% of the riders - shipping it unshifted would turn
-# four seats in ten into immovable walls. Everything moves up one, which leaves
-# 0 unused and meaning what the engine already thinks it means.
-COLOUR_SHIFT = 1
-SPECIAL = {500: 8, 501: 9}   # the two rare markers, 8 and 12 in the old format
+# four seats in ten into immovable walls.
+#
+# Where it moves to is not arbitrary either. The binary levels opened on sky
+# blue and 56% of their riders wore it; 1.63.1's colour 0 plays that same part,
+# down to being the only colour on the opening boards, so it takes sky's index
+# and the first levels look like they did before. NAMES is
+# grey red sky yellow green orange purple blue pink, and only those nine have
+# their own sprite - lime, teal, brown and navy share one with an earlier
+# colour, which is why the palette stops at eight.
+COLOURS = {0: 2, 1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7}
+# The two rare markers, 8 and 12 in the old format. They appear on 16 boards
+# between them, all of which already use green, so 501 cannot have lime.
+SPECIAL = {500: 8, 501: 7}
 
 
 def recolour(c):
-    return SPECIAL.get(c, c + COLOUR_SHIFT)
+    return SPECIAL[c] if c in SPECIAL else COLOURS[c]
 
 
 def grids():
@@ -67,7 +81,8 @@ def grids():
         xs = sorted({v["x"] for v in areas.values()})
         zs = sorted({v["z"] for v in areas.values()})
         W, H = len(xs), len(zs)
-        col = {v: W - 1 - i for i, v in enumerate(xs)}
+        # low x first: max x has to land on W-1, the engine's door wall
+        col = {v: i for i, v in enumerate(xs)}
         row = {v: H - 1 - i for i, v in enumerate(zs)}
         assert W * H == len(areas), "panel %s is not a full lattice" % pn
         out[int(pn)] = (W, H, {int(k): (col[v["x"]], row[v["z"]]) for k, v in areas.items()})
@@ -85,6 +100,7 @@ def capacity(s):
 
 def convert():
     G = grids()
+    doors = json.load(open(DOORS))
     boards, flags = [], collections.Counter()
     for r in json.load(open(LEVELS)):
         W, H, cells = G[r["panel"]]
@@ -114,6 +130,11 @@ def convert():
             # missing keys - a board without `variant` drops out of the ladder
             # silently and the game boots to an empty campaign.
             "variant": 0, "diff": 0,
+            # Where the queue walks in. Without this the engine hunts down the
+            # W-1 wall for the first free cell, which is the row the door is on
+            # only while nothing is parked in it - and something is parked in it
+            # on 987 of these boards.
+            "door": doors[str(r["panel"])]["entryRow"],
             "panel": r["panel"], "w": W, "h": H,
             "time": clock(len(r["queue"]) + len(r["queue2"])),
             "moves": r["moveCount"],
@@ -147,12 +168,25 @@ def check(boards):
             per[col] += cap
         if 0 in per:
             bad["a seat kept colour 0, which the engine reads as grey"] += 1
+        if not (0 <= b["door"] < b["h"]):
+            bad["door row is off the grid"] += 1
         if per != collections.Counter(b["queue"] + b["queue2"]):
             bad["seats do not match the queue"] += 1
     return bad
 
 
+def palette_check():
+    """No board may land two of its colours on the same engine colour."""
+    bad = 0
+    for r in json.load(open(LEVELS)):
+        used = {s["colour"] for s in r["seats"]} | set(r["queue"]) | set(r["queue2"])
+        if len({recolour(c) for c in used}) != len(used):
+            bad += 1
+    return bad
+
+
 boards, flags = convert()
+clashes = palette_check()
 bad = check(boards)
 json.dump(boards, open(OUT, "w"), separators=(",", ":"))
 print("boards        :", len(boards))
@@ -162,5 +196,7 @@ print("clock         : min %ds  max %ds" % (min(b["time"] for b in boards), max(
 print("colours       :", sorted({s[3] for b in boards for s in b["seats"]}))
 print("riders        :", sum(len(b["queue"]) + len(b["queue2"]) for b in boards))
 print("carried flags :", dict(flags))
+print("door rows     :", dict(collections.Counter(b["door"] for b in boards)))
+print("colour clashes:", clashes)
 print("failed checks :", dict(bad) or "none")
 print("wrote", OUT, "%.0f KB" % (os.path.getsize(OUT) / 1024))
