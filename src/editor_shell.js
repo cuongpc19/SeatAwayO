@@ -106,7 +106,7 @@ document.getElementById("b-speed").onclick = ev => {
   ev.target.textContent = "Speed " + (SPEED === 0.5 ? "\u00bd" : SPEED) + "\u00d7";
 };
 document.getElementById("b-jump").onclick = () => {
-  const v = prompt("Board 1-" + LEVELS.length + " (633 boards, 600 names):", S.level);
+  const v = prompt("Board 1-" + LEVELS.length + " (" + LEVELS.length + " boards):", S.level);
   const n = parseInt(v, 10);
   if (n >= 1 && n <= LEVELS.length) load(n);
 };

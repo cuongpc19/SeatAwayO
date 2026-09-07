@@ -79,11 +79,22 @@ const idx = (g, c, r) => r * g.W + c;
 const inBoard = (g, c, r) => c >= 0 && c < g.W && r >= 0 && r < g.H && !g.hole[idx(g, c, r)];
 const isFree = (g, c, r) => inBoard(g, c, r) && g.occ[idx(g, c, r)] < 0;
 
-/** The grid cells a seat covers. SeatDirect 0 and 2 lie along x, 1 and 3 along z. */
+/** The grid cells a seat covers. SeatDirect 0 and 2 lie along x, 1 and 3 along z.
+    `len` is the footprint in cells, which is not the same as how many people fit:
+    see placeCell. */
 function cellsOf(b) {
   const a = [];
   for (let k = 0; k < b.len; k++) a.push(b.dir & 1 ? [b.c, b.r + k] : [b.c + k, b.r]);
   return a;
+}
+
+/** The cell place k sits in. In the binary levels a bench covered one cell per
+    person, so the two numbers were interchangeable and the code used `len` for
+    both. 1.63.1 packs two, three or four places into a single cell instead, so a
+    place maps onto the footprint rather than being it. */
+function placeCell(b, k) {
+  const j = b.len === b.cap ? k : Math.floor(k * b.len / b.cap);
+  return b.dir & 1 ? [b.c, b.r + j] : [b.c + j, b.r];
 }
 /** Which way the seat faces, as a grid step. 0 up, 1 right, 2 down, 3 left. */
 const FACING = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -100,7 +111,7 @@ function entryDirs(b) {
     the next place along. */
 function cellEntries(g, b, k) {
   const own = new Set(cellsOf(b).map(([c, r]) => c + "," + r));
-  const [c, r] = cellsOf(b)[k];
+  const [c, r] = placeCell(b, k);
   const out = [];
   for (const [dc, dr] of entryDirs(b)) {
     const nc = c + dc, nr = r + dr;
@@ -111,7 +122,7 @@ function cellEntries(g, b, k) {
 }
 function entryCells(g, b) {
   const seen = new Set(), out = [];
-  for (let k = 0; k < b.len; k++)
+  for (let k = 0; k < b.cap; k++)
     for (const [c, r] of cellEntries(g, b, k)) {
       const key = c + "," + r;
       if (seen.has(key)) continue;
@@ -232,9 +243,10 @@ function load(n) {
   for (const i of raw.holes) hole[i] = 1;
   const occ = new Int16Array(W * H).fill(-1);
   const seats = raw.seats.map((s, i) => ({
-    id: i, c: s[0], r: s[1], len: s[2], colour: s[3],
+    id: i, c: s[0], r: s[1], cap: s[2], colour: s[3],
     dir: s[4] | 0,                                  // SeatDirect 0..3, straight from the APK
-    occ: new Array(s[2]).fill(null),                // one place per cell
+    len: s.length > 5 ? s[5] : s[2],                // footprint; the binary levels had none
+    occ: new Array(s[2]).fill(null),                // one entry per place
     pending: 0, locked: false,
   }));
   const g = { W, H, hole, occ, seats, door: 0, level: n, name: raw.id || raw.name,
@@ -466,13 +478,25 @@ function seatCentre(b) {
                    : [cellW(b.c) + n * SX, cellZ(b.r)];
 }
 const seatFrame = b => "s" + b.len + "_" + b.dir + "_" + (SPRITE[colName(b.colour)] || "grey");
+
+/** How many places share one cell: 1 for the binary levels, 2-4 for 1.63.1. */
+const packing = b => b.cap / b.len;
+/** Where place k sits, in world units. Places that share a cell sit side by side
+    inside it, spread along the seat's own axis so a bench still reads as a bench. */
+function placeAt(b, k) {
+  const [c, r] = placeCell(b, k), per = packing(b);
+  if (per <= 1) return [cellW(c), cellZ(r)];
+  const off = ((k % per) - (per - 1) / 2) / per;
+  return b.dir & 1 ? [cellW(c), cellZ(r) + off * SZ]
+                   : [cellW(c) + off * SX, cellZ(r)];
+}
 const riderFrame = (b, ci) => "r" + b.dir + "_" + (SPRITE[colName(ci)] || "grey");
 
 /** Frames carry their own size and origin: [x, y, w, h, pivotX, pivotY]. */
-function blit(frame, wx, wy, wz, alpha) {
+function blit(frame, wx, wy, wz, alpha, scale) {
   const f = META.frames[frame]; if (!f) return;
   const [px, py] = P(wx, wy, wz);
-  const k = LAY.s / META.scale;
+  const k = LAY.s / META.scale * (scale == null ? 1 : scale);
   ctx.globalAlpha = alpha == null ? 1 : alpha;
   ctx.drawImage(atlas, f[0], f[1], f[2], f[3],
                 px - f[4] * k, py - f[5] * k, f[2] * k, f[3] * k);
@@ -561,7 +585,16 @@ function drawBlock(wx, wz, alpha) {
 /** A seat, or a crate where the board carries one instead. */
 function paintPiece(b, wx, wz, alpha) {
   if (isBlock(b)) return drawBlock(wx, wz, alpha);
-  blit(seatFrame(b), wx, 0, wz, alpha);
+  const per = packing(b);
+  if (per <= 1) return blit(seatFrame(b), wx, 0, wz, alpha);
+  // A bench that covers one cell is drawn as its own places, side by side and
+  // scaled to fit, rather than as one wide cushion that would cover its
+  // neighbours. There is no atlas frame for a four-seater, and this needs none.
+  for (let i = 0; i < per; i++) {
+    const off = (i - (per - 1) / 2) / per;
+    blit(seatFrame(b), wx + (b.dir & 1 ? 0 : off * SX), 0,
+         wz + (b.dir & 1 ? off * SZ : 0), alpha, 1 / per);
+  }
 }
 
 /* ---------------- the room ----------------
@@ -1294,8 +1327,8 @@ function draw() {
     }
     b.occ.forEach((ci, i) => {
       if (ci == null) return;
-      const [c, r] = cellsOf(b)[i];
-      push(cellW(c), cellZ(r), () => blit(riderFrame(b, ci), cellW(c), .05 + cheerLift(c, r), cellZ(r) - .04), .3);
+      const [c, r] = placeCell(b, i), [wx, wz] = placeAt(b, i), z = 1 / packing(b);
+      push(wx, wz, () => blit(riderFrame(b, ci), wx, .05 + cheerLift(c, r), wz - .04, 1, z), .3);
     });
   }
 
@@ -1340,8 +1373,8 @@ function draw() {
     paintPiece(held, sx + gdx, sz + gdz, A);
     held.occ.forEach((ci, i) => {
       if (ci == null) return;
-      const [c, r] = cellsOf(held)[i];
-      blit(riderFrame(held, ci), cellW(c) + gdx, .05, cellZ(r) + gdz - .04, A);
+      const [wx, wz] = placeAt(held, i);
+      blit(riderFrame(held, ci), wx + gdx, .05, wz + gdz - .04, A, 1 / packing(held));
     });
   }
 
@@ -1413,9 +1446,9 @@ function pickSeatAt(clientX, clientY) {
     if (spriteHit(seatFrame(b), sx, 0, sz, X, Y)) take(b, view(sx, 0, sz)[2]);
     b.occ.forEach((ci, i) => {                  // a passenger counts as their seat
       if (ci == null) return;
-      const [c, r] = cellsOf(b)[i];
-      if (spriteHit(riderFrame(b, ci), cellW(c), .05, cellZ(r) - .04, X, Y))
-        take(b, view(cellW(c), 0, cellZ(r))[2] + .3);
+      const [wx, wz] = placeAt(b, i);
+      if (spriteHit(riderFrame(b, ci), wx, .05, wz - .04, X, Y))
+        take(b, view(wx, 0, wz)[2] + .3);
     });
   }
   if (best) return best;
@@ -1571,12 +1604,12 @@ function doorSeat(g, ci) {
   if (id < 0) return null;                        // -1 is an empty cell
   const seat = g.seats[id];
   if (!seat || !accepts(seat, ci)) return null;
-  const cells = cellsOf(seat);
-  for (let k = 0; k < seat.len; k++) {
+  for (let k = 0; k < seat.cap; k++) {
     if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
     // only the place that is actually in the doorway: the rest of a long seat is
     // inside the room, and there is no floor to walk round to it on
-    if (cells[k][0] === g.W - 1 && cells[k][1] === g.door)
+    const pc = placeCell(seat, k);
+    if (pc[0] === g.W - 1 && pc[1] === g.door)
       return { seat, k, entry: null };            // no entry tile: they step straight up
   }
   return null;
@@ -1591,7 +1624,7 @@ function pickSeat(g, ci) {
   let best = null, bestD = Infinity;
   for (const seat of g.seats) {
     if (!accepts(seat, ci)) continue;
-    for (let k = 0; k < seat.len; k++) {
+    for (let k = 0; k < seat.cap; k++) {
       if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
       for (const [nc, nr] of cellEntries(g, seat, k)) {
         const dist = d[idx(g, nc, nr)];
@@ -1618,7 +1651,7 @@ function walkPath(g, seat, k, entry) {
     }
   }
   path.reverse();
-  path.push(cellsOf(seat)[k]);
+  path.push(placeCell(seat, k));
   return path;
 }
 
@@ -1671,7 +1704,7 @@ function autoBoard(instant) {
     if (!instant) shuffleUp(S);          // the rest of the line steps up
     seat.pending++;
     (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
-    const cell = cellsOf(seat)[slot];
+    const cell = placeCell(seat, slot);
     seat.locked = true;             // no dragging a seat out from under a walker
     const sitDown = () => {
       seat.pending--;
@@ -1783,7 +1816,7 @@ const FLY_UP = 1.6;                // how high it arcs, in cells: clear of every
 
 /** The place the front of the queue could take on this seat, or -1. */
 function freeSlot(seat) {
-  for (let k = 0; k < seat.len; k++)
+  for (let k = 0; k < seat.cap; k++)
     if (seat.occ[k] == null && !(seat.claim && seat.claim.has(k))) return k;
   return -1;
 }
@@ -1802,7 +1835,7 @@ function jumpBoard(g, seat) {
   seat.pending++;
   (seat.claim || (seat.claim = new Set())).add(slot);
   seat.locked = true;                    // not while somebody is on their way in
-  const cell = cellsOf(seat)[slot];
+  const cell = placeCell(seat, slot);
   const from = [cellW(g.W - 1) + SX * 2.0, cellZ(g.door)];   // the spot at the door
   const to = [cellW(cell[0]), cellZ(cell[1]) - .04];
   const a = { ci, x: from[0], z: from[1], y: 0, route: null, facing: "l", phase: 1 };

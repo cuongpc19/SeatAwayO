@@ -324,7 +324,10 @@ function buildGrid() {
 }
 
 /* ---- playing -----------------------------------------------------------
-   33 of the 633 boards are second and third arrangements shipped under a level
+   1.63.1 ships exactly one board per level id, so the filter passes everything
+   and the ladder is simply the campaign in order. It is kept because the binary
+   levels it was written for are still on disk behind build.py's LEGACY, where
+   33 of the 633 boards were second and third arrangements shipped under a level
    name the game already used, and a few of those are display pieces nobody can
    clear. Counting them as levels pushed every number after the third out of step
    with the APK - "level 10" was Level_00005 all over again. The game plays one

@@ -26,6 +26,16 @@ KEEP = ("w", "h", "time", "holes", "seats", "queue")   # what a board cannot do 
 # something to be reconstructed. Deliberate departures live here instead of
 # being typed into either, which keeps the whole distance between the two games
 # readable in one place, and printed on every build.
+# ---- which campaign ships --------------------------------------------------
+# 1.63.1 stopped shipping the binary LevelCfModel assets the first dump read, so
+# the campaign now comes from src/convert_163.py. lv/boards_campaign.json is the
+# older dump and stays on disk: it is the only thing lv/overrides.json was
+# authored against, and an override is keyed by id alone, so pointing the same
+# file at a campaign where Level_00001 is a different board would silently
+# replace it with a board from the other game.
+CAMPAIGN = "lv/boards_163.json"
+LEGACY = "lv/boards_campaign.json"
+
 EXTRA_SECONDS = 30    # added to every board's clock
 GOLD_WIN = 100        # paid for a win, whatever the difficulty
 
@@ -45,9 +55,9 @@ def levels_json():
     edit exported from the level editor goes in lv/overrides.json instead, keyed
     by the board's id. So a board is reverted by deleting one entry, and the
     original is never a rebuild away from being lost."""
-    boards = json.load(open("lv/boards_campaign.json", encoding="utf-8"))
+    boards = json.load(open(CAMPAIGN, encoding="utf-8"))
     src = pathlib.Path("lv/overrides.json")
-    if src.exists():
+    if src.exists() and CAMPAIGN == LEGACY:
         at = {b["id"]: i for i, b in enumerate(boards)}
         for bid, b in json.loads(src.read_text(encoding="utf-8")).items():
             if bid not in at:
@@ -63,6 +73,7 @@ def levels_json():
     # otherwise be the one board in the campaign that did not get the extra.
     for b in boards:
         b["time"] += EXTRA_SECONDS
+    print("  campaign  %s, %d boards" % (CAMPAIGN, len(boards)))
     return json.dumps(boards, separators=(",", ":"))
 
 
