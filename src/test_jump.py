@@ -2,7 +2,7 @@
 land across the board, and exactly one charge should go."""
 import pathlib
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 with sync_playwright() as pw:
     br = pw.chromium.launch(); pg = br.new_page(viewport={"width": 1440, "height": 900})
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))

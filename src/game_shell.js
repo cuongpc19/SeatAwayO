@@ -4,6 +4,47 @@
    file only decides what the player sees around them.                        */
 
 RICH = true;                       // the engine draws a room, not a bare grid
+ROOM_SIGN = "SEAT MATCH";         // lettered along the far wall of every room
+
+/* ---- the address bar --------------------------------------------------
+   One read of the query string, at load, for the whole shell - the way Marble
+   Sort does it. `location.search` cannot change without a reload, so the three
+   separate reads this replaced were three copies free to drift apart, and did:
+   the theme was read out of a URL the reset flag had not been stripped from yet.
+
+     ?level=N     open board N straight away, past the home screen and past the
+                  unlock gate - the picker only lists what has been earned,
+                  which is no help when the board you want is number 300.
+     ?reset=1     wipe the save before it is read. ?reset=1&level=1 is a clean
+                  run from the very top.
+     ?win=1       hand every board a win the moment it opens, so the
+                  celebration and the result card can be read on any level
+                  without solving one.
+     ?theme=NAME  pin one room and stop the five-level rotation.
+                  classroom | station | stadium | concert | cinema
+     ?bg=NAME     swap the procedural room for a painted bg/NAME.png.
+
+   None of them is a way round the campaign: the level still has to be won to
+   unlock the next, and a reset is just the blank save.
+
+   A bare flag counts. Marble Sort tests `p.get("reset")`, which is `""` for
+   `?reset` and so ignores the form a person types first; here `=0` is the only
+   way to write a flag off.
+
+   The reset flag is dropped from the address bar once read, or every later
+   refresh would throw away the progress made since. `win` is deliberately kept:
+   it is a way of looking at something, and refreshing to see it again is the
+   whole use. Reading the flags into constants before editing `LINK` is what
+   makes that safe - the value is captured, not looked up a second time. */
+const LINK = new URLSearchParams(location.search);
+const flag = k => LINK.has(k) && LINK.get(k) !== "0";
+const RESET_ASKED = flag("reset");
+const WIN_ASKED = flag("win");
+if (RESET_ASKED) {
+  LINK.delete("reset");
+  const rest = LINK.toString();
+  history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
+}
 
 /* The room changes every five levels and then starts the rotation over, so a run
    of play keeps moving somewhere new without needing 633 rooms to do it.
@@ -13,7 +54,7 @@ const COVER_SRC = "/*__COVER__*/";       // the home screen's own render
 const BUILT = "/*__BUILT__*/";           // the stamp on the home screen's foot
 const THEME_RUN = 5;                    // levels before the room changes
 const THEME_ORDER = ["classroom", "station", "stadium", "concert", "cinema"];
-const pinnedTheme = new URLSearchParams(location.search).get("theme");
+const pinnedTheme = LINK.get("theme");
 
 /** The still on the cinema screen. Loaded once at boot rather than when a cinema
     level comes up: it is inlined in the build, so there is nothing to wait for,
@@ -42,14 +83,13 @@ function applyTheme(level) {
 /* Drop a painted room at bg/room.png (or pass ?bg=<name>) and it replaces the
    procedural station. Missing file, no harm: the station stays. */
 (() => {
-  const q = new URLSearchParams(location.search);
   // Only when asked for by name: guessing at a file meant every single load
   // reported a 404 for a plate nobody had made yet.
-  const asked = q.get("bg");
-  if (!asked) return;
+  const name = LINK.get("bg");
+  if (!name) return;
   const img = new Image();
   img.onload = () => { BG = img; draw(); };
-  img.src = "bg/" + asked + ".png";
+  img.src = "bg/" + name + ".png";
 })();
 
 /* ---- the numbers the shipped game runs on -----------------------------
@@ -64,8 +104,19 @@ const has = f => save.unlocked >= unlockedAt(f);
    localStorage verbatim, so renaming the key later restores the old name into a
    game that reads the new one and every player loses everything. Marble Sort
    moved `ms_` to `bf_` before anyone had played, which is the only time it is
-   free; this rename off `seataway.save.v2` is the same window, spent now. */
-const SAVE_KEY = "takeaseat.save.v1";
+   free; this rename onto the game's own name is the same window, spent now.
+
+   OLD_KEYS is read only when the current key holds nothing, and what it finds
+   is written straight back under the new name. It exists because both renames
+   happened while the game was being playtested on real phones, not because
+   migrating is cheap: delete it at launch, when nothing older than SAVE_KEY is
+   left anywhere to find.
+
+   A reset has to clear all three. Clearing only SAVE_KEY would leave an old key
+   standing for the next load to find, which would resurrect the save the reset
+   was asked to destroy. */
+const SAVE_KEY = "seatmatch.save.v1";
+const OLD_KEYS = ["takeaseat.save.v1", "seataway.save.v2"];
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
   seenBoosters: [],                // which unlock notices have been shown
@@ -75,24 +126,6 @@ const blank = () => ({
   freeTime: 0,                     // free goes at the time booster, from its tutorial
   sound: true, vibe: true,         // the two switches in Settings
 });
-/* ---- deep links --------------------------------------------------------
-   ?level=N opens a board straight away, past the home screen and past the
-   unlock gate: the picker only lists what has been earned, which is no help
-   when the board you want to look at is number 300. ?reset wipes the save
-   before it is read, so ?reset&level=1 is a clean run from the very top.
-
-   Neither is a way round the campaign - the level still has to be won to
-   unlock the next, and a reset is just the blank save. The reset flag is
-   dropped from the address bar once used, or every later refresh would throw
-   away the progress made since. */
-const LINK = new URLSearchParams(location.search);
-const RESET_ASKED = LINK.has("reset");
-if (RESET_ASKED) {
-  LINK.delete("reset");
-  const rest = LINK.toString();
-  history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
-}
-
 /* ⚠ The read is deferred to boot(), after PLATFORM.init() has resolved. On a
    host that keeps a cloud save, reading before init returns the local copy and
    the next write pushes that stale copy over the player's real save. Until then
@@ -100,8 +133,20 @@ if (RESET_ASKED) {
    while the home screen has not been shown. */
 let save = blank();
 function loadSave() {
-  if (RESET_ASKED) { PLATFORM.storage.removeItem(SAVE_KEY); return; }
-  try { save = Object.assign(blank(), JSON.parse(PLATFORM.storage.getItem(SAVE_KEY) || "{}")); }
+  if (RESET_ASKED) {
+    for (const k of [SAVE_KEY].concat(OLD_KEYS)) PLATFORM.storage.removeItem(k);
+    return;
+  }
+  try {
+    let raw = PLATFORM.storage.getItem(SAVE_KEY), adopted = false;
+    for (const k of OLD_KEYS) {
+      if (raw) break;
+      raw = PLATFORM.storage.getItem(k);
+      adopted = !!raw;
+    }
+    save = Object.assign(blank(), JSON.parse(raw || "{}"));
+    if (adopted) persist();          // once, so the next load reads the new name
+  }
   catch (e) { /* private window, cleared data, a browser that refuses storage */ }
 }
 function persist() { PLATFORM.storage.setItem(SAVE_KEY, JSON.stringify(save)); }
@@ -282,7 +327,7 @@ let CUR = 1;                       // the level number the player sees
    level nobody found hard. Ported whole; only the list of things being counted
    down to is this game's.
 
-   Take a Seat introduces four: two boosters, and two seats. The seats are read
+   Seat Match introduces four: two boosters, and two seats. The seats are read
    off the boards rather than written down, because the ladder moves - it has
    already been renumbered once - and a hand-written "level 7 -> grey seat" table
    is a second copy of it that goes stale silently. The boosters cannot be found
@@ -352,13 +397,40 @@ function startLevel(n) {
   // and then, over the board it is talking about, anything new on it
   const owed = introDue(CUR);
   if (owed) showIntro(owed);
+  else winIfAsked();
+}
+
+/** ?win=1: hand the open board a win without solving it, so the celebration and
+    the result card can be read on any of the 600 levels.
+
+    The clock is left near full on purpose. Stars come off the time remaining, so
+    a board handed a win on a stopped clock would show the one-star card - and
+    the thing this is used to look at is the three-star one.
+
+    Never under an intro card. On the four levels that introduce a piece the win
+    waits for the run to be read, so `introGo` calls this when the last step is
+    done. Calling it from `endIntro` instead would look tidier and be wrong: that
+    also runs from the `clearIntro()` at the top of `openBoard`, where `S` is
+    still the board being left. */
+function winIfAsked() {
+  if (!WIN_ASKED || !S || S.phase !== "play") return;
+  S.seated = S.total;
+  S.queue.length = 0;
+  S.left = Math.max(S.left, S.time * 0.9);
+  finish(true);
 }
 
 /** The board itself, once there is nothing left to explain. */
 function openBoard() {
-  INTRO_MARK = null;             // a ring left over from the last board means nothing here
+  clearIntro();                  // a half-run walkthrough must not outlive its board
   hideCard();
   show("play");
+  // the opening beat is there to teach the boarding, so it stops with the lesson
+  OPEN_MS = CUR <= 2 ? 2000 : 0;
+  /* Set before load(), not in showIntro(): with no opening beat, load() starts
+     the queue on the frame the board appears, which is before the walkthrough
+     that is meant to hold them has been put up. */
+  HOLD = !!introDue(CUR);
   applyTheme(CUR);                 // before load(), so the first frame is right
   load(CAMPAIGN[CUR - 1]);
   onHud();
@@ -367,6 +439,9 @@ function openBoard() {
 let sayUntil = 0;
 const toastEl = () => document.getElementById("hint");
 onSay = msg => {
+  // A walkthrough is already saying its piece in the bubble, and the toast for
+  // the same tap lands under it saying it again.
+  if (INTRO) return;
   const el = toastEl();
   el.textContent = msg; el.classList.add("on");
   sayUntil = performance.now() + 2600;
@@ -433,18 +508,17 @@ $("b-time").onclick = () => {
   const freeT = save.freeTime > 0;
   if (!freeT && save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
   if (freeT) save.freeTime--; else save.coins -= CF.boosterTime.price;
-  $("b-time").classList.remove("hint");        // the tutorial ring is spent with it
   SFX.buy(); buzz(14);
   S.left += CF.boosterTime.value;
   S.time = Math.max(S.time, S.left);          // keep the bar honest
   persist(); say("+" + CF.boosterTime.value + " seconds."); onHud();
+  introSaw("timed");
 };
 
 $("b-jump").onclick = () => {
   if (!S || S.phase !== "play") return;
   if (!has("booster_jump")) return lockedSay("booster_jump", "Jump");
   if (JUMP) { JUMP = false; say("Jump cancelled."); onHud(); draw(); return; }
-  $("b-jump").classList.remove("hint");        // the tutorial ring is spent with it
   if (save.jumps === 0) {
     if (save.coins < CF.boosterJump.price) return say("Not enough gold for a jump.");
     save.coins -= CF.boosterJump.price;
@@ -453,63 +527,106 @@ $("b-jump").onclick = () => {
     persist();
   }
   JUMP = true;
-  say("Jump armed - drag any seat straight to where you want it.");
+  say("Jump armed - tap the seat you want the next passenger flown into.");
   onHud(); draw();
+  introSaw("armed");
 };
 
 /* One charge per seat actually moved, and the arming ends with it. */
-onSeatMoved = () => {
-  SFX.move(); buzz(12);
-  if (!JUMP) return;
+onSeatMoved = () => { SFX.move(); buzz(12); };
+
+/* Armed, a tap on a seat is the booster being used: the front of the queue
+   flies into it. A tap on a seat they cannot sit in is not a wasted charge -
+   it says so and stays armed, because the one thing worse than a booster that
+   does nothing is one that charges for it. */
+onSeatPick = seat => {
+  if (!JUMP) return false;
+  if (!S.queue.length) { say("Nobody left in the queue."); return true; }
+  if (!jumpBoard(S, seat)) {
+    bump();
+    say("Tap a seat that matches the passenger at the front of the queue.");
+    return true;
+  }
   JUMP = false;
   save.jumps = Math.max(0, save.jumps - 1);
-  persist(); onHud();
+  persist(); buzz(16); onHud(); draw();
+  introSaw("jumped");
+  return true;
 };
 
 /* ---- introducing a feature ---------------------------------------------
-   One card, once, the first time the player reaches the level that carries the
-   thing. The levels come from the FEATURES ladder above rather than from a
-   second list here: that ladder already works out where each piece arrives, and
-   a written-down copy of it goes stale the moment the ladder moves.
+   Four pieces need explaining, and each one gets a short walkthrough the first
+   time the player reaches the level that carries it. Which level that is comes
+   from the FEATURES ladder above rather than from a second list here, so moving
+   a gate cannot leave the introductions pointing at the wrong board.
 
-   The card is shown OVER the live board, not in front of it. A piece explained
-   on a blank screen is a paragraph to skim; explained with the board behind it
-   and the thing itself ringed, it is a pointer. The clock is held while it is
-   up, so nothing is lost to reading it.
+   A run is a list of steps, and a step points at exactly one thing:
 
-   A booster cannot be pointed at and then charged for - the player would have to
-   buy the tutorial. Each booster hands over one free go, and the ring on the
-   button stays until they spend it. */
-const INTRO_TEXT = {
-  grey: ["GOT IT",
-    "Grey seats never move, whatever you drag. In exchange they take a passenger "
-    + "of any colour - so work the other seats around them."],
-  twin: ["GOT IT",
-    "A double seats two passengers, both of its own colour, and it needs two free "
-    + "cells to slide into."],
-  jump: ["TRY IT",
-    "Jump lifts a seat straight over everything else instead of sliding it. "
-    + "Here is one on the house - tap it, then drag any seat where you want it."],
-  time: ["TRY IT",
-    "This one puts more seconds on the clock. Here is one on the house - tap it "
-    + "whenever time gets tight."],
+     - a seat step rings the seats on the board and washes the room out around
+       them, so the sentence lands on something the player is already looking at;
+     - a booster step lifts the button through the wash, hands over a free go,
+       and then waits for it to actually be pressed. A booster described in a
+       paragraph is a paragraph; one you have pressed once is a button you know.
+       The step after it points at what the press did - the arming, the seconds
+       going onto the clock - because that is the half a paragraph cannot show.
+
+   The clock is held for the whole run, so none of it is paid for in seconds.
+
+   Nothing is locked out. Every waiting step grows a way past it after a few
+   seconds: a board can always turn out to have no move left in it, and a
+   tutorial nobody can leave is a fault rather than a lesson. */
+const INTRO_RUNS = {
+  /* No `twin`. A double seat explains itself the first time one is dragged - it
+     is visibly two cells long and it either fits or it does not - and the
+     FEATURES ladder still counts it for the progress bar either way. A run is
+     written here only for a piece that cannot be worked out by looking. */
+  grey: [
+    { spot: "seats", text: "One seat on this board is ringed. Have a look at it before you move anything." },
+    { spot: "seats", btn: "GOT IT",
+      text: "That one is bolted down - drag it and it will not budge. In exchange it "
+          + "takes a passenger of any colour, so plan the other seats around it." },
+  ],
+  jump: [
+    { text: "Passengers have to walk in, so a seat with no way through to it is no use to anybody - however right its colour is." },
+    { spot: "b-jump", wait: "armed",
+      text: "Jump flies the next passenger straight into a seat instead. Here is one on the house - tap the arrow button." },
+    { wait: "jumped", thru: true, dock: "high", slim: true,
+      text: "Now tap a seat that matches the passenger at the front of the queue. They will fly over everything in the way." },
+    { btn: "GOT IT", text: "That is a jump. More of them cost {p} gold from the same button." },
+  ],
+  time: [
+    { spot: "clock", text: "The clock at the top is the only way to lose a board." },
+    { spot: "b-time", wait: "timed",
+      text: "This booster puts more of it back. Here is one on the house - tap the clock button." },
+    { spot: "clock", btn: "GOT IT",
+      text: "+{t} seconds, straight onto the clock. Tap it whenever time gets tight." },
+  ],
 };
-const INTRO_BOOSTER = { jump: "b-jump", time: "b-time" };
+
+/* What a step can point at, and what has to be lifted through the wash for the
+   player to be able to reach it. */
+const SPOTS = {
+  "b-jump": ["#b-jump", "#boosters"],
+  "b-time": ["#b-time", "#boosters"],
+  clock:    [".pill-time", "#play .topbar"],
+};
 
 /** The introduction owed on this level, or null. `at <= n` rather than `at === n`
     so a player who jumps ahead from the level picker still gets it. */
 function introDue(n) {
   for (const f of featureLevels())
-    if (f.at <= n && INTRO_TEXT[f.id] && !save.seenBoosters.includes(f.id)) return f;
+    if (f.at <= n && INTRO_RUNS[f.id] && !save.seenBoosters.includes(f.id)) return f;
   return null;
 }
 
-let INTRO = null;                      // the feature being introduced, while it is up
-/* The card sits in the middle of the screen and the seats it is describing are
-   under it as often as not, so the ring outlives the card by a few seconds:
-   dismiss it, and the board underneath is still marked. A booster needs no such
-   thing - its ring is on a button beside the card, and it stays until spent. */
-let INTRO_MARK = null;                 // { id, until } - seats still worth ringing
+let INTRO = null;                      // { id, label, steps, i } while a run is going
+/* The bubble stands in the middle of the screen and the seats it describes are
+   under it as often as not, so the ring outlives the last step by a moment:
+   press GOT IT and the board underneath is still marked. */
+let INTRO_MARK = null;                 // { id, until }
+const MARK_MS = 2500;
+const STUCK_MS = 7000;                 // how long a waiting step waits before offering a way out
+let stuckTimer = 0, introRunning = false;
 
 /** The free go that makes "tap it" an offer rather than a price tag. */
 function giveFreeGo(id) {
@@ -519,50 +636,152 @@ function giveFreeGo(id) {
 }
 
 function showIntro(f) {
-  const [button, text] = INTRO_TEXT[f.id];
-  $("intro-title").textContent = f.label;
-  $("intro-text").textContent = text;
-  $("intro-ok").textContent = button;
+  const steps = INTRO_RUNS[f.id];
+  if (!steps) return;
   save.seenBoosters.push(f.id); persist();
-  INTRO = f;
-  const bid = INTRO_BOOSTER[f.id];
-  if (bid) {
-    giveFreeGo(f.id);
-    $("boosters").classList.add("spotlight");
-    $(bid).classList.add("hint");      // stays on after the card, until it is used
-  }
+  giveFreeGo(f.id);
+  INTRO = { id: f.id, label: f.label, steps, i: 0 };
   setPaused(true);
+  HOLD = true;                   // the queue waits outside until this is over
   $("intro").classList.add("on");
-  onHud(); introFrame();
+  onHud();
+  introGo(0);
+  introFrame();
 }
 
-/** The ring around a seat is painted on the canvas, in the room's own
-    projection, and the canvas only redraws when something asks it to. */
-function introFrame() {
-  const marking = INTRO_MARK && performance.now() < INTRO_MARK.until;
-  if (!INTRO && !marking) { if (INTRO_MARK) { INTRO_MARK = null; draw(); } return; }
-  if (marking || (INTRO && !INTRO_BOOSTER[INTRO.id])) draw();
-  requestAnimationFrame(introFrame);
+/** Nothing on the HUD or the boosters is lifted or ringed any more. */
+function clearSpot() {
+  for (const el of document.querySelectorAll(".spotlight")) el.classList.remove("spotlight");
+  for (const el of document.querySelectorAll(".hint")) el.classList.remove("hint");
 }
 
-const MARK_MS = 3000;                  // how long a seat stays ringed after the card
-$("intro-ok").onclick = () => {
-  $("intro").classList.remove("on");
-  $("boosters").classList.remove("spotlight");
-  if (INTRO && !INTRO_BOOSTER[INTRO.id])
+function introGo(i) {
+  if (!INTRO) return;
+  clearSpot();
+  clearTimeout(stuckTimer);
+  if (i >= INTRO.steps.length) { endIntro(); return winIfAsked(); }
+  INTRO.i = i;
+  const st = INTRO.steps[i], tip = $("intro-tip");
+  $("intro-title").textContent = INTRO.label;
+  $("intro-text").textContent = st.text
+    .replace("{t}", CF.boosterTime.value).replace("{p}", CF.boosterJump.price);
+  // one dot per step, filled up to this one, so a run reads as a run
+  $("intro-dots").textContent =
+    INTRO.steps.map((_, k) => (k === i ? "\u25CF" : "\u25CB")).join("");
+  $("intro-ok").textContent = st.wait ? "SKIP" : (st.btn || "NEXT");
+  tip.classList.toggle("waiting", !!st.wait);
+  tip.classList.remove("stuck");
+  $("intro").classList.toggle("thru", !!st.thru);
+  if (st.wait) stuckTimer = setTimeout(() => tip.classList.add("stuck"), STUCK_MS);
+  if (st.spot && st.spot !== "seats") {
+    const [sel, host] = SPOTS[st.spot];
+    document.querySelector(host).classList.add("spotlight");
+    document.querySelector(sel).classList.add("hint");
+  }
+  dockTip(st);
+  draw();
+}
+
+/** Where the seats being ringed are on the screen, as a fraction of its height,
+    or null when there are none. */
+function seatFocusY() {
+  const marked = introSeats();
+  if (!marked.length || !LAY) return null;
+  const r = cv.getBoundingClientRect();
+  let sum = 0;
+  for (const b of marked) sum += ringCentre(b)[1];
+  return (r.top + (sum / marked.length) * r.height / cv.height) / innerHeight;
+}
+
+/** The bubble goes wherever the thing being pointed at is not. */
+function dockTip(st) {
+  const tip = $("intro-tip");
+  let y = null;
+  if (st.spot === "seats") y = seatFocusY();
+  else if (st.spot) {
+    const r = document.querySelector(SPOTS[st.spot][0]).getBoundingClientRect();
+    y = (r.top + r.height / 2) / innerHeight;
+  }
+  const dock = st.dock ? "dock-" + st.dock
+             : y == null ? "dock-mid" : y > .5 ? "dock-top" : "dock-bottom";
+  tip.classList.remove("dock-high", "dock-top", "dock-mid", "dock-bottom");
+  tip.classList.toggle("slim", !!st.slim);
+  tip.classList.add(dock);
+}
+
+$("intro-ok").onclick = () => { if (INTRO) introGo(INTRO.i + 1); };
+
+/** Something a step was waiting for has happened. The pause before moving on is
+    the point of the step: it is where the player sees what their tap did. */
+function introSaw(what) {
+  if (!INTRO) return;
+  const st = INTRO.steps[INTRO.i];
+  if (!st || st.wait !== what) return;
+  clearTimeout(stuckTimer);
+  setTimeout(() => { if (INTRO && INTRO.steps[INTRO.i] === st) introGo(INTRO.i + 1); }, 620);
+}
+
+function endIntro() {
+  clearTimeout(stuckTimer);
+  clearSpot();
+  $("intro").classList.remove("on", "thru");
+  if (INTRO && INTRO.id === "grey")
     INTRO_MARK = { id: INTRO.id, until: performance.now() + MARK_MS };
   INTRO = null;
   setPaused(false);
-  introFrame(); draw();
-};
+  HOLD = false;
+  autoBoard();                   // and now they can get on
+  onHud(); introFrame(); draw();
+}
 
-/** Which seats on this board the card is talking about. */
+/** A run left half-finished - the board was won under it, or the player restarted
+    - must not leave the clock paused or a button lit. */
+function clearIntro() {
+  if (INTRO) endIntro();
+  INTRO_MARK = null;
+}
+
+/** The ring is painted on the canvas, in the room's own projection, and the
+    canvas only redraws when something asks it to. */
+function introFrame() {
+  if (introRunning) return;
+  introRunning = true;
+  const step = () => {
+    const marking = INTRO_MARK && performance.now() < INTRO_MARK.until;
+    if (!INTRO && !marking) {
+      introRunning = false;
+      if (INTRO_MARK) INTRO_MARK = null;
+      draw();
+      return;
+    }
+    if (introSeats().length) draw();
+    requestAnimationFrame(step);
+  };
+  step();
+}
+
+/** Where to put the ring: the mean of a seat's cells rather than its middle
+    cell - a two-cell seat has no middle one and the ring lands over its
+    right-hand half.
+
+    ⚠ The engine already has a `seatCentre`, which answers a different
+    question in different units. Declaring that name again here quietly replaced
+    it, and every seat on every board went off the side of the canvas. */
+function ringCentre(b) {
+  const cs = cellsOf(b);
+  const mc = cs.reduce((a, [c]) => a + c, 0) / cs.length;
+  const mr = cs.reduce((a, [, r]) => a + r, 0) / cs.length;
+  return P(cellW(mc), .02, cellZ(mr));
+}
+
+/** Which seats on this board the current step is talking about. */
 function introSeats() {
-  const id = INTRO ? INTRO.id
-           : (INTRO_MARK && performance.now() < INTRO_MARK.until) ? INTRO_MARK.id : null;
+  const st = INTRO && INTRO.steps[INTRO.i];
+  const id = st && st.spot === "seats" ? INTRO.id
+           : (!INTRO && INTRO_MARK && performance.now() < INTRO_MARK.until) ? INTRO_MARK.id
+           : null;
   if (!id || !S) return [];
   if (id === "grey") return S.seats.filter(b => b.colour === 0);
-  if (id === "twin") return S.seats.filter(b => b.len > 1);
   return [];
 }
 
@@ -696,22 +915,50 @@ function drawHand(x, y, s) {
    right tile at every window size. The engine hands the overlay the last word
    on the frame; everything here is painted over the finished room. */
 onOverlay = () => {
-  if (LAY && introSeats().length) {
-    // the same ring the coach mark uses to say "this one", around every seat on
-    // the board that is an example of what the card just described
-    const t = performance.now() / 1000, pulse = .5 + .5 * Math.sin(t * 3.6);
+  /* Armed, the seats the front of the queue could be flown into are ringed.
+     Without it "tap a seat" is a guess, and a guess that lands on the wrong
+     colour reads as the booster being broken. */
+  if (JUMP && LAY && S && S.queue.length) {
+    const ci = S.queue[0], t = performance.now() / 1000;
+    const pulse = .5 + .5 * Math.sin(t * 3.6);
     ctx.save();
+    ctx.strokeStyle = "#ffd75e"; ctx.lineWidth = Math.max(2, LAY.s * .05);
+    ctx.globalAlpha = .45 + .4 * pulse;
+    for (const b of S.seats) {
+      if (b.locked || !accepts(b, ci) || freeSlot(b) < 0) continue;
+      const A = ringCentre(b);
+      const rx = SX * (.44 + .05 * pulse) * (b.len > 1 ? b.len * .72 : 1) * LAY.s;
+      ctx.beginPath(); ctx.ellipse(A[0], A[1], rx, SX * .4 * LAY.s, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  const marked = LAY ? introSeats() : [];
+  if (marked.length) {
+    const t = performance.now() / 1000, pulse = .5 + .5 * Math.sin(t * 3.6);
+    const rad = b => [SX * (.46 + .06 * pulse) * (b.len > 1 ? b.len * .72 : 1) * LAY.s,
+                      SX * .42 * LAY.s];
+    ctx.save();
+    // The room goes dark everywhere except around the seats being talked about.
+    // One even-odd fill and not a punched-out composite: `destination-out` would
+    // take the room away with the wash and show the page through the hole.
+    ctx.beginPath();
+    ctx.rect(0, 0, cv.width, cv.height);
+    for (const b of marked) {
+      const A = ringCentre(b), [rx, ry] = rad(b);
+      // raised, because a seat's sprite stands well above the tile the ring is on
+      const cy = A[1] - ry * .55;
+      ctx.moveTo(A[0] + rx * 1.5, cy);
+      ctx.ellipse(A[0], cy, rx * 1.5, ry * 2.0, 0, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = "rgba(10,9,34,.55)";
+    ctx.fill("evenodd");
+    // and the ring itself, in the same gold the coach mark uses to say "this one"
     ctx.strokeStyle = "#ffd75e"; ctx.lineWidth = Math.max(2, LAY.s * .06);
     ctx.globalAlpha = .55 + .4 * pulse;
-    for (const b of introSeats()) {
-      // the mean of the cells, not the middle one: on a two-cell seat there is
-      // no middle cell and the ring lands over its right-hand half
-      const cs = cellsOf(b);
-      const mc = cs.reduce((a, [c]) => a + c, 0) / cs.length;
-      const mr = cs.reduce((a, [, r]) => a + r, 0) / cs.length;
-      const A = P(cellW(mc), .02, cellZ(mr));
-      const rx = SX * (.46 + .06 * pulse) * (b.len > 1 ? b.len * .72 : 1) * LAY.s;
-      ctx.beginPath(); ctx.ellipse(A[0], A[1], rx, SX * .42 * LAY.s, 0, 0, Math.PI * 2);
+    for (const b of marked) {
+      const A = ringCentre(b), [rx, ry] = rad(b);
+      ctx.beginPath(); ctx.ellipse(A[0], A[1], rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -905,8 +1152,9 @@ function confetti(on) {
 
 /** The beat between winning and the card: paper, and a few bursts over the
     board. Losing has nothing to celebrate and still gets its card at once. */
-const CHEER_MS = 1200;
+const CHEER_MS = 1500;
 function cheer() {
+  finale(CHEER_MS);              // the room plays its own ending under the paper
   confetti(true);
   cardEl.classList.add("cheer");
   const box = $("c-confetti");
@@ -1046,6 +1294,7 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
 }
 
 onFinish = function (won) {
+  clearIntro();                  // won under the walkthrough: unpause before the card
   if (won) { SFX.win(); buzz([18, 60, 18]); } else { SFX.lose(); buzz(90); }
   TUT = null; tutKey = ""; $("coach").hidden = true;   // the lesson is over either way
   PLATFORM.gameplayStop();                             // a card is up: an ad may land here
@@ -1102,6 +1351,7 @@ addEventListener("resize", () => { fitDesign(); draw(); });
 let last = performance.now();
 function tick(now) {
   const dt = (now - last) / 1000; last = now;
+  if (JUMP && S && S.phase === "play") draw();   // the armed rings breathe
   if (S && S.phase === "play" && !PAUSED) {
     S.left -= dt;
     if (S.left <= 0) { S.left = 0; finish(false); }

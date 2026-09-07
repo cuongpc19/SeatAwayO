@@ -7,7 +7,7 @@ the card, and the ladder the feature bar counts down to.
 import pathlib
 from playwright.sync_api import sync_playwright
 
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 FRAMES = {"phone 430x932": (430, 932), "tall 360x800": (360, 800),
           "desktop 1440x900": (1440, 900), "landscape phone 844x390": (844, 390)}
 

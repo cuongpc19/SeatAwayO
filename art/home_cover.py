@@ -110,7 +110,7 @@ def ground():
 # The name used to be HTML laid over this picture. Baked in, it is the same
 # drawing everywhere - the store covers are crops of this render, and a title
 # that lives in the DOM cannot come with them.
-TITLE = "Take a Seat"
+TITLE = "Seat Match"
 TAGLINE = "find everyone a seat"
 FONT = "Baloo2-ExtraBold.ttf"       # the same face the UI headings use
 TITLE_Y = 0.30                      # the band the row above was laid out to leave free

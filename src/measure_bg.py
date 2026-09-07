@@ -2,7 +2,7 @@
 in roughly the same screen rect every time, one background plate is enough."""
 import pathlib, collections, json
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 
 JS = """
 (() => {

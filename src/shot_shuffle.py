@@ -7,7 +7,7 @@ quicker than that, so at 1x the strip would be five pictures of one moment.
 import pathlib
 from PIL import Image
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 SLOW, SHOTS, EVERY = 0.22, 5, 480
 
 with sync_playwright() as pw:

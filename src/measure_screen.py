@@ -21,7 +21,7 @@ with sync_playwright() as pw:
         seen.add((b["w"], b["h"])); firsts.append((n, b["w"], b["h"]))
     for tag, vp in (("phone", {"width": 430, "height": 860}), ("desk", {"width": 1440, "height": 900})):
         pg = br.new_page(viewport=vp)
-        pg.goto("http://127.0.0.1:8080/game.html?theme=cinema")
+        pg.goto("http://127.0.0.1:8080/?theme=cinema")
         pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
         worst = None
         for n, w, h in firsts:

@@ -42,5 +42,6 @@ class Server(socketserver.ThreadingTCPServer):
     daemon_threads = True
 
 with Server(("127.0.0.1", PORT), NoCache) as srv:
-    print("http://127.0.0.1:%d/level_player.html  (no-cache)" % PORT, flush=True)
+    print("http://127.0.0.1:%d/            the game     (no-cache)" % PORT, flush=True)
+    print("http://127.0.0.1:%d/level_player.html  the editor" % PORT, flush=True)
     srv.serve_forever()

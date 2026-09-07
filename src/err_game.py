@@ -1,6 +1,6 @@
 from playwright.sync_api import sync_playwright
 import sys, pathlib
-url = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "../game.html").resolve().as_uri()
+url = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "../index.html").resolve().as_uri()
 with sync_playwright() as pw:
     br = pw.chromium.launch(); pg = br.new_page(viewport={"width": 460, "height": 900})
     errs = []

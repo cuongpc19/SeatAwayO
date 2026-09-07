@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Take a Seat</title>
+<title>Seat Match</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lilita+One&family=Nunito:wght@600;700;800&display=swap">
@@ -31,7 +31,7 @@
   --disp: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
   /* The home screen and the results card are ports of Marble Sort's, down to the
      coordinates, so they carry that game's own face and palette rather than
-     being re-tinted into this one. Everything else stays Take a Seat's. */
+     being re-tinted into this one. Everything else stays Seat Match's. */
   --ms: "Lilita One", "Baloo 2", Arial, sans-serif;
   --ms-ink: #2b3550; --ms-face: #e9e8f7; --ms-edge: #c6c2e2;
   --ms-win: #4bc84b; --ms-lose: #d8556a; --ms-gold: #ffc21e; --ms-rays: #ffd75e;
@@ -651,49 +651,94 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #set-resume { top: 785px; }
 
 
-/* ---------- the feature introductions ----------
-   The same panel as Settings and the result card. It stands between choosing a
-   level and the board appearing, so nothing is running behind it: no clock to
-   burn and no queue walking in unseen while the player reads. */
+/* ---------- the feature walkthroughs ----------
+   Not one card that says everything at once: a short run of steps, each one
+   pointing at a single thing and stopping there.
+
+   A seat step rings the seat on the board and washes the rest of the room out
+   around it, so "this seat" is a seat the player is already looking at rather
+   than a sentence to match up with something later. A booster step lifts the
+   button through the wash, hands over a free go, and then waits - the run does
+   not move on until the button has actually been pressed and its effect has
+   landed. The clock is held for the whole thing, so none of it is paid for in
+   seconds.
+
+   The bubble docks wherever the thing being pointed at is not, so it never
+   stands on top of what it is describing. */
 #intro { position: absolute; inset: 0; display: none; z-index: 24; font-family: var(--ms); }
-/* Lighter than the result card's. This one is shown over a board that is being
-   talked about - black it out and the introduction has nothing to point at. */
-#intro .dim { background: rgba(13,10,42,.5); }
 #intro.on { display: block; }
-#intro .design {
-  --dy: 0px; --dz: 0px;
-  position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
+/* Light. The board dims itself on the canvas with a hole where the ringed seat
+   is, and a heavy wash here would put that hole straight back in the dark. */
+#intro .dim { background: rgba(13,10,42,.42); }
+/* On the step that asks for a drag the overlay stops taking taps altogether,
+   and the bubble alone keeps them. */
+#intro.thru { pointer-events: none; }
+#intro.thru .tip-box { pointer-events: auto; }
+
+.tip {
+  position: absolute; left: 50%; width: 452px;
   transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
 }
-#intro .design > * { position: absolute; }
-.intro-panel { left: 58px; top: 356px; width: 424px; height: 448px; }
-.intro-panel i { height: 440px; }
-.intro-panel u { height: 432px; }
-.intro-head {
-  left: 0; top: 386px; width: 540px; text-align: center;
-  font-size: 36px; color: #fff; -webkit-text-stroke: 8px var(--ms-ink); paint-order: stroke fill;
+.tip.dock-high   { top: 16%; }
+.tip.dock-top    { top: 26%; }
+.tip.dock-mid    { top: 50%; }
+.tip.dock-bottom { top: 72%; }
+/* The step that asks for a drag has to leave the board draggable, so its bubble
+   is trimmed down and pushed up out of the way. */
+.tip.slim { width: 486px; }
+.tip.slim .tip-box { padding: 18px 24px 20px; }
+.tip.slim .tip-text { font-size: 22px; }
+.tip-box {
+  position: relative; padding: 26px 30px 30px; border-radius: 32px; text-align: center;
+  background: var(--ms-face); border: 6px solid var(--ms-edge);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5);
 }
-.intro-body {
-  left: 96px; top: 470px; width: 348px; margin: 0; text-align: center;
-  font-family: var(--body); font-weight: 700; font-size: 25px; line-height: 1.45;
-  color: var(--ms-ink);
+.tip-title {
+  display: block; font-size: 31px; color: #fff; letter-spacing: .02em;
+  -webkit-text-stroke: 7px var(--ms-ink); paint-order: stroke fill;
 }
-#intro-ok { left: 270px; top: 726px; transform: translate(-50%, -50%); }
-#intro-ok:active { transform: translate(-50%, calc(-50% + 3px)); }
+.tip-text {
+  margin: 14px 0 0; font-family: var(--body); font-weight: 700;
+  font-size: 24px; line-height: 1.42; color: var(--ms-ink);
+}
+#intro-ok { position: relative; left: auto; top: auto; margin-top: 22px; transform: none; }
+#intro-ok:active { transform: translateY(3px); box-shadow: 0 3px 0 #2c8330; }
+/* A step that is waiting on the player says so and hides its button: there is
+   nothing to press but the thing being pointed at. */
+.tip-wait {
+  display: none; margin-top: 20px; font-size: 22px; color: #7b83ad;
+  animation: tip-wait 1.2s ease-in-out infinite;
+}
+@keyframes tip-wait { 50% { opacity: .3; } }
+.tip.waiting #intro-ok { display: none; }
+.tip.waiting .tip-wait { display: block; }
+/* ...unless they cannot do it. After a few seconds a way past appears, because
+   a board can always turn out to have no move left in it and a tutorial nobody
+   can leave is a fault, not a lesson. */
+.tip.waiting.stuck #intro-ok { display: inline-block; }
+.tip-dots {
+  display: block; margin-top: 12px; font-size: 20px; letter-spacing: .3em;
+  color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.55);
+}
 
-/* The booster being introduced is lifted through the overlay and ringed, so the
-   card can say "tap it" and mean a thing the player can actually see and reach.
-   The ring stays until they use it, not until they dismiss the card. */
-#boosters.spotlight { z-index: 25; }
-.boost.hint::before {
+/* Whatever is being pointed at is lifted through the wash and ringed. */
+#boosters.spotlight, #play .topbar.spotlight { z-index: 25; }
+/* Lifting the bar lifts both buttons with it, so the one that is not being
+   talked about is pushed back down again. */
+#boosters.spotlight .boost:not(.hint) { opacity: .4; filter: saturate(.5); }
+.boost.hint::before, .pill.hint::before {
   content: ""; position: absolute; inset: -7px; border-radius: 26px;
   border: 3px solid var(--gold); animation: boost-hint 1.15s ease-in-out infinite;
 }
+.pill.hint { position: relative; }
+.pill.hint::before { inset: -6px; border-radius: 999px; }
 @keyframes boost-hint {
   0%, 100% { transform: scale(1); opacity: .95; }
   50%      { transform: scale(1.08); opacity: .45; }
 }
-@media (prefers-reduced-motion: reduce) { .boost.hint::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .boost.hint::before, .pill.hint::before, .tip-wait { animation: none; }
+}
 </style>
 
 <div id="app">
@@ -701,7 +746,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
     <div class="design">
       <div class="edge edge-l" id="h-edge-l"></div>
       <div class="edge edge-r" id="h-edge-r"></div>
-      <img class="cover" id="h-cover" alt="Take a Seat">
+      <img class="cover" id="h-cover" alt="Seat Match">
       <div class="scrim" id="h-scrim"></div>
 
       <!-- Top left, the lives that let you start a level at all; top right, the
@@ -781,16 +826,18 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   <!-- Settings, built on the card's own panel so the two read as one family.
        Only switches that do something are here: there is no music track in the
        build, so there is no music switch to go with it. -->
-  <!-- Shown once, the first time a board actually contains the thing being
-       explained. Config says grey seats unlock at level 7, but no board carries
-       one until 13, so these fire off the board data rather than off config. -->
+  <!-- The walkthrough bubble. One per step; what it points at is ringed either
+       on the canvas or on the button itself. -->
   <div id="intro">
     <div class="dim"></div>
-    <div class="design">
-      <div class="panel intro-panel"><i></i><u><b></b></u></div>
-      <div class="head intro-head" id="intro-title"></div>
-      <p class="intro-body" id="intro-text"></p>
-      <button class="wide-btn" id="intro-ok">GOT IT</button>
+    <div class="tip dock-mid" id="intro-tip">
+      <div class="tip-box">
+        <b class="tip-title" id="intro-title"></b>
+        <p class="tip-text" id="intro-text"></p>
+        <button class="wide-btn" id="intro-ok">GOT IT</button>
+        <span class="tip-wait" id="intro-wait">Your turn</span>
+      </div>
+      <span class="tip-dots" id="intro-dots"></span>
     </div>
   </div>
 

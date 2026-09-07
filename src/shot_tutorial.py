@@ -1,7 +1,7 @@
 """What the coached boards actually look like, phone and desktop."""
 import pathlib
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 SETTLED = "() => !S || S.phase !== 'play' || (!S.anim.length && !S.boarding)"
 
 with sync_playwright() as pw:

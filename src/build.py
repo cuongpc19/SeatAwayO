@@ -2,8 +2,10 @@
 
   ../level_player.html   the editor / study tool: every board, door controls,
                          guides, the gesture recorder
-  ../game.html           the real game: one board at a time, saved progress,
-                         a full room around the grid, a proper win card
+  ../index.html          the real game: one board at a time, saved progress,
+                         a full room around the grid, a proper win card. The
+                         root page, so a deep link reads /?level=1 - see the
+                         address bar block in game_shell.js
   ../dist/index.html     the same game with the CrazyGames host door built in,
                          ready to drag into their upload box
 
@@ -165,10 +167,10 @@ targets = sys.argv[1:] or ["editor", "game"]
 if "editor" in targets:
     build("editor_head.html", "editor_shell.js", "../level_player.html")
 if "game" in targets:
-    page = build("game_head.html", "game_shell.js", "../game.html")
+    page = build("game_head.html", "game_shell.js", "../index.html")
     # ⚠ Proved, not assumed: the plain web build must carry no host SDK at all.
     if "sdk.crazygames.com" in page:
-        sys.exit("game.html carries a host SDK - the platform split has leaked")
+        sys.exit("index.html carries a host SDK - the platform split has leaked")
 if "crazy" in targets:
     out = "../dist/index.html"
     check_crazy(build("game_head.html", "game_shell.js", out, host="crazy"), out)

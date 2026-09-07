@@ -2,7 +2,7 @@
 the saved progress and the level picker all follow."""
 import pathlib, json
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 
 with sync_playwright() as pw:
     br = pw.chromium.launch(); pg = br.new_page(viewport={"width": 460, "height": 900})
@@ -53,7 +53,7 @@ with sync_playwright() as pw:
     print("  purse               :", " ".join(pg.locator("#c-coins").inner_text().split()),
           "| summary hidden:", pg.evaluate("$('c-sum').hidden"))
     print("  confetti pieces     :", pg.evaluate("document.querySelectorAll('#c-confetti i').length"))
-    sv = pg.evaluate("JSON.parse(localStorage.getItem('takeaseat.save.v1'))")
+    sv = pg.evaluate("JSON.parse(localStorage.getItem('seatmatch.save.v1'))")
     print("  saved               :", json.dumps(sv))
 
     pg.click("#c-next"); pg.wait_for_timeout(500)

@@ -1,7 +1,7 @@
 import pathlib
 from PIL import Image
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 with sync_playwright() as pw:
     br = pw.chromium.launch()
     pg = br.new_page(viewport={"width": 1440, "height": 900}, device_scale_factor=2)

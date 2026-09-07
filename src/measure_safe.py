@@ -24,7 +24,7 @@ with sync_playwright() as pw:
     for tag, vp in (("phone 430x860", {"width": 430, "height": 860}),
                     ("desk 1440x900", {"width": 1440, "height": 900})):
         pg = br.new_page(viewport=vp)
-        pg.goto("http://127.0.0.1:8080/game.html")
+        pg.goto("http://127.0.0.1:8080/")
         pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
         rows = []
         for n, w, h in firsts:

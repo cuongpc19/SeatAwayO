@@ -1,6 +1,6 @@
 import pathlib
 from playwright.sync_api import sync_playwright
-url = pathlib.Path("../game.html").resolve().as_uri()
+url = pathlib.Path("../index.html").resolve().as_uri()
 with sync_playwright() as pw:
     br = pw.chromium.launch()
     for tag, vp in (("desk", {"width": 1440, "height": 900}), ("phone", {"width": 430, "height": 860})):

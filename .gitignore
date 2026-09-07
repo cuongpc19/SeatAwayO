@@ -8,7 +8,11 @@ venv/
 # base64 atlases into two single-file pages, ~2.6 MB each — a rebuild would add
 # another copy of both to history every commit, so neither is tracked. Build with:
 #   cd src && python build.py
-/game.html
+#
+# The game is index.html, not game.html, so that a deep link reads /?level=1.
+# The game.html that is tracked is a short forward for the links already handed
+# out; it is six lines, not a build.
+/index.html
 /level_player.html
 
 # Reference material. The phone capture of the original game is the spec for the

@@ -4,7 +4,7 @@ with sync_playwright() as pw:
     br = pw.chromium.launch()
     pg = br.new_page(viewport={"width": 1440, "height": 900}, device_scale_factor=2)
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto("http://127.0.0.1:8080/game.html?theme=cinema")
+    pg.goto("http://127.0.0.1:8080/?theme=cinema")
     pg.wait_for_function("typeof ready !== 'undefined' && ready", timeout=20000)
     pg.evaluate("save.unlocked = 60; save.coins = 5000; save.hearts = 4; startLevel(60)")
     pg.wait_for_timeout(1400)
