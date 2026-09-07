@@ -20,6 +20,23 @@ ENGINE = open("engine.js", encoding="utf-8").read()
 
 KEEP = ("w", "h", "time", "holes", "seats", "queue")   # what a board cannot do without
 
+# ---- where this game differs from the one it was decoded from --------------
+# lv/boards_campaign.json and remote_config.json are the APK, verbatim, and they
+# stay that way - so what the original did is always one file away rather than
+# something to be reconstructed. Deliberate departures live here instead of
+# being typed into either, which keeps the whole distance between the two games
+# readable in one place, and printed on every build.
+EXTRA_SECONDS = 30    # added to every board's clock
+GOLD_WIN = 100        # paid for a win, whatever the difficulty
+
+
+def tuning(shipped_gold):
+    """Say out loud, every build, how far this is from the shipped numbers."""
+    if EXTRA_SECONDS:
+        print("  tuning    every clock +%ds" % EXTRA_SECONDS)
+    if GOLD_WIN != shipped_gold:
+        print("  tuning    gold per win %d -> %d" % (shipped_gold, GOLD_WIN))
+
 
 def levels_json():
     """The campaign boards, with any hand-edited ones laid over the top.
@@ -41,6 +58,11 @@ def levels_json():
             b["id"] = bid                       # the key is what decides which board
             boards[at[bid]] = b
             print("  override %-16s %d seats, %d passengers" % (bid, len(b["seats"]), len(b["queue"])))
+    # ⚠ After the overrides, not before. An override carries the board's whole
+    # KEEP set including `time`, so a board edited in the level editor would
+    # otherwise be the one board in the campaign that did not get the extra.
+    for b in boards:
+        b["time"] += EXTRA_SECONDS
     return json.dumps(boards, separators=(",", ":"))
 
 
@@ -85,7 +107,10 @@ def live_config():
         "unlock": {k.replace("level_unlock_", ""): int(float(v["defaultValue"]["value"]))
                    for k, v in g["tutorial"]["parameters"].items()
                    if k.startswith("level_unlock")},
-        "goldWin": int(num("gameplay", "gold_win_normal")),
+        # ⚠ Ours, not the APK's. The shipped game pays 10 for a win at every
+        # difficulty - gold_win_normal, _hard and _hardest are all 10 - and the
+        # read is kept so that a re-dump which changed it would be noticed.
+        "goldWin": GOLD_WIN,
         "streakGold": [[int(num("gameplay", "win_streak_gold_%d_level" % i)),
                         int(num("gameplay", "win_streak_gold_%d_value" % i))] for i in (1, 2, 3, 4)],
         "heartMax": int(num("features", "heart_max_stack")),
@@ -99,6 +124,7 @@ def live_config():
         "keepPlaying": {"price": int(num("gameplay", "keep_playing_price")),
                         "secs": int(num("gameplay", "keep_playing_time"))},
     }
+    tuning(int(num("gameplay", "gold_win_normal")))
     return json.dumps(out, separators=(",", ":"))
 
 
