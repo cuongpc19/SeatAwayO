@@ -38,8 +38,13 @@ let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
                            // mid-walk would let the old chain seat people into
                            // the new board. Every load stamps a fresh token.
 let GUIDES = false;        // the coaching overlays - none of these are in the real game
+let ROOM_SIGN = "";        // lettering for the far wall; the shell owns the name
 let SPEED = 1;             // 1 = normal, 2 = double
-const OPEN_MS = 2000;      // the pause between a board appearing and the queue starting
+/* The pause between a board appearing and the queue starting. It exists for one
+   reason - so a first-time player sees the first passenger hop on rather than
+   finding them already sitting - so the shell turns it off once that lesson is
+   over. Zero is a board that starts boarding on the frame it opens. */
+let OPEN_MS = 2000;
 /* Walking pace. 260, 300 and 520 are the numbers measured off the recording, and
    each constant is that measurement divided by how much quicker the game runs -
    always recomputed from the original rather than from the last value, or the
@@ -260,20 +265,26 @@ function load(n) {
   g.sel = null; g.drag = null; g.anim = []; g.qstep = null;
   S = g;
   S.boarding = false; S.launching = false;
+  FIN = null; SHIFT = [0, 0];   // the last room's ending stops here
   fitCanvas(g);
   LAY = layout();
   onNewLevel();                 // each shell clears its own end-of-level card
   onHud(); draw();
-  /* A beat before anybody moves. Boarding used to start on the same frame the
-     board appeared, so on a level where the queue can walk straight in - level 1
-     is one - the first passenger was already sitting down before the player had
-     looked at the screen, and the hop that teaches the whole game went unseen.
-     INSTANT keeps its synchronous path: headless play-throughs read S.seated on
-     the next line and cannot wait out a timer. */
-  if (INSTANT) autoBoard();
+  /* A beat before anybody moves, on the boards that teach. Boarding used to
+     start on the same frame the board appeared, so on a level where the queue
+     can walk straight in - level 1 is one - the first passenger was already
+     sitting down before the player had looked at the screen, and the hop that
+     teaches the whole game went unseen.
+
+     Only where there is something to see: a beat on a board whose queue cannot
+     reach a seat yet is two seconds of a still picture, so that one starts at
+     once. INSTANT keeps its synchronous path - headless play-throughs read
+     S.seated on the next line and cannot wait out a timer. */
+  const beat = OPEN_MS && g.queue.length && pickSeat(g, g.queue[0]) ? OPEN_MS : 0;
+  if (INSTANT || !beat) autoBoard();
   else {
     const token = S.token;
-    setTimeout(() => { if (S && S.token === token) autoBoard(); }, OPEN_MS / SPEED);
+    setTimeout(() => { if (S && S.token === token) autoBoard(); }, beat / SPEED);
   }
 }
 
@@ -443,7 +454,7 @@ function layout() {
 }
 
 function P(x, y, z) {
-  const v = view(x, y, z);
+  const v = view(x + SHIFT[0], y, z + SHIFT[1]);
   return [LAY.ox + v[0] * LAY.s, LAY.oy - v[1] * LAY.s, v[2]];
 }
 const cellW = (c) => LAY.x0 + c * SX;
@@ -505,6 +516,54 @@ let BG = null;          // a painted room to use instead of the procedural one
 let THEME = "station";  // any key of THEMES, below
 let MOVIE = null;       // the still showing on the cinema screen
 let NOW = 0;            // seconds, fed by the shell, for anything that moves
+
+/* ---------------- the finale ----------------
+   The beat between the last passenger sitting down and the result card, played
+   out in the room itself: the train pulls out, the film starts, the teacher
+   turns to the board. Each theme owns its own ending, the same way it owns its
+   own outside - see THEMES, below.
+
+   ⚠ Kept, not cleared, when the clock runs out. The card that follows dims the
+   board rather than covering it, so an ending that snapped back to the opening
+   frame would be seen doing it through the dim. FIN stays at f = 1 until the
+   next board loads.
+
+   `SHIFT` is the one ending that moves the room: a world offset every point of
+   the carriage and its contents is drawn at. The ground outside is drawn with
+   it zeroed, because a platform that leaves with the train is no departure. */
+let FIN = null;            // { t0, ms, f } from the win until the next board loads
+let SHIFT = [0, 0];        // world offset the carriage and its contents are drawn at
+let ROOME = null;          // drawRoom's geometry, kept for the stage drawn over the board
+let SCREEN = null;         // the cinema sheet's box on the canvas, from screenWash
+
+const clamp01 = t => t < 0 ? 0 : t > 1 ? 1 : t;
+const ease = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
+/** 0 before `a`, 1 after `b`, eased in between. */
+const span = (f, a, b) => ease((f - a) / (b - a));
+
+/** Play the room's ending over the next `ms`. Redraws itself; stops on its own,
+    or the moment another board is loaded under it. */
+function finale(ms) {
+  if (!S) return;
+  const g = S;
+  FIN = { t0: performance.now(), ms, f: 0 };
+  const step = () => {
+    if (S !== g || !FIN) return;          // a new board has taken over
+    draw();
+    if (FIN.f < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/** How high a seated passenger is bounced by the win: a wave that runs across
+    the seats, column by column, so a full house reads as a crowd rather than
+    as one piston. Per-theme amplitude - a class does not do a Mexican wave. */
+function cheerLift(c, r) {
+  if (!FIN || FIN.f < .05) return 0;
+  const amp = (THEMES[THEME] || THEMES.station).cheer || 0;
+  const w = Math.sin(Math.PI * 2 * (FIN.f * 2.4 - c * .11 - r * .05));
+  return Math.max(0, w) * amp;
+}
 
 const ROOM = {
   ground: "#7e8288", ballastA: "#888c92", ballastB: "#6d7177",
@@ -589,7 +648,8 @@ function screenWash(x0, z0, x1, z1) {
   vig.addColorStop(0, "rgba(0,0,0,0)"); vig.addColorStop(1, "rgba(0,0,0,.45)");
   ctx.fillStyle = vig; ctx.fillRect(L, T, W, H);
   ctx.restore();
-  return [T, B, L, R];
+  SCREEN = [T, B, L, R];
+  return SCREEN;
 }
 
 function drawCinema(E) {
@@ -624,7 +684,7 @@ function drawCinema(E) {
    the engine needs to learn the name.                                        */
 
 function drawStation(E) {
-  const { x0, x1, OX, gx0, gx1, gz0, gz1 } = E;
+  const { x0, x1, z0, T, OX, gx0, gx1, gz0, gz1 } = E;
 
   ctx.fillStyle = ballast();
   ctx.fillRect(0, 0, cv.width, cv.height);
@@ -646,6 +706,36 @@ function drawStation(E) {
   slab(OX + SX * .30, gz0, OX + SX * .42, gz1, -.026, ROOM.safety);
   for (let z = gz0; z < gz1; z += SZ * .34)   // the strip you feel underfoot
     slab(OX + SX * .50, z, OX + SX * .58, z + SZ * .17, -.026, ROOM.tactile);
+
+  // The name board, so the place says what it is. Up past the far end of the
+  // carriage, where nobody in the line ever stands, and level with the wall
+  // top so it clears the HUD on a phone.
+  nameBoard("STATION", OX + SX * .85, z0 - T * .2);
+}
+
+/** A sign on a post, drawn as a billboard in canvas space the way the sprites
+    are: at this pitch a board stood up in world units would come out a quarter
+    of a cell tall. */
+function nameBoard(text, wx, wz) {
+  const [px, py] = P(wx, 0, wz);
+  const s = LAY.s;
+  const size = Math.max(9, s * .26);
+  ctx.save();
+  ctx.font = '800 ' + size + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const w = ctx.measureText(text).width + size * 1.1, h = size * 1.5;
+  const cy = py - s * .95;                     // the board's centre, up the post
+  shadow(wx, wz, .14);
+  ctx.strokeStyle = ROOM.post; ctx.lineCap = "round"; ctx.lineWidth = Math.max(2, s * .06);
+  ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+  const r = size * .35, L = px - w / 2, T = cy - h / 2;
+  ctx.beginPath();
+  ctx.moveTo(L + r, T); ctx.arcTo(L + w, T, L + w, T + h, r); ctx.arcTo(L + w, T + h, L, T + h, r);
+  ctx.arcTo(L, T + h, L, T, r); ctx.arcTo(L, T, L + w, T, r); ctx.closePath();
+  ctx.fillStyle = "#1d3f7a"; ctx.fill();
+  ctx.strokeStyle = "#f3f6fb"; ctx.lineWidth = Math.max(1, s * .035); ctx.stroke();
+  ctx.fillStyle = "#ffffff"; ctx.fillText(text, px, cy + size * .05);
+  ctx.restore();
 }
 
 /* Terracing under a floodlit pitch. The grass is the one saturated thing in any
@@ -753,37 +843,225 @@ function drawClassroom(E) {
   slab(OX + SX * 2.75, gz0 + SZ * 3, gx1, gz0 + SZ * 8, -.034, CLASSROOM.sun);
 }
 
+/* ===========================  ENDINGS  ===========================
+   One per theme, a second and a half long, drawn in three passes so each piece
+   lands in the right layer:
+     "back"  - right after the outside, before the walls: anything beyond the
+               far wall, where the walls occlude its feet the way they should
+     "room"  - the end of drawRoom, with the carriage: the door leaf
+     "over"  - the end of draw(), over the seats and passengers: light in the air
+   `f` runs 0..1 over the beat. Everything here is a function of f and nothing
+   else, so a dropped frame skips ahead instead of stalling the ending.       */
+
+/** The train leaves. The doors close over the first third, then it pulls out
+    along the track - away from the camera, up the screen - gathering speed. The
+    platform stays where it is: see SHIFT. */
+function finStation(E, f, stage) {
+  if (stage !== "room") return;
+  const { x1, OX, dz0, dz1, H, SKIN } = E;
+  const k = span(f, .04, .34);
+  if (k <= 0) return;
+  const zEnd = dz0 + (dz1 - dz0) * k;
+  slab(x1 - .02, dz0, OX + .02, zEnd, H + .005, SKIN.wall);               // the leaf
+  slab(x1 - .02, Math.max(dz0, zEnd - .09), OX + .02, zEnd, H + .006, SKIN.trim);
+}
+const trainOut = f => {
+  // Gone by .92, not 1: the card is timed to f = 1, and a frame drawn a few
+  // milliseconds short of it still had the tail's edge in shot under the card.
+  const k = clamp01((f - .40) / .52);
+  if (k <= 0) return [0, 0];
+  // ⚠ Off the top of the canvas entirely, not a fixed distance. At a fixed 4.6
+  // cells the tail of a tall board was still in shot when the card came up,
+  // and a card over a carriage with its tail showing reads as a train that
+  // stalled. Measured on the canvas, so it holds for any board and any window.
+  SHIFT = [0, 0];
+  const near = P(0, 0, cellZ(S.H - 1 + .5) + .9 + .5)[1];   // the near shadow edge, on screen
+  const perZ = -BZ[1] * LAY.s;                               // canvas px per unit of z
+  const gone = Math.min(-SZ * 4.6, (-LAY.s * .8 - near) / perZ);
+  return [0, gone * k * k];
+};
+
+/** The film starts: a countdown leader on the sheet, then the still comes up
+    with a flash and settles with a flicker, and the projector beam crosses the
+    room. The audience does no more than shift in their seats. */
+function finCinema(E, f, stage) {
+  if (!SCREEN) return;
+  const [T, B, L, R] = SCREEN, W = R - L, Hh = B - T;
+  if (stage === "back") {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(L, T, W, Hh); ctx.clip();
+    if (f < .5) {
+      // the leader: 3, 2, 1, each with a sweep of the hand
+      const n = 3 - Math.floor(f * 6), sweep = (f * 6) % 1;
+      const cx = L + W / 2, cy = T + Hh / 2, rad = Math.min(W, Hh) * .40;
+      ctx.fillStyle = "#3b3b37"; ctx.fillRect(L, T, W, Hh);
+      ctx.fillStyle = "rgba(255,255,255,.16)";
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, rad, -Math.PI / 2, -Math.PI / 2 + sweep * Math.PI * 2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = Math.max(1, rad * .045);
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(L, cy); ctx.lineTo(R, cy); ctx.moveTo(cx, T); ctx.lineTo(cx, B); ctx.stroke();
+      ctx.fillStyle = "#f2f2ee"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "800 " + rad * 1.35 + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+      ctx.fillText(String(Math.max(1, n)), cx, cy + rad * .06);
+    } else {
+      // the picture, already on the sheet under this: a flash off it, then a flicker
+      const a = (1 - span(f, .5, .70)) * .85 + (f < .92 ? Math.random() * .05 : 0);
+      ctx.fillStyle = "rgba(255,250,235," + a + ")"; ctx.fillRect(L, T, W, Hh);
+    }
+    ctx.restore();
+  } else if (stage === "over") {
+    // the beam, from a projector behind the back row up to the sheet
+    const a = span(f, .5, .78) * .13;
+    if (a <= 0) return;
+    const ox = cv.width / 2, oy = cv.height * 1.08;
+    const gr = ctx.createLinearGradient(ox, oy, ox, T);
+    gr.addColorStop(0, "rgba(255,244,220,0)"); gr.addColorStop(1, "rgba(255,244,220," + a + ")");
+    ctx.save(); ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.moveTo(ox - 8, oy); ctx.lineTo(L, T); ctx.lineTo(R, T); ctx.lineTo(ox + 8, oy);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+}
+
+/** Kick-off. One player runs onto the ball and strikes it, the other runs in to
+    meet it, and both throw their arms up when it lands. Out on the pitch, past
+    the far wall, so the wall hides their feet the way the turf's edge should. */
+function finStadium(E, f, stage) {
+  if (stage !== "back") return;
+  const { x0, x1, z0, T } = E;
+  const mid = (x0 + x1) / 2;
+  const tz0 = z0 - T * .6 - SZ * .75;          // the near touchline, as drawStadium placed it
+  // ⚠ Close behind the touchline, and a short run. The frame leaves the pitch
+  // only a couple of cells deep and the phone only a couple of cells either
+  // side of the room; further out, the players played half off the canvas.
+  const pz = tz0 - SZ * .55;                   // the line the play runs along
+  const run = SX * 1.7, close = SX * .8;
+  const a = span(f, .02, .42), b = span(f, .44, .84), flight = span(f, .44, .84);
+  const ax = mid - run - SX * .5 + run * a;    // stops half a cell short: that is the kick
+  const bx = mid + run + close - close * b;
+  const ballX = mid + run * flight, ballY = Math.sin(flight * Math.PI) * .9;
+  const phaseOf = d => Math.floor(d / STRIDE) % WMETA.phases;
+  shadow(ax, pz, .3); shadow(bx, pz, .3);
+  if (f >= .86) { blit("cheer_red", ax, 0, pz, 1); blit("cheer_sky", bx, 0, pz, 1); }
+  else {
+    blitWalk("red", "r", a > 0 && a < 1 ? phaseOf(run * a) : 0, ax, 0, pz);
+    blitWalk("sky", "l", b > 0 && b < 1 ? phaseOf(close * b) : 0, bx, 0, pz);
+  }
+  shadow(ballX, pz, .13);
+  const [px, py] = P(ballX, ballY + .13, pz);
+  ctx.save(); ctx.fillStyle = "#f4f4f2"; ctx.strokeStyle = "#2b2f33";
+  ctx.lineWidth = Math.max(1, LAY.s * .02);
+  ctx.beginPath(); ctx.arc(px, py, LAY.s * .13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+/** The show starts. Three colours of light swing across the boards, the
+    footlights pulse, and the act bounces centre stage with their arms going up
+    on every other beat. */
+function finConcert(E, f, stage) {
+  if (stage !== "back") return;
+  const { x0, x1, z0, T, gx0, gx1 } = E;
+  const sz1 = z0 - T * .9, sz0 = sz1 - SZ * 2.4;    // the stage, as drawConcert placed it
+  const sx0 = gx0 + SX * 2.0, sx1 = gx1 - SX * 2.0;
+  const mid = (x0 + x1) / 2, sz = (sz0 + sz1) / 2;
+  const swing = (x1 - x0) * .55 + SX;
+  for (const [rgb, ph] of [["255,80,200", 0], ["80,200,255", 2.1], ["255,220,120", 4.2]]) {
+    const x = mid + Math.sin(f * Math.PI * 1.8 + ph) * swing;
+    const [px, py] = P(x, .02, sz);
+    const r = LAY.s * SX * .95;
+    ctx.save(); ctx.translate(px, py); ctx.scale(1, .42);
+    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    gr.addColorStop(0, "rgba(" + rgb + ",.45)"); gr.addColorStop(1, "rgba(" + rgb + ",0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  const pulse = .22 + .22 * Math.sin(f * Math.PI * 8);
+  slab(sx0 + SX * .2, sz1 - .06, sx1 - SX * .2, sz1 + .02, -.025, "rgba(255,255,255," + pulse + ")");
+  const hop = Math.abs(Math.sin(f * Math.PI * 4)) * .16;
+  const az = sz1 - SZ * .8;
+  shadow(mid, az, .3);
+  blit((Math.floor(f * 8) % 2 ? "cheer_" : "idle_") + "purple", mid, hop, az, 1);
+}
+
+/** Class over. The teacher, beside the board, points the class through what is
+    written up as it appears - chalk, left to right, under the pointer. */
+function finClassroom(E, f, stage) {
+  if (stage !== "back") return;
+  const { x0, x1, z0, T } = E;
+  const bz1 = z0 - T * .95, bz0 = bz1 - SZ * 1.5;     // the board, as drawClassroom placed it
+  const room = (x1 - x0) * LAY.s;
+  const msg = "WELL DONE!";
+  // fitted to the board, and set a little right of centre to clear the teacher
+  const [bx, by] = P((x0 + x1) / 2 + (x1 - x0) * .07, .014, (bz0 + bz1) / 2);
+  let size = Math.max(8, room * .12);
+  ctx.save();
+  const font = s => '800 ' + s + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+  ctx.font = font(size);
+  let w = ctx.measureText(msg).width;
+  if (w > room * .58) { size *= room * .58 / w; ctx.font = font(size); w = ctx.measureText(msg).width; }
+  const reveal = span(f, .10, .74);
+  const left = bx - w / 2;
+  ctx.beginPath(); ctx.rect(left - size * .1, by - size, w * reveal + size * .1, size * 2); ctx.clip();
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255,255,255,.88)";
+  ctx.fillText(msg, left, by);
+  ctx.restore();
+
+  // the teacher: one of the atlas figures, with a book and a pointer drawn on
+  const tx = x0 + SX * .45, tz = z0 - T - SZ * .30;   // inside the board's frame
+  const k = LAY.s / META.scale;
+  const [px, py] = P(tx, 0, tz);
+  shadow(tx, tz, .3);
+  blit("idle_grey", tx, 0, tz, 1);
+  ctx.save();
+  // the book, in the near hand
+  ctx.translate(px - 40 * k, py - 4 * k); ctx.rotate(-.28);
+  ctx.fillStyle = "#c9432f"; ctx.fillRect(-13 * k, -9 * k, 26 * k, 20 * k);
+  ctx.fillStyle = "#f4ecd8"; ctx.fillRect(8 * k, -7 * k, 4 * k, 16 * k);
+  ctx.restore();
+  // the pointer, from the far hand to wherever the chalk has got to
+  const tipX = left + w * Math.max(.02, reveal), tipY = by + size * .35;
+  ctx.save();
+  ctx.strokeStyle = "#8b5a2b"; ctx.lineCap = "round"; ctx.lineWidth = Math.max(2, 4 * k);
+  ctx.beginPath(); ctx.moveTo(px + 42 * k, py - 6 * k); ctx.lineTo(tipX, tipY); ctx.stroke();
+  ctx.fillStyle = "#2b2f33"; ctx.beginPath(); ctx.arc(tipX, tipY, Math.max(2, 3.5 * k), 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 /* head  - fraction of the canvas left empty above the room, so that whatever a
            theme puts beyond the far wall has somewhere to go
+   finale - the ending, see ENDINGS above; cheer - how high the seated bounce;
+   shift  - the room's own movement during the ending, as a world offset of f
    page  - what the shell paints behind the canvas, for the strip it never covers
    plate - true if a ?bg= plate may stand in for this theme's outside          */
 const THEMES = {
   station: {
     head: .09, plate: true, outside: drawStation,
+    finale: finStation, shift: trainOut, cheer: .12,
     skin: { wall: ROOM.livery, trim: ROOM.trim, top: ROOM.liveryTop, lip: ROOM.liveryLip,
             fa: ROOM.floorA, fb: ROOM.floorB, grout: ROOM.grout, glass: ROOM.glass,
             door: ROOM.mat },
   },
   cinema: {
-    head: .27, page: CINEMA.outside, outside: drawCinema,
+    head: .27, page: CINEMA.outside, outside: drawCinema, finale: finCinema, cheer: .05,
     skin: { wall: CINEMA.wall, trim: CINEMA.trim, top: CINEMA.wallLip, lip: CINEMA.grout,
             fa: CINEMA.carpetA, fb: CINEMA.carpetB, grout: CINEMA.grout, glass: null,
             door: CINEMA.wallLip },
   },
   stadium: {
-    head: .22, page: STADIUM.night, outside: drawStadium,
+    head: .22, page: STADIUM.night, outside: drawStadium, finale: finStadium, cheer: .20,
     skin: { wall: STADIUM.wall, trim: STADIUM.trim, top: STADIUM.wallLip, lip: STADIUM.grout,
             fa: STADIUM.deckA, fb: STADIUM.deckB, grout: STADIUM.grout, glass: null,
             door: STADIUM.nosing },
   },
   concert: {
-    head: .24, page: CONCERT.dark, outside: drawConcert,
+    head: .24, page: CONCERT.dark, outside: drawConcert, finale: finConcert, cheer: .18,
     skin: { wall: CONCERT.wall, trim: CONCERT.trim, top: CONCERT.wallLip, lip: CONCERT.grout,
             fa: CONCERT.parqA, fb: CONCERT.parqB, grout: CONCERT.grout, glass: null,
             door: CONCERT.stageLip },
   },
   classroom: {
-    head: .20, page: CLASSROOM.lino, outside: drawClassroom,
+    head: .20, page: CLASSROOM.lino, outside: drawClassroom, finale: finClassroom, cheer: .08,
     skin: { wall: CLASSROOM.wall, trim: CLASSROOM.trim, top: CLASSROOM.wallLip,
             lip: CLASSROOM.grout, fa: CLASSROOM.linoA, fb: CLASSROOM.linoB,
             grout: CLASSROOM.grout, glass: null, door: CLASSROOM.tray },
@@ -806,10 +1084,17 @@ function drawRoom(g) {
   const gx0 = x0 - T - SX * 9, gx1 = x1 + T + SX * 9;
   const gz0 = z0 - T - SZ * 9, gz1 = z1 + T + SZ * 9;
   const TH = THEMES[THEME] || THEMES.station;
+  const f = FIN ? FIN.f : null;
+  const E = { g, x0, x1, z0, z1, T, H, OX, dz0, dz1, gx0, gx1, gz0, gz1, SKIN: TH.skin };
+  ROOME = E;
+  // ⚠ The ground does not move with the carriage. SHIFT is the train pulling
+  // out; everything beyond the walls is drawn where it stands.
+  const moved = SHIFT; SHIFT = [0, 0];
   // A painted plate stands in for the station ground and nothing else: the other
   // themes draw a whole building out there, which no ground tile can replace.
-  if (!(painted && TH.plate))
-    TH.outside({ g, x0, x1, z0, z1, T, H, OX, dz0, dz1, gx0, gx1, gz0, gz1 });
+  if (!(painted && TH.plate)) TH.outside(E);
+  if (f != null && TH.finale) TH.finale(E, f, "back");
+  SHIFT = moved;
 
   // ---- the carriage ----
   ctx.save(); ctx.globalAlpha = .22;             // it sits on the ground, so it casts
@@ -854,6 +1139,62 @@ function drawRoom(g) {
   // drawn at floor level, so under this camera they landed BELOW the cut and the
   // three of them stacked up into bars across the way in.
   slab(x1 - .02, dz0, OX + .02, dz1, H + .004, SKIN.door);
+
+  if (ROOM_SIGN) sign(g, x0, x1, z0, T, H, SKIN);
+  if (f != null && TH.finale) TH.finale(E, f, "room");
+}
+
+/** The name, lettered along the far wall like a sign over a platform.
+
+    ⚠ Drawn flat, not projected onto the wall plane. Under this camera the far
+    band is within a few degrees of horizontal, so skewing the type to match it
+    buys nothing the eye can see and costs a per-glyph transform every frame.
+
+    ⚠ Low contrast on purpose. This is on screen behind every board in the game,
+    and a sign that competes with the seats is a sign that has to be read past on
+    every single level. It sits at a quarter alpha in the wall's own top colour -
+    present when looked at, gone when playing. */
+function sign(g, x0, x1, z0, T, H, SKIN) {
+  const mid = (x0 + x1) / 2;
+  // ⚠ On the crown, not the middle of the band. The windows are let into the far
+  // wall between z0-T*.74 and z0-T*.18, so a sign centred on the band lands
+  // across the glass and reads as smeared. This sits just outside them.
+  const [px, py] = P(mid, H + .006, z0 - T * .86);
+  const room = (x1 - x0) * LAY.s;
+  const track = 0.14;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  // fitted to the wall rather than set in pixels: the room is 3 cells wide on
+  // board 1 and 9 on the late ones, and a fixed size overruns the narrow ones
+  let size = Math.max(7, room * .085);
+  const width = s => {
+    ctx.font = '800 ' + s + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+    let w = 0;
+    for (const ch of ROOM_SIGN) w += ctx.measureText(ch).width + s * track;
+    return w - s * track;
+  };
+  while (size > 7 && width(size) > room * .62) size -= 1;
+
+  // ⚠ Engraved, not tinted. The first version filled with SKIN.top at a quarter
+  // alpha, which is the wall's own highlight colour - on the station's yellow
+  // band that is the wall, and the sign was invisible on three of the five
+  // rooms. A dark press and a light face read on any of them because they carry
+  // their own contrast instead of borrowing the wall's.
+  const w = width(size);
+  const lift = Math.max(1, size * .06);
+  const run = (dy, style, a) => {
+    ctx.fillStyle = style; ctx.globalAlpha = a;
+    let x = px - w / 2;
+    for (const ch of ROOM_SIGN) {
+      ctx.fillText(ch, x, py + dy);
+      x += ctx.measureText(ch).width + size * track;
+    }
+  };
+  run(lift, "#000000", .30);
+  run(0, "#ffffff", .58);
+  ctx.restore();
 }
 
 function draw() {
@@ -862,6 +1203,9 @@ function draw() {
   fitCanvas(g);
   LAY = layout();
   if (!ready) return;
+  const TH = THEMES[THEME] || THEMES.station;
+  if (FIN) FIN.f = Math.min(1, (performance.now() - FIN.t0) / FIN.ms);
+  SHIFT = FIN && RICH && TH.shift ? TH.shift(FIN.f) : [0, 0];
   if (RICH) { ctx.fillStyle = ROOM.ground; ctx.fillRect(0, 0, cv.width, cv.height); }
   else {
     const grad = ctx.createLinearGradient(0, 0, 0, cv.height);
@@ -946,7 +1290,7 @@ function draw() {
     b.occ.forEach((ci, i) => {
       if (ci == null) return;
       const [c, r] = cellsOf(b)[i];
-      push(cellW(c), cellZ(r), () => blit(riderFrame(b, ci), cellW(c), .05, cellZ(r) - .04), .3);
+      push(cellW(c), cellZ(r), () => blit(riderFrame(b, ci), cellW(c), .05 + cheerLift(c, r), cellZ(r) - .04), .3);
     });
   }
 
@@ -1003,6 +1347,7 @@ function draw() {
     }
   }
 
+  if (FIN && RICH && TH.finale && ROOME) TH.finale(ROOME, FIN.f, "over");
   onOverlay(g);                  // the shell's own marks, on top of the room
 }
 
@@ -1132,6 +1477,10 @@ cv.addEventListener("pointerdown", ev => {
           places: seat ? placements(S, seat).length : null,
           walkers: S.anim.length, ptype: ev.pointerType, btn: ev.buttons });
   if (!seat) { trace({ ev: "refused", reason: "no seat under pointer" }); releaseHeld(); draw(); return; }
+  /* The shell gets first refusal on the seat. It is how the jump booster works:
+     armed, a tap on a seat is a passenger flying into it rather than the start
+     of a drag. */
+  if (onSeatPick(seat)) { releaseHeld(); draw(); return; }
   if (seat.locked) { trace({ ev: "refused", seat: seat.id, reason: "locked" }); bump(); say("Somebody is already walking to that seat."); releaseHeld(); draw(); return; }
   const targets = placements(S, seat);
   if (!targets.length) {                      // boxed in on every side
@@ -1273,9 +1622,15 @@ function walkPath(g, seat, k, entry) {
     several are usually crossing the floor at once. The launches are staggered by
     one stride and nothing more. The player never taps a seat - they only slide
     seats. */
+/* Nobody walks in while something is being explained over the board. It is a
+   hold and not a stop: whatever asked for it calls autoBoard() again on the way
+   out, and the queue picks up where it was. */
+let HOLD = false;
+
 function autoBoard(instant) {
   instant = instant || INSTANT;
   if (!S || S.phase !== "play") return;
+  if (HOLD) return;
   if (S.boarding && !instant) return;
   const token = S.token;
   const stale = () => !S || S.token !== token;
@@ -1406,6 +1761,75 @@ function autoBoard(instant) {
   launch();
 }
 
+/* ---- the jump booster ---------------------------------------------------
+   A jump is not a seat that moves - it is a passenger that flies. The player
+   picks a seat the front of the queue can sit in, and they go straight to it
+   over the top of whatever is in the way. That is the whole point of it: the
+   seat that would win the board is usually the one nothing can walk to, and a
+   booster that only slides a seat is a booster that does what dragging already
+   does.
+
+   Everything except the route is ordinary boarding - the same claim on the
+   place, the same lock while they are in the air, the same landing - so a jump
+   in the middle of a queue that is already walking does not need its own
+   bookkeeping. */
+const FLY_MS = 620;                // how long the flight takes at normal speed
+const FLY_UP = 1.6;                // how high it arcs, in cells: clear of everything
+
+/** The place the front of the queue could take on this seat, or -1. */
+function freeSlot(seat) {
+  for (let k = 0; k < seat.len; k++)
+    if (seat.occ[k] == null && !(seat.claim && seat.claim.has(k))) return k;
+  return -1;
+}
+
+/** Fly the front of the queue into `seat`. False when they cannot sit there,
+    which leaves the booster armed for another try rather than eating it. */
+function jumpBoard(g, seat) {
+  if (!g || g.phase !== "play" || !g.queue.length || !seat) return false;
+  const ci = g.queue[0];
+  if (!accepts(seat, ci)) return false;
+  const slot = freeSlot(seat);
+  if (slot < 0) return false;
+
+  g.queue.shift();
+  shuffleUp(g);                          // the rest of the line steps up
+  seat.pending++;
+  (seat.claim || (seat.claim = new Set())).add(slot);
+  seat.locked = true;                    // not while somebody is on their way in
+  const cell = cellsOf(seat)[slot];
+  const from = [cellW(g.W - 1) + SX * 2.0, cellZ(g.door)];   // the spot at the door
+  const to = [cellW(cell[0]), cellZ(cell[1]) - .04];
+  const a = { ci, x: from[0], z: from[1], y: 0, route: null, facing: "l", phase: 1 };
+  g.anim.push(a);
+
+  const token = g.token, t0 = performance.now(), dur = FLY_MS / SPEED;
+  const tick = now => {
+    if (!S || S.token !== token) return;
+    const t = Math.min(1, (now - t0) / dur);
+    const e = t * t * (3 - 2 * t);
+    a.x = from[0] + (to[0] - from[0]) * e;
+    a.z = from[1] + (to[1] - from[1]) * e;
+    a.y = Math.sin(t * Math.PI) * FLY_UP;
+    a.phase = t < .5 ? 1 : 3;            // legs tucked on the way up, out to land
+    draw();
+    if (t < 1) return requestAnimationFrame(tick);
+    S.anim.splice(S.anim.indexOf(a), 1);
+    seat.pending--;
+    seat.locked = seat.pending > 0;
+    if (seat.claim) seat.claim.delete(slot);
+    seat.occ[slot] = ci; S.seated++;
+    onSeated();
+    onHud(); draw();
+    /* Whoever else can now reach a seat gets on, and the board is finished here
+       if that was the last of them. autoBoard() steps aside when a queue is
+       already walking; that chain does the same check when it lands. */
+    autoBoard();
+  };
+  requestAnimationFrame(tick);
+  return true;
+}
+
 /* The three things only the surrounding page can answer. A shell assigns
    these; the engine never reaches into the DOM around the canvas itself. */
 let onHud = () => {};
@@ -1413,6 +1837,7 @@ let onSay = () => {};
 let onFinish = () => {};
 let onNewLevel = () => {};
 let onSeatMoved = () => {};
+let onSeatPick = () => false;    // true = the shell has taken this tap
 let onSeated = () => {};         // a passenger has just taken a place
 let onOverlay = () => {};        // coach marks: drawn last, over everything
 function say(msg) { onSay(msg); }
