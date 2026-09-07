@@ -4,7 +4,6 @@
    file only decides what the player sees around them.                        */
 
 RICH = true;                       // the engine draws a room, not a bare grid
-ROOM_SIGN = "SEAT MATCH";         // lettered along the far wall of every room
 
 /* ---- the address bar --------------------------------------------------
    One read of the query string, at load, for the whole shell - the way Marble
