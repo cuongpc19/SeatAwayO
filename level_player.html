@@ -224,7 +224,6 @@ let LOAD_TOKEN = 0;        // animation callbacks hold the global S, so a reload
                            // mid-walk would let the old chain seat people into
                            // the new board. Every load stamps a fresh token.
 let GUIDES = false;        // the coaching overlays - none of these are in the real game
-let ROOM_SIGN = "";        // lettering for the far wall; the shell owns the name
 let SPEED = 1;             // 1 = normal, 2 = double
 /* The pause between a board appearing and the queue starting. It exists for one
    reason - so a first-time player sees the first passenger hop on rather than
@@ -1326,62 +1325,9 @@ function drawRoom(g) {
   // three of them stacked up into bars across the way in.
   slab(x1 - .02, dz0, OX + .02, dz1, H + .004, SKIN.door);
 
-  if (ROOM_SIGN) sign(g, x0, x1, z0, T, H, SKIN);
   if (f != null && TH.finale) TH.finale(E, f, "room");
 }
 
-/** The name, lettered along the far wall like a sign over a platform.
-
-    ⚠ Drawn flat, not projected onto the wall plane. Under this camera the far
-    band is within a few degrees of horizontal, so skewing the type to match it
-    buys nothing the eye can see and costs a per-glyph transform every frame.
-
-    ⚠ Low contrast on purpose. This is on screen behind every board in the game,
-    and a sign that competes with the seats is a sign that has to be read past on
-    every single level. It sits at a quarter alpha in the wall's own top colour -
-    present when looked at, gone when playing. */
-function sign(g, x0, x1, z0, T, H, SKIN) {
-  const mid = (x0 + x1) / 2;
-  // ⚠ On the crown, not the middle of the band. The windows are let into the far
-  // wall between z0-T*.74 and z0-T*.18, so a sign centred on the band lands
-  // across the glass and reads as smeared. This sits just outside them.
-  const [px, py] = P(mid, H + .006, z0 - T * .86);
-  const room = (x1 - x0) * LAY.s;
-  const track = 0.14;
-
-  ctx.save();
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  // fitted to the wall rather than set in pixels: the room is 3 cells wide on
-  // board 1 and 9 on the late ones, and a fixed size overruns the narrow ones
-  let size = Math.max(7, room * .085);
-  const width = s => {
-    ctx.font = '800 ' + s + 'px "Baloo 2", "Trebuchet MS", sans-serif';
-    let w = 0;
-    for (const ch of ROOM_SIGN) w += ctx.measureText(ch).width + s * track;
-    return w - s * track;
-  };
-  while (size > 7 && width(size) > room * .62) size -= 1;
-
-  // ⚠ Engraved, not tinted. The first version filled with SKIN.top at a quarter
-  // alpha, which is the wall's own highlight colour - on the station's yellow
-  // band that is the wall, and the sign was invisible on three of the five
-  // rooms. A dark press and a light face read on any of them because they carry
-  // their own contrast instead of borrowing the wall's.
-  const w = width(size);
-  const lift = Math.max(1, size * .06);
-  const run = (dy, style, a) => {
-    ctx.fillStyle = style; ctx.globalAlpha = a;
-    let x = px - w / 2;
-    for (const ch of ROOM_SIGN) {
-      ctx.fillText(ch, x, py + dy);
-      x += ctx.measureText(ch).width + size * track;
-    }
-  };
-  run(lift, "#000000", .30);
-  run(0, "#ffffff", .58);
-  ctx.restore();
-}
 
 function draw() {
   if (!S) return;
