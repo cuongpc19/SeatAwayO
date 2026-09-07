@@ -88,9 +88,12 @@ MIN_SECONDS = 60
 # Four of the seven are read straight off captures of the real game: the board
 # at ID 124 puts source 3 where the capture shows red, source 1 where it shows
 # green and source 4 where it shows pink, with source 2 yellow in both; source 0
-# is the blue every early level is made of. 5 and 6 are the two left over,
-# orange and purple, and which way round they go is the one guess here.
-COLOURS = {0: 2, 1: 4, 2: 3, 3: 1, 4: 8, 5: 5, 6: 6}
+# is the blue every early level is made of. 5 and 6 were the two left over,
+# orange and purple, and which way round they went was a guess until source ID
+# 1016 turned up in a capture: the six seats it puts at (0,0) (2,0) (0,2) (2,2)
+# (0,4) (2,4) are orange there and were coming out purple here. So 6 is orange
+# and 5 is purple, and nothing in the palette is guessed any more.
+COLOURS = {0: 2, 1: 4, 2: 3, 3: 1, 4: 8, 5: 6, 6: 5}
 GREY = 0           # the engine's fixture colour, and GREY_TAKES is 2 - sky
 # SeatDirect: 0 and 2 run along x, 1 and 3 along z. turnNumber is this, not a
 # count of turns - see the module docstring.
