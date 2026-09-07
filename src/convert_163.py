@@ -14,18 +14,25 @@ its door on - is column W-1, which is the only column the engine will put a
 door in.  Getting that backwards puts the door against the far wall on every
 board in the campaign.
 
-A bench covers one cell, not several
-------------------------------------
-`doubleSeat` / `tripleSeat` / `fourSeater` are the bench's *capacity*, not its
-footprint.  Three things say so and no third reading survives them:
+A bench covers one cell per person, and turnNumber says which way
+-----------------------------------------------------------------
+`doubleSeat` / `tripleSeat` / `fourSeater` are the footprint, the same as the
+binary format's seat size: a two-seater covers two cells.  Reading them as a
+capacity packed into one cell survives every overlap check, which is why it
+lasted a while, but captures of the shipped game show two-cell benches - and
+what makes the spans fit is `turnNumber`.  It is the seat's rotation, not a
+count of turns: 0 runs along +x, 1 along +z, 2 along -x, 3 along -z, which is
+SeatDirect under another name.  With it, boards that will not lay out drop from
+422 to 20, and the multi-seats on those 422 are exactly the ones wearing turn 2,
+pointing back the other way.
 
-  * no level anywhere puts two seatData entries on the same slot;
-  * treating capacity as a span overlaps other benches on 422 boards, and on
-    18 of the 19 boards that use a four-seater;
-  * summing capacity per colour equals the queue's colour counts exactly on
-    2674 of 2676 boards.  A board is saturated: every place is spoken for by
-    one rider, and the two that miss are ID 2488 (queue counted twice) and
-    2504 (no queue at all).
+Checked against captures of the real game: level 5, and the board at ID 25,
+come out cell for cell - spans, grey seats, door corner and all.
+
+Capacity summed per colour still equals the queue's colour counts on 2674 of
+2676 boards - a board is saturated, every place spoken for by one rider - and
+the two that miss are ID 2488, whose queue is counted twice, and 2504, which
+has no queue.
 
 That last one also fixes the colours.  Colour 0 is a real colour here, not the
 grey wildcard it was in the binary format - the shipped JSON just omits it as a
@@ -66,6 +73,9 @@ MIN_SECONDS = 60
 # colour, which is why the palette stops at eight.
 COLOURS = {0: 2, 1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7}
 GREY = 0           # the engine's fixture colour, and GREY_TAKES is 2 - sky
+# SeatDirect: 0 and 2 run along x, 1 and 3 along z. turnNumber is this, not a
+# count of turns - see the module docstring.
+STEP = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 # The two rare markers, 8 and 12 in the old format. They appear on 16 boards
 # between them, all of which already use green, so 501 cannot have lime.
 SPECIAL = {500: 8, 501: 7}
@@ -88,17 +98,28 @@ def seat_colour(s):
 
 
 def grids():
-    """panel number -> (W, H, {slot: (col, row)})"""
+    """panel number -> (W, H, {slot: (col, row)})
+
+    The lattice is one column wider than the board. Every panel carries an
+    `ExtraGridGorsterge` strip sitting exactly on its lowest-x column with
+    scaleX 0 - collapsed, switched off - and across all 2676 levels nothing
+    ever lands there: no seat, no coloured tile, no hole, no obstacle. So the
+    low column is dropped and the board is what is left, which is also what
+    turns the commonest size from 6x8 into the 5x8 the binary campaign ran on.
+    """
     out = {}
     for pn, areas in json.load(open(PANELS)).items():
         xs = sorted({v["x"] for v in areas.values()})
         zs = sorted({v["z"] for v in areas.values()})
+        assert len(xs) * len(zs) == len(areas), "panel %s is not a full lattice" % pn
+        dropped, xs = xs[0], xs[1:]
         W, H = len(xs), len(zs)
         # low x first: max x has to land on W-1, the engine's door wall
         col = {v: i for i, v in enumerate(xs)}
         row = {v: H - 1 - i for i, v in enumerate(zs)}
-        assert W * H == len(areas), "panel %s is not a full lattice" % pn
-        out[int(pn)] = (W, H, {int(k): (col[v["x"]], row[v["z"]]) for k, v in areas.items()})
+        cells = {int(k): (col[v["x"]], row[v["z"]])
+                 for k, v in areas.items() if v["x"] != dropped}
+        out[int(pn)] = (W, H, cells)
     return out
 
 
@@ -114,27 +135,48 @@ def capacity(s):
 def convert():
     G = grids()
     doors = json.load(open(DOORS))
-    boards, flags = [], collections.Counter()
+    boards, flags, dropped = [], collections.Counter(), []
     for r in json.load(open(LEVELS)):
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
+        laid, ok = set(), True
         for i, s in enumerate(r["seats"]):
-            c, row = cells[s["slot"]]
-            # c, r, capacity, colour, SeatDirect, footprint. The sixth number is
-            # what tells the engine a bench covers one cell however many people
-            # it holds; a board without it is read the old way, footprint = seats.
-            seats.append([c, row, capacity(s), seat_colour(s), 0, 1])
-            # staticSeat is left out: it ships as grey and the engine runs it.
+            if s["slot"] not in cells:      # the switched-off column; nothing uses it
+                ok = False
+                break
+            c0, r0 = cells[s["slot"]]
+            n, d = capacity(s), s["turn"] & 3
+            dc, dr = STEP[d]
+            covered = [(c0 + dc * k, r0 + dr * k) for k in range(n)]
+            if any(not (0 <= c < W and 0 <= rr < H) for c, rr in covered) or laid & set(covered):
+                ok = False
+                break
+            laid |= set(covered)
+            # c, r, size, colour, SeatDirect. The engine lays a seat out from its
+            # anchor in the positive direction whichever way it faces, so one
+            # pointing back down an axis is anchored at its far end; the rotation
+            # itself is kept, because the sprite and the no-entry-over-the-backrest
+            # rule both read it.
+            c, row = min(covered)
+            # The atlas has no s1_1 or s1_3: a single cell was only ever drawn
+            # facing along x. A one-cell seat covers the same cell whichever way
+            # it points, so the rotation is folded onto the axis that has art
+            # rather than leaving 487 seats with no sprite at all, which draws
+            # nothing and reads as an empty square.
+            seats.append([c, row, n, seat_colour(s), (d & 2) if n == 1 else d])
+            # staticSeat ships as grey and turnNumber as the rotation; the engine
+            # runs both, so neither belongs in mods.
             mods = {k: True for k in ("isLocked", "vanish", "split",
                                       "transparentSeat", "firstClass") if s[k]}
             if s["ice"]:
                 mods["ice"] = s["ice"]
-            if s["turn"]:
-                mods["turn"] = s["turn"]
             for k in mods:
                 flags[k] += 1
             if mods:
                 extra[str(i)] = mods
+        if not ok:
+            dropped.append(r["id"])
+            continue
         boards.append({
             "id": "Level_%05d" % r["id"], "name": "Level_%05d" % r["id"],
             "track": "campaign",
@@ -163,7 +205,7 @@ def convert():
             "colouredGrid": r["colouredGrid"],
             "seatArms": r["seatArms"],
         })
-    return boards, flags
+    return boards, flags, dropped
 
 
 def check(boards):
@@ -200,11 +242,12 @@ def palette_check():
     return bad
 
 
-boards, flags = convert()
+boards, flags, dropped = convert()
 clashes = palette_check()
 bad = check(boards)
 json.dump(boards, open(OUT, "w"), separators=(",", ":"))
 print("boards        :", len(boards))
+print("dropped       :", len(dropped), "that will not lay out:", dropped[:10])
 print("grid sizes    :", collections.Counter((b["w"], b["h"]) for b in boards).most_common())
 print("capacities    :", collections.Counter(s[2] for b in boards for s in b["seats"]))
 print("clock         : min %ds  max %ds" % (min(b["time"] for b in boards), max(b["time"] for b in boards)))

@@ -1,11 +1,18 @@
 """Bake every seat variant the APK actually ships, plus riders facing each way.
 
-The level data gives each seat a length (1, 2 or 3 cells) and a SeatDirect
-(0..3). Only seven combinations occur:
+The level data gives each seat a length (1 to 4 cells) and a SeatDirect (0..3).
+The binary campaign only ever used seven combinations:
 
     (1,0) (2,0)          - the ordinary up-facing seats, 99% of them
     (1,2) (2,2)          - the same, turned to face down       (level 351+)
     (2,1) (2,3) (3,3)    - turned side-on, cells running down  (level 353+)
+
+1.63.1 adds four more - three-seaters at every rotation and one four-seater.
+They are rare, 95 seats across 45 boards, but a missing frame draws nothing at
+all rather than falling back, so the board would show empty squares where the
+seats are. (1,1) and (1,3) are deliberately absent: a single cell covers the
+same square whichever way it points, and the converter folds those onto the
+axis that has art.
 
 Long seats are ONE piece spanning several cells, not a row of single seats, so
 each variant gets its own sprite sized to its own bounding box.
@@ -24,7 +31,8 @@ ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "g
 # SeatDirect -> how far to spin the model. 0 faces up the screen; the cells of a
 # 1/3 seat run down the screen, so those must face left or right.
 DIRECT_SPIN = {0: math.pi, 1: -math.pi / 2, 2: 0.0, 3: math.pi / 2}
-VARIANTS = [(1, 0), (2, 0), (1, 2), (2, 2), (2, 1), (2, 3), (3, 3)]
+VARIANTS = [(1, 0), (2, 0), (1, 2), (2, 2), (2, 1), (2, 3), (3, 3),
+            (3, 0), (3, 1), (3, 2), (4, 0)]
 
 
 
