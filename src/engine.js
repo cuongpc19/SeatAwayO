@@ -505,6 +505,65 @@ function shadow(wx, wz, rx) {
   ctx.fill(); ctx.restore();
 }
 
+/* ---------------- the blockers ----------------
+   Seat colour 12 is not a colour. It stands on the decoded boards 508 times and
+   appears in a queue NOT ONCE, and the decode's own header puts passenger
+   colours at 1..8 - so nobody can ever sit in one. They are movable obstacles: a
+   wall to be shuffled out of the way, and on two boards a full nine of them run
+   down the middle column.
+
+   ⚠ Drawn as a crate, not as a seat. Through the seat sprite they came out in
+   the palette's blue, all but indistinguishable from a sky seat, so those two
+   boards read as nine seats that could not be filled - and because every level's
+   usable places match its queue exactly, with nothing spare, a seat that cannot
+   be used reads as a seat that is missing. Nothing about how they behave changes
+   here: `accepts` already turns every passenger away, since no passenger is ever
+   colour 12. This is what they look like and nothing else. */
+const BLOCK = 12;
+const isBlock = b => b.colour === BLOCK;
+
+const CRATE = { face: "#7c6145", top: "#9d7f5d", edge: "#3d2f22", strap: "#5c4732" };
+
+/** A crate standing in one cell.
+
+    ⚠ Two faces, not six. The camera's yaw is zero, so a wall at a constant x is
+    seen exactly edge-on and projects to a line of no width - drawing the sides
+    puts nothing on the screen but a seam. The front and the lid are the whole
+    box, which is the same pair of faces the seat sprites were baked with. */
+function drawBlock(wx, wz, alpha) {
+  const a = SX * .37, d = SZ * .37, h = .52;
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = CRATE.edge;
+  ctx.lineWidth = Math.max(1, LAY.s * .026);
+  const face = (pts, fill) => {
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  };
+  face([P(wx - a, 0, wz + d), P(wx + a, 0, wz + d),
+        P(wx + a, h, wz + d), P(wx - a, h, wz + d)], CRATE.face);
+  face([P(wx - a, h, wz - d), P(wx + a, h, wz - d),
+        P(wx + a, h, wz + d), P(wx - a, h, wz + d)], CRATE.top);
+  // the straps across the lid: what says crate rather than plinth
+  ctx.strokeStyle = CRATE.strap;
+  ctx.lineWidth = Math.max(1, LAY.s * .045);
+  const c = [P(wx - a, h, wz - d), P(wx + a, h, wz - d),
+             P(wx + a, h, wz + d), P(wx - a, h, wz + d)];
+  ctx.beginPath();
+  ctx.moveTo(c[0][0], c[0][1]); ctx.lineTo(c[2][0], c[2][1]);
+  ctx.moveTo(c[1][0], c[1][1]); ctx.lineTo(c[3][0], c[3][1]);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A seat, or a crate where the board carries one instead. */
+function paintPiece(b, wx, wz, alpha) {
+  if (isBlock(b)) return drawBlock(wx, wz, alpha);
+  blit(seatFrame(b), wx, 0, wz, alpha);
+}
+
 /* ---------------- the room ----------------
    The editor draws the board flat, because what it is for is reading the level
    data. The game draws a carriage around it: walls with real thickness, windows
@@ -1213,7 +1272,7 @@ function draw() {
   for (const b of g.seats) {
     if (b === held) continue;                 // drawn last, riding the cursor
     const [sx, sz] = seatCentre(b);
-    push(sx, sz, () => { shadow(sx, sz, .45 * b.len); blit(seatFrame(b), sx, 0, sz, 1); });
+    push(sx, sz, () => { shadow(sx, sz, (isBlock(b) ? .32 : .45) * b.len); paintPiece(b, sx, sz, 1); });
     if (GUIDES && doorBlocked && b.id === g.occ[idx(g, g.W - 1, g.door)]) {
       const cs = cellsOf(b), mid = cs[Math.floor(cs.length / 2)];
       push(cellW(mid[0]), cellZ(mid[1]), () => {
@@ -1277,8 +1336,8 @@ function draw() {
   if (held) {
     const A = .72;                          // lighter than a seat that is put down
     const [sx, sz] = seatCentre(held);
-    shadow(sx + gdx, sz + gdz, .45 * held.len);
-    blit(seatFrame(held), sx + gdx, 0, sz + gdz, A);
+    shadow(sx + gdx, sz + gdz, (isBlock(held) ? .32 : .45) * held.len);
+    paintPiece(held, sx + gdx, sz + gdz, A);
     held.occ.forEach((ci, i) => {
       if (ci == null) return;
       const [c, r] = cellsOf(held)[i];
