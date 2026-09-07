@@ -96,7 +96,12 @@ function applyTheme(level) {
    reward below is the live value, not a guess. */
 const CF = /*__CONFIG__*/;
 const unlockedAt = f => { const n = CF.unlock[f]; return n > 0 ? n : Infinity; };
-const has = f => save.unlocked >= unlockedAt(f);
+/* A booster is open once the player has reached the level that opens it.
+   `save.unlocked` alone answers that for ordinary play - it is always at or
+   past the level being played - but not for a board opened straight from
+   `?level=N`, where it says 1 and the whole bottom bar comes up locked on a
+   level that is meant to have it. Standing on the level is what counts. */
+const has = f => Math.max(save.unlocked, CUR || 0) >= unlockedAt(f);
 
 /* ---- saved progress ---------------------------------------------------- */
 /* ⚠ This name is fixed from launch on. CrazyGames' Progress Save backs up
@@ -304,8 +309,11 @@ function buildGrid() {
   for (let n = 1; n <= upto; n++) {
     const b = document.createElement("button");
     const st = save.stars[n] || 0;
-    b.className = "cellbtn " + (n > save.unlocked ? "locked" : st ? "done" : "");
-    b.innerHTML = n + (st ? '<span class="s">' + "★".repeat(st) + "</span>" : "");
+    const d = diffOf(n);
+    b.className = "cellbtn " + (n > save.unlocked ? "locked" : st ? "done" : "")
+                + (d ? " " + d.cls : "");
+    b.innerHTML = (d ? '<span class="d">' + d.tile + "</span>" : "")
+                + n + (st ? '<span class="s">' + "★".repeat(st) + "</span>" : "");
     if (n <= save.unlocked) b.onclick = () => startLevel(n);
     grid.appendChild(b);
   }
@@ -343,6 +351,27 @@ const FEATURES = [
 ];
 
 const boardOf = n => LEVELS[CAMPAIGN[n - 1] - 1];
+
+/* ---- the hard levels ---------------------------------------------------
+   The APK carries an int per board called `difficultLevel`, 0 to 2, and this is
+   that value rather than a judgement of our own: 118 of the 600 campaign levels
+   are marked, 59 of each grade, and the spacing says it was laid out on purpose
+   - from 25 on, every level ending in 5 is a 1 and every level ending in 9 is a
+   2, with 9, 15 and 19 set early to get the run going.
+
+   ⚠ Read off the board, never listed here. The campaign numbering has already
+   moved once, when the 33 duplicate arrangements came out of it, and a table of
+   level numbers written in this file is a second copy of the data that goes
+   stale without anything failing. */
+const DIFFS = {
+  /* ⚠ The chip says SUPER, not SUPER HARD. The topbar is a three-column grid and
+     the left group holds the gear, the level pill and this; at the full wording
+     the group grew past the middle column and pushed the clock off centre on a
+     phone. The card that opens the level carries the whole name. */
+  1: { cls: "hard",  tile: "HARD",  chip: "Hard",  warn: "HARD LEVEL",       bonus: 15 },
+  2: { cls: "shard", tile: "SUPER", chip: "Super", warn: "SUPER HARD LEVEL", bonus: 45 },
+};
+const diffOf = n => { const b = boardOf(n); return b ? DIFFS[b.diff] || null : null; };
 
 /** The first campaign level whose board answers `test`, or Infinity. */
 function firstBoard(test) {
@@ -393,10 +422,68 @@ function startLevel(n) {
   closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
   openBoard();
-  // and then, over the board it is talking about, anything new on it
-  const owed = introDue(CUR);
-  if (owed) showIntro(owed);
-  else winIfAsked();
+  // The warning first, then anything new on the board. Chained rather than run
+  // side by side: both stop the clock and hold the queue, and two overlays that
+  // each let go on their own way out leave the board running under the second.
+  const after = () => {
+    const owed = introDue(CUR);
+    if (owed) showIntro(owed);
+    else winIfAsked();
+  };
+  const d = diffOf(CUR);
+  if (d) showWarning(d, after);
+  else after();
+}
+
+/* ---- the hard-level warning -------------------------------------------
+   Raised on the way in, EVERY time rather than once. It is a warning, not a
+   lesson: the moment it is most worth reading is the retry after the board has
+   just beaten you. The chip on the HUD brings it back mid-board.
+
+   Its own overlay rather than a step bolted onto INTRO_RUNS - that machinery is
+   keyed to a feature, records the feature as seen and hands over a free go, and
+   none of it belongs to something that has to come back every time. */
+let warnGo = null;
+
+const WARN_MS = 1500;           // ⚠ matches the `stamp` keyframes in the head, both of them
+let warnTimer = 0;
+
+function showWarning(d, then) {
+  if (!S || S.phase !== "play") return then && then();
+  warnGo = then || null;
+  const w = $("warn");
+  $("warn-text").textContent = d.warn;
+  // ⚠ Off, reflow, on. Re-adding a class the element already carries does not
+  // restart a CSS animation, so tapping the chip twice would show nothing the
+  // second time.
+  w.className = "";
+  void w.offsetWidth;
+  w.className = "on " + d.cls;
+  setPaused(true);
+  HOLD = true;                   // nothing moves, and the beat costs no clock
+  clearTimeout(warnTimer);
+  warnTimer = setTimeout(closeWarning, WARN_MS);
+  onHud();
+}
+
+/** Hidden with its follow-on dropped: for a board being left, not one starting.
+    Anything queued behind it belonged to the board that is going. */
+function killWarning() {
+  clearTimeout(warnTimer);
+  warnGo = null;
+  $("warn").className = "";
+}
+
+function closeWarning() {
+  if (!$("warn").classList.contains("on")) return;
+  clearTimeout(warnTimer);
+  $("warn").className = "";
+  const go = warnGo; warnGo = null;
+  if (go) go();
+  // ⚠ Only when nothing took the hold on. showIntro() stops the clock again for
+  // its own run, and letting go here would start the queue walking under it.
+  if (!INTRO) { HOLD = false; setPaused(false); autoBoard(); }
+  onHud();
 }
 
 /** ?win=1: hand the open board a win without solving it, so the celebration and
@@ -429,22 +516,50 @@ function openBoard() {
   /* Set before load(), not in showIntro(): with no opening beat, load() starts
      the queue on the frame the board appears, which is before the walkthrough
      that is meant to hold them has been put up. */
-  HOLD = !!introDue(CUR);
+  killWarning();                 // a warning belongs to the board it was raised on
+  HOLD = !!introDue(CUR) || !!diffOf(CUR);
   applyTheme(CUR);                 // before load(), so the first frame is right
   load(CAMPAIGN[CUR - 1]);
+  RUNNING = false;                 // ⚠ after load(): it is the new board's clock
+  /* The seconds the marked boards carry on top of what the APK gave them.
+
+     ⚠ Added to the budget the stars are scored against as well as to the clock.
+     `starsFor` reads `left / time`, so putting it only on the clock would hand
+     the player more time to finish and, in the same breath, a stricter bar for
+     three stars - the gift taken back by the arithmetic. */
+  const grade = diffOf(CUR);
+  if (grade && grade.bonus) { S.time += grade.bonus; S.left = S.time; }
   onHud();
 }
 
+/* ---- when the clock starts ---------------------------------------------
+   Not on the frame the board appears. It starts on the first thing that really
+   happens: a passenger stepping off the stop, or - on a board where nobody can
+   move yet, because the doorway is blocked - the player's first seat. Reading
+   the board before anything is committed costs nothing, which is what the
+   opening beat was already trying to buy on levels 1 and 2.
+
+   ⚠ A latch, not a test run each frame. `S.anim` empties between one walker and
+   the next, and both it and `S.moves` are cleared by load(), so a condition
+   evaluated live would stop the clock again in every gap. */
+let RUNNING = false;
+
 let sayUntil = 0;
 const toastEl = () => document.getElementById("hint");
+let sayAnyway = false;
 onSay = msg => {
   // A walkthrough is already saying its piece in the bubble, and the toast for
-  // the same tap lands under it saying it again.
-  if (INTRO) return;
+  // the same tap lands under it saying it again. What does get through is a
+  // refusal - a step waiting on the player has to be able to tell them why
+  // what they just did did not count.
+  if (INTRO && !sayAnyway) return;
   const el = toastEl();
   el.textContent = msg; el.classList.add("on");
   sayUntil = performance.now() + 2600;
 };
+
+/** A message that gets through a walkthrough, for the few that have to. */
+const nudge = m => { sayAnyway = true; say(m); sayAnyway = false; };
 
 const $ = id => document.getElementById(id);
 const setAll = (ids, text) => { for (const i of ids) { const e = $(i); if (e) e.textContent = text; } };
@@ -452,6 +567,11 @@ const setAll = (ids, text) => { for (const i of ids) { const e = $(i); if (e) e.
 onHud = function () {
   if (!S) return;
   setAll(["g-level"], CUR);
+  // the pill is left alone - the chip beside it is what carries the grade
+  const d = diffOf(CUR);
+  const chip = $("g-grade");
+  chip.hidden = !d;
+  if (d) { chip.textContent = d.chip; chip.className = "grade " + d.cls; }
   setAll(["g-clock"], fmt(S.left));
   setAll(["g-coins", "h-coins"], save.coins);
   setAll(["h-stars"], totalStars());
@@ -502,6 +622,7 @@ function lockedSay(feat, what) {
 }
 
 $("b-time").onclick = () => {
+  if (introWaitingOnBoard()) return;
   if (!S || S.phase !== "play") return;
   if (!has("booster_time")) return lockedSay("booster_time", "Extra time");
   const freeT = save.freeTime > 0;
@@ -514,7 +635,15 @@ $("b-time").onclick = () => {
   introSaw("timed");
 };
 
+/* While a walkthrough is waiting for the board to be tapped its overlay lets
+   taps through, which puts the whole HUD back within reach. Nothing there may
+   answer for the player: cancelling the armed jump, or restarting the level,
+   would take away the one way on from a step that has no other. */
+const introWaitingOnBoard = () =>
+  !!(INTRO && INTRO.steps[INTRO.i] && INTRO.steps[INTRO.i].thru);
+
 $("b-jump").onclick = () => {
+  if (introWaitingOnBoard()) return;
   if (!S || S.phase !== "play") return;
   if (!has("booster_jump")) return lockedSay("booster_jump", "Jump");
   if (JUMP) { JUMP = false; say("Jump cancelled."); onHud(); draw(); return; }
@@ -543,7 +672,7 @@ onSeatPick = seat => {
   if (!S.queue.length) { say("Nobody left in the queue."); return true; }
   if (!jumpBoard(S, seat)) {
     bump();
-    say("Tap a seat that matches the passenger at the front of the queue.");
+    nudge("Tap a ringed seat - one the passenger at the front of the queue can use.");
     return true;
   }
   JUMP = false;
@@ -580,23 +709,27 @@ const INTRO_RUNS = {
      FEATURES ladder still counts it for the progress bar either way. A run is
      written here only for a piece that cannot be worked out by looking. */
   grey: [
-    { spot: "seats", text: "One seat on this board is ringed. Have a look at it before you move anything." },
     { spot: "seats", btn: "GOT IT",
-      text: "That one is bolted down - drag it and it will not budge. In exchange it "
-          + "takes a passenger of any colour, so plan the other seats around it." },
+      text: "The ringed seat is bolted down. It does not move, whatever you drag." },
   ],
+  /* Each booster is explained and pressed in the same step. There is no NEXT to
+     click past first: a card that can be dismissed is a card that gets
+     dismissed, and the player ends up owning a booster they have never used.
+     The only way on is the button itself, which is why it comes with a free
+     go. */
   jump: [
-    { text: "Passengers have to walk in, so a seat with no way through to it is no use to anybody - however right its colour is." },
     { spot: "b-jump", wait: "armed",
-      text: "Jump flies the next passenger straight into a seat instead. Here is one on the house - tap the arrow button." },
-    { wait: "jumped", thru: true, dock: "high", slim: true,
-      text: "Now tap a seat that matches the passenger at the front of the queue. They will fly over everything in the way." },
-    { btn: "GOT IT", text: "That is a jump. More of them cost {p} gold from the same button." },
+      text: "A passenger has to walk to their seat, so a seat with no way through to it "
+          + "is no use. Jump flies them straight in instead. Here is a free one - tap "
+          + "the arrow button." },
+    { spot: "seats", wait: "jumped", thru: true, dock: "high", slim: true,
+      text: "Now tap one of the lit seats. The passenger at the front of the queue flies "
+          + "straight to it, over everything in the way." },
   ],
   time: [
-    { spot: "clock", text: "The clock at the top is the only way to lose a board." },
     { spot: "b-time", wait: "timed",
-      text: "This booster puts more of it back. Here is one on the house - tap the clock button." },
+      text: "Running out of clock is the only way to lose a board. This booster puts "
+          + "seconds back on it. Here is a free one - tap the clock button." },
     { spot: "clock", btn: "GOT IT",
       text: "+{t} seconds, straight onto the clock. Tap it whenever time gets tight." },
   ],
@@ -612,20 +745,19 @@ const SPOTS = {
 
 /** The introduction owed on this level, or null. `at <= n` rather than `at === n`
     so a player who jumps ahead from the level picker still gets it. */
+const INTRO_NEEDS = { jump: "booster_jump", time: "booster_time" };
 function introDue(n) {
-  for (const f of featureLevels())
-    if (f.at <= n && INTRO_RUNS[f.id] && !save.seenBoosters.includes(f.id)) return f;
+  for (const f of featureLevels()) {
+    if (f.at > n || !INTRO_RUNS[f.id] || save.seenBoosters.includes(f.id)) continue;
+    // never walk somebody through a button they cannot press yet
+    if (INTRO_NEEDS[f.id] && !has(INTRO_NEEDS[f.id])) continue;
+    return f;
+  }
   return null;
 }
 
 let INTRO = null;                      // { id, label, steps, i } while a run is going
-/* The bubble stands in the middle of the screen and the seats it describes are
-   under it as often as not, so the ring outlives the last step by a moment:
-   press GOT IT and the board underneath is still marked. */
-let INTRO_MARK = null;                 // { id, until }
-const MARK_MS = 2500;
-const STUCK_MS = 7000;                 // how long a waiting step waits before offering a way out
-let stuckTimer = 0, introRunning = false;
+let introRunning = false;
 
 /** The free go that makes "tap it" an offer rather than a price tag. */
 function giveFreeGo(id) {
@@ -657,21 +789,26 @@ function clearSpot() {
 function introGo(i) {
   if (!INTRO) return;
   clearSpot();
-  clearTimeout(stuckTimer);
   if (i >= INTRO.steps.length) { endIntro(); return winIfAsked(); }
   INTRO.i = i;
+  INTRO.acted = false;             // nothing lit once the step has been answered
   const st = INTRO.steps[i], tip = $("intro-tip");
+  /* There is no way past a step but doing it, so a step with nothing to do
+     cannot be shown at all: on a board where no seat suits the front of the
+     queue there would be nothing to tap and no way on. Nothing can empty the
+     set once the step is up - the clock is stopped, the queue is held, and the
+     only thing a tap can do there is spend the jump. */
+  if (st.wait === "jumped" && !introSeats().length) return introGo(i + 1);
   $("intro-title").textContent = INTRO.label;
   $("intro-text").textContent = st.text
     .replace("{t}", CF.boosterTime.value).replace("{p}", CF.boosterJump.price);
   // one dot per step, filled up to this one, so a run reads as a run
   $("intro-dots").textContent =
     INTRO.steps.map((_, k) => (k === i ? "\u25CF" : "\u25CB")).join("");
-  $("intro-ok").textContent = st.wait ? "SKIP" : (st.btn || "NEXT");
+  $("intro-ok").textContent = st.btn || "NEXT";
   tip.classList.toggle("waiting", !!st.wait);
-  tip.classList.remove("stuck");
   $("intro").classList.toggle("thru", !!st.thru);
-  if (st.wait) stuckTimer = setTimeout(() => tip.classList.add("stuck"), STUCK_MS);
+  $("intro").classList.toggle("on-board", st.spot === "seats");
   if (st.spot && st.spot !== "seats") {
     const [sel, host] = SPOTS[st.spot];
     document.querySelector(host).classList.add("spotlight");
@@ -716,16 +853,17 @@ function introSaw(what) {
   if (!INTRO) return;
   const st = INTRO.steps[INTRO.i];
   if (!st || st.wait !== what) return;
-  clearTimeout(stuckTimer);
+  /* Stop lighting anything the moment they have done it. The jump step lights
+     the seats the front of the queue can use, and the front of the queue has
+     just changed - leaving it live moves the spotlight onto a different set of
+     seats for as long as the beat before the next step lasts. */
+  INTRO.acted = true;
   setTimeout(() => { if (INTRO && INTRO.steps[INTRO.i] === st) introGo(INTRO.i + 1); }, 620);
 }
 
 function endIntro() {
-  clearTimeout(stuckTimer);
   clearSpot();
-  $("intro").classList.remove("on", "thru");
-  if (INTRO && INTRO.id === "grey")
-    INTRO_MARK = { id: INTRO.id, until: performance.now() + MARK_MS };
+  $("intro").classList.remove("on", "thru", "on-board");
   INTRO = null;
   setPaused(false);
   HOLD = false;
@@ -737,7 +875,6 @@ function endIntro() {
     - must not leave the clock paused or a button lit. */
 function clearIntro() {
   if (INTRO) endIntro();
-  INTRO_MARK = null;
 }
 
 /** The ring is painted on the canvas, in the room's own projection, and the
@@ -746,13 +883,7 @@ function introFrame() {
   if (introRunning) return;
   introRunning = true;
   const step = () => {
-    const marking = INTRO_MARK && performance.now() < INTRO_MARK.until;
-    if (!INTRO && !marking) {
-      introRunning = false;
-      if (INTRO_MARK) INTRO_MARK = null;
-      draw();
-      return;
-    }
+    if (!INTRO) { introRunning = false; draw(); return; }
     if (introSeats().length) draw();
     requestAnimationFrame(step);
   };
@@ -776,11 +907,11 @@ function ringCentre(b) {
 /** Which seats on this board the current step is talking about. */
 function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
-  const id = st && st.spot === "seats" ? INTRO.id
-           : (!INTRO && INTRO_MARK && performance.now() < INTRO_MARK.until) ? INTRO_MARK.id
-           : null;
-  if (!id || !S) return [];
-  if (id === "grey") return S.seats.filter(b => b.colour === 0);
+  if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
+  if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
+  // the seats the free jump can actually be spent on, lit the same way
+  if (INTRO.id === "jump" && S.queue.length)
+    return S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
   return [];
 }
 
@@ -917,7 +1048,7 @@ onOverlay = () => {
   /* Armed, the seats the front of the queue could be flown into are ringed.
      Without it "tap a seat" is a guess, and a guess that lands on the wrong
      colour reads as the booster being broken. */
-  if (JUMP && LAY && S && S.queue.length) {
+  if (JUMP && LAY && S && S.queue.length && !introSeats().length) {
     const ci = S.queue[0], t = performance.now() / 1000;
     const pulse = .5 + .5 * Math.sin(t * 3.6);
     ctx.save();
@@ -950,11 +1081,12 @@ onOverlay = () => {
       ctx.moveTo(A[0] + rx * 1.5, cy);
       ctx.ellipse(A[0], cy, rx * 1.5, ry * 2.0, 0, 0, Math.PI * 2);
     }
-    ctx.fillStyle = "rgba(10,9,34,.55)";
+    ctx.fillStyle = "rgba(9,8,30,.82)";
     ctx.fill("evenodd");
     // and the ring itself, in the same gold the coach mark uses to say "this one"
-    ctx.strokeStyle = "#ffd75e"; ctx.lineWidth = Math.max(2, LAY.s * .06);
-    ctx.globalAlpha = .55 + .4 * pulse;
+    ctx.strokeStyle = "#ffd75e"; ctx.lineWidth = Math.max(3, LAY.s * .085);
+    ctx.shadowColor = "rgba(255,215,94,.9)"; ctx.shadowBlur = LAY.s * .5;
+    ctx.globalAlpha = .8 + .2 * pulse;
     for (const b of marked) {
       const A = ringCentre(b), [rx, ry] = rad(b);
       ctx.beginPath(); ctx.ellipse(A[0], A[1], rx, ry, 0, 0, Math.PI * 2);
@@ -1336,7 +1468,9 @@ document.getElementById("h-hearts").onclick = () => {
 };
 document.getElementById("h-levels").onclick = () => show("levels");
 document.getElementById("l-back").onclick = () => show("home");
-$("g-retry").onclick = () => startLevel(CUR);
+$("g-retry").onclick = () => { if (!INTRO) startLevel(CUR); };
+// the chip is a real control: it plays the stamp again mid-board
+$("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null); };
 // the menu button opens Settings; Home lives inside it, beside the switches
 /* The gear pauses the game and opens the card. It used to be a hamburger
    wired straight to `show("home")`, so the one control on the HUD that was
@@ -1352,8 +1486,12 @@ function tick(now) {
   const dt = (now - last) / 1000; last = now;
   if (JUMP && S && S.phase === "play") draw();   // the armed rings breathe
   if (S && S.phase === "play" && !PAUSED) {
-    S.left -= dt;
-    if (S.left <= 0) { S.left = 0; finish(false); }
+    // anybody walking, or a seat the player has already committed
+    if (!RUNNING && (S.anim.length || S.boarding || S.moves > 0)) RUNNING = true;
+    if (RUNNING) {
+      S.left -= dt;
+      if (S.left <= 0) { S.left = 0; finish(false); }
+    }
     onHud();
     if (TUT) draw();               // the only thing on screen that moves by itself
   }

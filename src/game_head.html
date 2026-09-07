@@ -355,8 +355,75 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   background: linear-gradient(180deg, #6d84a8, #4c5f7d); box-shadow: 0 3px 0 rgba(0,0,0,.28);
 }
 .cellbtn.done { background: linear-gradient(180deg, var(--go), var(--go-dk)); }
+/* ---------- the hard levels ----------
+   `difficultLevel` off the APK board: 0, 1 or 2. 118 of the 600 campaign levels
+   carry one, and the game shows it in two places - the tile here, and the level
+   pill while the board is up.
+
+   ⚠ These sit between `.done` and `.locked` on purpose. A hard level that has
+   been cleared keeps its warning colour, because the tile is also how a player
+   decides what to replay, and the stars along the bottom already say it was
+   beaten. Locked still wins over both: a board that cannot be opened should not
+   be shouting. */
+.cellbtn.hard  { background: linear-gradient(180deg, #ef7d4d, #c1502a); }
+.cellbtn.shard { background: linear-gradient(180deg, #a95ce2, #7233ab); }
 .cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); cursor: not-allowed; }
 .cellbtn .s { position: absolute; inset: auto 0 3px 0; font-size: .55rem; letter-spacing: .1em; color: var(--gold); }
+.cellbtn .d {
+  position: absolute; inset: 4px 0 auto 0; font-size: .44rem; font-weight: 800;
+  letter-spacing: .07em; color: rgba(255,255,255,.95); text-shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+.cellbtn.locked .d { color: rgba(255,255,255,.42); text-shadow: none; }
+/* The grade rides beside the level pill as its own control, so "Level 9" keeps
+   reading as "Level 9". Tapping it brings the warning card back - a chip that
+   cannot be pressed is a label wearing a button's clothes. */
+.grade {
+  border: 0; cursor: pointer; font-family: var(--disp); font-weight: 800;
+  font-size: .6rem; letter-spacing: .04em; text-transform: uppercase; color: #fff;
+  border-radius: 999px; padding: .26rem .46rem; white-space: nowrap; line-height: 1.15;
+  background: var(--gr); box-shadow: 0 3px 0 var(--gr-dk), 0 5px 12px rgba(0,0,0,.22);
+}
+.grade:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--gr-dk); }
+.grade.hard  { --gr: #e0673a; --gr-dk: #ac4522; }
+.grade.shard { --gr: #9a4bd6; --gr-dk: #6b2c9e; }
+/* ⚠ Spelled out. `.grade` sets no display of its own today, so the UA rule for
+   [hidden] would carry it - but the export panel and the coach card were both
+   caught by exactly that assumption the moment they were given a display, and
+   the chip sits in a flex row that invites one. */
+.grade[hidden] { display: none; }
+
+/* ---------- the hard-level warning ----------
+   A stamp over the board that plays and goes. Not a card with a button: there is
+   nothing here to decide, and a panel that has to be dismissed turns a heads-up
+   into a toll on the way into every retry.
+
+   ⚠ pointer-events: none. It is over the board for a beat and the board is what
+   the player came for - it must never swallow the first drag. */
+#warn {
+  position: absolute; inset: 0; display: none; z-index: 25;
+  place-items: center; pointer-events: none; font-family: var(--ms);
+}
+#warn.on { display: grid; }
+#warn.hard  { --st: #ac4522; }
+#warn.shard { --st: #6b2c9e; }
+#warn .stamp {
+  /* Wrapped by width, not by a newline in the string: a two-line label written
+     with an escape is one heredoc away from a literal newline inside a JS
+     string, which is a parse error that takes the whole page with it. */
+  font-size: 46px; line-height: 1.05; text-align: center; color: #fff; max-width: 6.2em;
+  letter-spacing: .02em; -webkit-text-stroke: 9px var(--st); paint-order: stroke fill;
+  animation: stamp 1.5s ease-out both;
+}
+@keyframes stamp {
+  0%   { transform: scale(1.55); opacity: 0; }
+  16%  { transform: scale(1);    opacity: 1; }
+  68%  { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #warn .stamp { animation: stamp-fade 1.5s linear both; }
+  @keyframes stamp-fade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
+}
 
 /* ---------- result card ----------
    Marble Sort's `GameScene.overlay`, port for port. Same 540 x 1160 design box
@@ -667,9 +734,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    stands on top of what it is describing. */
 #intro { position: absolute; inset: 0; display: none; z-index: 24; font-family: var(--ms); }
 #intro.on { display: block; }
-/* Light. The board dims itself on the canvas with a hole where the ringed seat
-   is, and a heavy wash here would put that hole straight back in the dark. */
-#intro .dim { background: rgba(13,10,42,.42); }
+/* Dark enough that what is lifted through it is the only thing on the screen.
+   A light wash reads as a tint rather than as a spotlight, and the button being
+   pointed at goes unnoticed. */
+#intro .dim { background: rgba(9,7,28,.86); }
+/* Except on the steps that ring a seat: those do their darkening on the canvas,
+   with a hole cut where the seat is, and a heavy wash here would fill that hole
+   straight back in. */
+#intro.on-board .dim { background: rgba(11,9,34,.26); }
 /* On the step that asks for a drag the overlay stops taking taps altogether,
    and the bubble alone keeps them. */
 #intro.thru { pointer-events: none; }
@@ -712,32 +784,46 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 @keyframes tip-wait { 50% { opacity: .3; } }
 .tip.waiting #intro-ok { display: none; }
 .tip.waiting .tip-wait { display: block; }
-/* ...unless they cannot do it. After a few seconds a way past appears, because
-   a board can always turn out to have no move left in it and a tutorial nobody
-   can leave is a fault, not a lesson. */
-.tip.waiting.stuck #intro-ok { display: inline-block; }
 .tip-dots {
   display: block; margin-top: 12px; font-size: 20px; letter-spacing: .3em;
   color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.55);
 }
 
-/* Whatever is being pointed at is lifted through the wash and ringed. */
+/* Whatever is being pointed at is lifted through the wash, grown, and ringed in
+   a gold that glows onto the dark around it. All three together: a ring alone on
+   a button the same size as the one beside it is easy to miss on a phone. */
 #boosters.spotlight, #play .topbar.spotlight { z-index: 25; }
 /* Lifting the bar lifts both buttons with it, so the one that is not being
-   talked about is pushed back down again. */
-#boosters.spotlight .boost:not(.hint) { opacity: .4; filter: saturate(.5); }
+   talked about is pushed well back down again. */
+#boosters.spotlight .boost:not(.hint) { opacity: .12; filter: saturate(.2); }
+.boost.hint, .pill.hint { transform: scale(1.22); }
+/* Two rings, because one is easy to read past on a phone in daylight: a fat
+   gold band welded to the button with a glow that spills onto the dark, and a
+   second one that keeps going outwards like a radar sweep. */
 .boost.hint::before, .pill.hint::before {
-  content: ""; position: absolute; inset: -7px; border-radius: 26px;
-  border: 3px solid var(--gold); animation: boost-hint 1.15s ease-in-out infinite;
+  content: ""; position: absolute; inset: -10px; border-radius: 30px;
+  border: 6px solid var(--gold);
+  box-shadow: 0 0 0 10px rgba(255,215,94,.3), 0 0 64px 26px rgba(255,215,94,.75);
+  animation: boost-hint 1.05s ease-in-out infinite;
+}
+.boost.hint::after, .pill.hint::after {
+  content: ""; position: absolute; inset: -10px; border-radius: 30px;
+  border: 5px solid rgba(255,215,94,.9); pointer-events: none;
+  animation: hint-radar 1.4s ease-out infinite;
 }
 .pill.hint { position: relative; }
-.pill.hint::before { inset: -6px; border-radius: 999px; }
+.pill.hint::before, .pill.hint::after { inset: -8px; border-radius: 999px; }
 @keyframes boost-hint {
-  0%, 100% { transform: scale(1); opacity: .95; }
-  50%      { transform: scale(1.08); opacity: .45; }
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.12); opacity: .6; }
+}
+@keyframes hint-radar {
+  0%   { transform: scale(1); opacity: .9; }
+  100% { transform: scale(1.7); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .boost.hint::before, .pill.hint::before, .tip-wait { animation: none; }
+  .boost.hint::after, .pill.hint::after { display: none; }
 }
 </style>
 
@@ -788,6 +874,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
           </svg>
         </button>
         <div class="pill"><span class="pill-lab">Level</span><span class="pill-val" id="g-level">1</span></div>
+        <button class="grade" id="g-grade" hidden></button>
       </div>
       <div class="pill pill-time">
         <span class="pill-lab">Time</span>
@@ -840,6 +927,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       <span class="tip-dots" id="intro-dots"></span>
     </div>
   </div>
+
+  <div id="warn"><b class="stamp" id="warn-text"></b></div>
 
   <div id="settings">
     <div class="dim" id="set-dim"></div>
