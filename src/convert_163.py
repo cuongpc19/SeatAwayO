@@ -71,14 +71,22 @@ MIN_SECONDS = 60
 # grey red sky yellow green orange purple blue pink, and only those nine have
 # their own sprite - lime, teal, brown and navy share one with an earlier
 # colour, which is why the palette stops at eight.
-COLOURS = {0: 2, 1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7}
+# NAMES is grey red sky yellow green orange purple blue pink, and the bundle
+# ships exactly seven seat colours - Grid_Blue, Grid_Green, Grid_Orange,
+# Grid_Pink, Grid_Puple, Grid_Red, Grid_Yellow - which is the 0..6 range.
+# Four of the seven are read straight off captures of the real game: the board
+# at ID 124 puts source 3 where the capture shows red, source 1 where it shows
+# green and source 4 where it shows pink, with source 2 yellow in both; source 0
+# is the blue every early level is made of. 5 and 6 are the two left over,
+# orange and purple, and which way round they go is the one guess here.
+COLOURS = {0: 2, 1: 4, 2: 3, 3: 1, 4: 8, 5: 5, 6: 6}
 GREY = 0           # the engine's fixture colour, and GREY_TAKES is 2 - sky
 # SeatDirect: 0 and 2 run along x, 1 and 3 along z. turnNumber is this, not a
 # count of turns - see the module docstring.
 STEP = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 # The two rare markers, 8 and 12 in the old format. They appear on 16 boards
 # between them, all of which already use green, so 501 cannot have lime.
-SPECIAL = {500: 8, 501: 7}
+SPECIAL = {500: 7, 501: 6}
 
 
 def recolour(c):
