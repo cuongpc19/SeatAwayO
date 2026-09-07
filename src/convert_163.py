@@ -54,6 +54,17 @@ PANELS = "lv/panels_163.json"
 DOORS = "lv/doors_163.json"
 OUT = "lv/boards_163.json"
 
+# ⚠ The ladder does not start at ID 0. The bundle carries two campaigns: an
+# older one in IDs 0..1004, still ramping 2, 3, 4, 5 seats from the front like a
+# tutorial, and the one 1.63.1 actually plays from 1005 on. Captures taken off
+# this very APK pin it: its level 3 is ID 1007 and its level 4 is ID 1008, each
+# matching cell for cell and each the only board in the whole set that does. So
+# the displayed level is ID - 1004, and the old block is left out of the ladder
+# rather than shipped in front of it, which is what made the first thousand
+# levels a second, easier tutorial.
+FIRST_ID = 1005
+LAST_ID = 2508      # 5000+ is event content, not the campaign
+
 SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
 MIN_SECONDS = 60
 
@@ -145,6 +156,8 @@ def convert():
     doors = json.load(open(DOORS))
     boards, flags, dropped = [], collections.Counter(), []
     for r in json.load(open(LEVELS)):
+        if not (FIRST_ID <= r["id"] <= LAST_ID):
+            continue
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
         laid, ok = set(), True
@@ -186,7 +199,9 @@ def convert():
             dropped.append(r["id"])
             continue
         boards.append({
-            "id": "Level_%05d" % r["id"], "name": "Level_%05d" % r["id"],
+            "id": "Level_%05d" % (r["id"] - FIRST_ID + 1),
+            "name": "Level_%05d" % (r["id"] - FIRST_ID + 1),
+            "sourceId": r["id"],
             "track": "campaign",
             # The shell builds its campaign ladder by filtering on variant 0 and
             # reads difficulty off `diff`; 1.63.1 ships one board per id and no
