@@ -65,6 +65,7 @@ MIN_SECONDS = 60
 # their own sprite - lime, teal, brown and navy share one with an earlier
 # colour, which is why the palette stops at eight.
 COLOURS = {0: 2, 1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7}
+GREY = 0           # the engine's fixture colour, and GREY_TAKES is 2 - sky
 # The two rare markers, 8 and 12 in the old format. They appear on 16 boards
 # between them, all of which already use green, so 501 cannot have lime.
 SPECIAL = {500: 8, 501: 7}
@@ -72,6 +73,18 @@ SPECIAL = {500: 8, 501: 7}
 
 def recolour(c):
     return SPECIAL[c] if c in SPECIAL else COLOURS[c]
+
+
+def seat_colour(s):
+    """`staticSeat` is the grey fixture, not a rule of its own.
+
+    All 14091 of them wear colour 0 and not one wears anything else, which is
+    the binary format's grey seat exactly: a seat that never moves and takes
+    only the first colour. The engine already has that - FIXED is colour 0, and
+    GREY_TAKES is 2, which is where colour 0 lands - so writing grey out says
+    the whole thing without a flag or a line of engine code.
+    """
+    return GREY if s["staticSeat"] else recolour(s["colour"])
 
 
 def grids():
@@ -110,8 +123,9 @@ def convert():
             # c, r, capacity, colour, SeatDirect, footprint. The sixth number is
             # what tells the engine a bench covers one cell however many people
             # it holds; a board without it is read the old way, footprint = seats.
-            seats.append([c, row, capacity(s), recolour(s["colour"]), 0, 1])
-            mods = {k: True for k in ("staticSeat", "isLocked", "vanish", "split",
+            seats.append([c, row, capacity(s), seat_colour(s), 0, 1])
+            # staticSeat is left out: it ships as grey and the engine runs it.
+            mods = {k: True for k in ("isLocked", "vanish", "split",
                                       "transparentSeat", "firstClass") if s[k]}
             if s["ice"]:
                 mods["ice"] = s["ice"]
@@ -166,8 +180,9 @@ def check(boards):
         per = collections.Counter()
         for _, _, cap, col, *_ in b["seats"]:
             per[col] += cap
-        if 0 in per:
-            bad["a seat kept colour 0, which the engine reads as grey"] += 1
+        # a grey fixture takes the first colour, so its places belong to sky
+        if GREY in per:
+            per[COLOURS[0]] += per.pop(GREY)
         if not (0 <= b["door"] < b["h"]):
             bad["door row is off the grid"] += 1
         if per != collections.Counter(b["queue"] + b["queue2"]):
@@ -196,6 +211,11 @@ print("clock         : min %ds  max %ds" % (min(b["time"] for b in boards), max(
 print("colours       :", sorted({s[3] for b in boards for s in b["seats"]}))
 print("riders        :", sum(len(b["queue"]) + len(b["queue2"]) for b in boards))
 print("carried flags :", dict(flags))
+print("grey fixtures :", sum(1 for b in boards for s in b["seats"] if s[3] == GREY),
+      "on", sum(1 for b in boards if any(s[3] == GREY for s in b["seats"])), "boards")
+first = next((b["id"] for b in boards if any(s[3] == GREY for s in b["seats"])), None)
+print("first grey at :", first, "= campaign level",
+      next(i + 1 for i, b in enumerate(boards) if b["id"] == first))
 print("door rows     :", dict(collections.Counter(b["door"] for b in boards)))
 print("colour clashes:", clashes)
 print("failed checks :", dict(bad) or "none")
