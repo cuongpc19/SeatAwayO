@@ -183,7 +183,11 @@ function loadSave() {
       adopted = !!raw;
     }
     save = Object.assign(blank(), JSON.parse(raw || "{}"));
-    if (adopted) persist();          // once, so the next load reads the new name
+    /* ⚠ `!raw` too. A brand-new player had no save written until they finished
+       something, so the first session left nothing behind at all - and on a host
+       with cloud storage that is progress which starts existing one level later
+       than the player thinks it does. */
+    if (adopted || !raw) persist();
   }
   catch (e) { /* private window, cleared data, a browser that refuses storage */ }
 }
@@ -228,6 +232,12 @@ function starsFor(g) {
 /* ---- screens ----------------------------------------------------------- */
 const screens = { home: "home", levels: "levels", play: "play" };
 function show(name) {
+  /* ⚠ Leaving the board is what stops play, so the screen change is what says
+     so - see setPaused(). Every exit used to say it for itself, which is the
+     arrangement that guarantees one is missed: HOME from the settings menu
+     unpaused on its way out and told the host play had just STARTED, and then
+     never stopped it. The clock kept running on the home screen too. */
+  setPaused(name !== "play");
   for (const id of Object.values(screens))
     document.getElementById(id).classList.toggle("on", id === name);
   if (name === "home") refreshHome();
@@ -462,7 +472,6 @@ function featureProgress(cleared) {
 }
 
 function startLevel(n) {
-  PLATFORM.gameplayStart();
   if (hearts() <= 0) {
     /* ⚠ The card that asked for this is still up, and show() does not touch it.
        Without this, TRY AGAIN on the loss that spent the last life left OUT OF
@@ -1358,7 +1367,12 @@ function syncToggles() {
     Only the clock stops. A passenger already walking to a seat keeps walking -
     those are the engine's own timers and stopping them mid-stride would need the
     walk to be resumable, which is a much bigger change than the fault warrants. */
-let PAUSED = false;
+/* ⚠ Starts true: nothing is in play until a board is actually open. Starting
+   false made the first show("home") emit a gameplayStop the host had never been
+   told to expect - a stop with no start - while the first show("play") emitted
+   nothing at all, because false was already the value. The pair only comes out
+   in order if the game admits it is not playing yet. */
+let PAUSED = true;
 
 /** ⚠ The single place the host is told whether play is live. Marble Sort's note
     is that emitting from each call site guarantees missing one, and the one you
@@ -1376,6 +1390,8 @@ function openSettings() {
   setEl.classList.add("on");
 }
 function closeSettings() { setPaused(false); setEl.classList.remove("on"); }
+/** Shut it on the way somewhere else: no unpause, because nothing is resuming. */
+function dropSettings() { setEl.classList.remove("on"); }
 
 /** Turning a switch on demonstrates itself - a sound cue for sound, a buzz for
     vibration - which is the only way a player can tell the switch did anything
@@ -1391,7 +1407,7 @@ $("set-vibe").onclick = () => toggleSetting("vibe");
 $("set-close").onclick = closeSettings;
 $("set-dim").onclick = closeSettings;
 $("set-retry").onclick = () => { closeSettings(); startLevel(CUR); };
-$("set-home").onclick = () => { closeSettings(); hideCard(); show("home"); };
+$("set-home").onclick = () => { dropSettings(); hideCard(); show("home"); };
 /* The way back to the board, and the reason the card needs one: with only a
    close disc in the corner, the one obvious thing to press was HOME, so
    opening the settings meant leaving the level. */
@@ -1612,7 +1628,7 @@ function revive() {
      all. Two rows is the honest account: a loss, then a second game carrying
      `revive` in `used`. See telemetry.js. */
   teleResume("revive");
-  PLATFORM.gameplayStart();
+  setPaused(false);
   SFX.buy();
   onHud(); boosterUi(); draw();      // onHud repaints the purse; 500 gone can price a booster out
 }
@@ -1662,7 +1678,7 @@ onFinish = function (won) {
   clearIntro();                  // won under the walkthrough: unpause before the card
   if (won) { SFX.win(); buzz([18, 60, 18]); } else { SFX.lose(); buzz(90); }
   TUT = null; tutKey = ""; $("coach").hidden = true;   // the lesson is over either way
-  PLATFORM.gameplayStop();                             // a card is up: an ad may land here
+  setPaused(true);                                     // a card is up: an ad may land here
   if (won) PLATFORM.happytime();
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;

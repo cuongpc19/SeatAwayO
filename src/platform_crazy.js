@@ -25,6 +25,12 @@ const LOAD_TIMEOUT_MS = 2000;
 const SDK_URL = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
 
 let sdk = null;
+/** ⚠ The game calls loadingStart() before init() has finished - it is loading,
+    and that is when it is loading. The SDK does not exist yet, so the call had
+    nowhere to go and the host never heard it: a loadingStop with no start.
+    Remembered here and emitted the moment the SDK is live, which keeps the pair
+    in order without making boot wait for a host that may never answer. */
+let loading = false;
 let muted = false, mutedSeeded = false;
 const muteListeners = [];
 
@@ -123,6 +129,7 @@ const PLATFORM = {
         new Promise(r => setTimeout(r, Math.max(0, INIT_TIMEOUT_MS - (Date.now() - start)))),
       ]);
       sdk = found;
+      if (loading) { try { sdk.game.loadingStart(); } catch (e) {} }
     } catch (e) { sdk = null; }
     // ⚠ addSettingsChangeListener, not a window event. There is no volume event
     // to listen for; guessing one would make the submission form's "supports
@@ -136,8 +143,8 @@ const PLATFORM = {
 
   storage: dualStore,
 
-  loadingStart()  { try { if (sdk) sdk.game.loadingStart();  } catch (e) {} },
-  loadingStop()   { try { if (sdk) sdk.game.loadingStop();   } catch (e) {} },
+  loadingStart()  { loading = true;  try { if (sdk) sdk.game.loadingStart(); } catch (e) {} },
+  loadingStop()   { loading = false; try { if (sdk) sdk.game.loadingStop();  } catch (e) {} },
   gameplayStart() { try { if (sdk) sdk.game.gameplayStart(); } catch (e) {} },
   gameplayStop()  { try { if (sdk) sdk.game.gameplayStop();  } catch (e) {} },
   happytime()     { try { if (sdk) sdk.game.happytime();     } catch (e) {} },
