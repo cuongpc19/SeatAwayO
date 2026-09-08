@@ -147,6 +147,7 @@ const blank = () => ({
   streak: 0,                       // wins in a row
   hearts: CF.heartMax, heartAt: 0, // heartAt: when the next one lands, ms epoch
   jumps: 0,                        // jump booster charges bought
+  lines: 0,                        // add-line booster charges bought
   freeTime: 0,                     // free goes at the time booster, from its tutorial
   sound: true, vibe: true,         // the two switches in Settings
 });
@@ -368,6 +369,7 @@ const FEATURES = [
   { id: "grey", label: "FIXED SEAT",
     from: () => firstBoard(b => b.seats.some(s => s[3] === 0)) },
   { id: "jump", label: "JUMP BOOSTER", from: () => unlockedAt("booster_jump") },
+  { id: "area", label: "ADD LINE", from: () => unlockedAt("booster_area") },
   { id: "twin", label: "DOUBLE SEAT",
     from: () => firstBoard(b => b.seats.some(s => s[2] > 1)) },
   { id: "time", label: "TIME BOOSTER", from: () => unlockedAt("booster_time") },
@@ -391,8 +393,14 @@ const DIFFS = {
      the left group holds the gear, the level pill and this; at the full wording
      the group grew past the middle column and pushed the clock off centre on a
      phone. The card that opens the level carries the whole name. */
-  1: { cls: "hard",  tile: "HARD",  chip: "Hard",  warn: "HARD LEVEL",       bonus: 15 },
-  2: { cls: "shard", tile: "SUPER", chip: "Super", warn: "SUPER HARD LEVEL", bonus: 45 },
+  // ⚠ bonus 0 while the clock is flat. It used to hand a hard board +15s and a
+  // super +45s on top of its own time, which was a compensation for a clock
+  // fitted per board. With build.py writing 240s for every graded level, the
+  // bonus only means the HUD does not show the number that was asked for -
+  // 4:15 and 4:45 instead of 4:00. Put 15 and 45 back the day the clock stops
+  // being flat.
+  1: { cls: "hard",  tile: "HARD",  chip: "Hard",  warn: "HARD LEVEL",       bonus: 0 },
+  2: { cls: "shard", tile: "SUPER", chip: "Super", warn: "SUPER HARD LEVEL", bonus: 0 },
 };
 const diffOf = n => { const b = boardOf(n); return b ? DIFFS[b.diff] || null : null; };
 
@@ -630,13 +638,21 @@ function lockChip(el, tagId, feat) {
 }
 
 function boosterUi() {
-  const t = $("b-time"), j = $("b-jump");
+  const t = $("b-time"), j = $("b-jump"), a = $("b-area");
   const tOpen = lockChip(t, "b-time-cost", "booster_time");
   const jOpen = lockChip(j, "b-jump-cost", "booster_jump");
+  const aOpen = lockChip(a, "b-area-cost", "booster_area");
   if (tOpen) $("b-time-cost").textContent = save.freeTime > 0 ? "FREE" : CF.boosterTime.price;
   if (jOpen) $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + "x" : CF.boosterJump.price;
+  // "USED" rather than a price once the lane is out: the board has one to give,
+  // and a button quoting a price it will refuse to take is a worse lie than a
+  // greyed-out one.
+  if (aOpen) $("b-area-cost").textContent = S && S.lines ? "USED"
+    : save.lines > 0 ? save.lines + "x" : CF.boosterArea.price;
   t.classList.toggle("broke", tOpen && !save.freeTime && save.coins < CF.boosterTime.price);
   j.classList.toggle("broke", jOpen && save.jumps === 0 && save.coins < CF.boosterJump.price);
+  a.classList.toggle("broke", aOpen && !(S && S.lines)
+    && save.lines === 0 && save.coins < CF.boosterArea.price);
   j.classList.toggle("armed", JUMP);
 }
 
@@ -685,6 +701,30 @@ $("b-jump").onclick = () => {
   say("Jump armed - tap the seat you want the next passenger flown into.");
   onHud(); draw();
   introSaw("armed");
+};
+
+/* Unlike the jump there is nothing to aim: the lane opens the moment it is
+   bought. Charged only when the board actually takes it, so a press that lands
+   while somebody is still walking, or on a board that already has its lane,
+   costs nothing. */
+$("b-area").onclick = () => {
+  if (introWaitingOnBoard()) return;
+  if (!S || S.phase !== "play") return;
+  if (!has("booster_area")) return lockedSay("booster_area", "Add line");
+  if (S.lines) return say("This board already has its extra lane.");
+  if (S.anim.length || S.launching) return say("Wait for the queue to settle.");
+  const paid = save.lines > 0;
+  if (!paid && save.coins < CF.boosterArea.price) return say("Not enough gold for a lane.");
+  if (!addLine(S)) return say("No room for another lane here.");
+  if (paid) save.lines--;
+  else {
+    save.coins -= CF.boosterArea.price;
+    if (CF.boosterArea.uses > 1) save.lines = CF.boosterArea.uses - 1;
+  }
+  SFX.buy(); buzz(14);
+  persist(); say("A lane opens down the left."); onHud(); draw();
+  autoBoard();
+  introSaw("area");
 };
 
 /* One charge per seat actually moved, and the arming ends with it. */
@@ -753,6 +793,19 @@ const INTRO_RUNS = {
       text: "Now tap one of the lit seats. The passenger at the front of the queue flies "
           + "straight to it, over everything in the way." },
   ],
+  /* Two steps, like the clock. The first buys the press; the second is worth a
+     card of its own because what just happened is easy to misread - the board
+     did not move, it grew, and the lane that opened is the one the panel was
+     already carrying. */
+  area: [
+    { spot: "b-area", wait: "area",
+      text: "Every bus has one spare lane down its left side, folded away. This opens "
+          + "it, so there is somewhere to slide a seat to. Here is a free one - tap "
+          + "the green button." },
+    { spot: "seats", btn: "GOT IT",
+      text: "The whole board shifted right and that left column is clear floor now. "
+          + "One lane per board, so spend it on the one that has you stuck." },
+  ],
   time: [
     { spot: "b-time", wait: "timed",
       text: "Running out of clock is the only way to lose a board. This booster puts "
@@ -767,12 +820,14 @@ const INTRO_RUNS = {
 const SPOTS = {
   "b-jump": ["#b-jump", "#boosters"],
   "b-time": ["#b-time", "#boosters"],
+  "b-area": ["#b-area", "#boosters"],
   clock:    [".pill-time", "#play .topbar"],
 };
 
 /** The introduction owed on this level, or null. `at <= n` rather than `at === n`
     so a player who jumps ahead from the level picker still gets it. */
-const INTRO_NEEDS = { jump: "booster_jump", time: "booster_time" };
+const INTRO_NEEDS = { jump: "booster_jump", time: "booster_time",
+                      area: "booster_area" };
 function introDue(n) {
   for (const f of featureLevels()) {
     if (f.at > n || !INTRO_RUNS[f.id] || save.seenBoosters.includes(f.id)) continue;
@@ -790,6 +845,7 @@ let introRunning = false;
 function giveFreeGo(id) {
   if (id === "jump") save.jumps = Math.max(save.jumps, 1);
   if (id === "time") save.freeTime = Math.max(save.freeTime, 1);
+  if (id === "area") save.lines = Math.max(save.lines, 1);
   persist();
 }
 

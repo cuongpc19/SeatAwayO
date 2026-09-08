@@ -36,8 +36,62 @@ KEEP = ("w", "h", "time", "holes", "seats", "queue")   # what a board cannot do 
 CAMPAIGN = "lv/boards_163.json"
 LEGACY = "lv/boards_campaign.json"
 
-EXTRA_SECONDS = 30    # added to every board's clock
+# 0 while the clock is flat. PLAIN_SECONDS / HARD_SECONDS are written after
+# this is added, so on the campaign that ships it does nothing but print a line
+# that is not true. It still applies to LEGACY, which carries real times.
+EXTRA_SECONDS = 0
 GOLD_WIN = 100        # paid for a win, whatever the difficulty
+AREA_UNLOCK = 16      # the add-line booster; the APK opens it at 18
+
+
+# ---- which levels are marked hard ------------------------------------------
+# The APK carried an int per board called `difficultLevel`, 0 to 2, and the game
+# still reads it: it raises the warning card, puts the HARD / SUPER chip on the
+# topbar, pays the clock bonus, and picks the party room (see PARTY in
+# engine.js). 1.63.1 stopped shipping the field - convert_163.py has to write a
+# flat 0 for every board - so on the campaign that ships, none of that fires.
+#
+# So it is worked out here instead, and this is the older dump's own spacing
+# rather than a scheme of ours: over the 600 levels of lv/boards_campaign.json
+# the rule below reproduces 118 of the 118 marked boards and both their grades,
+# and predicts exactly one more (level 415, which that dump leaves blank and we
+# do not bother to leave blank too).
+#
+# ⚠ Worked out from the level's number, so the numbering has to be the campaign
+# the player counts through - the boards AFTER the duplicate arrangements are
+# dropped, which is what `variant == 0` picks out. Applied to the raw file it
+# would land on a different set of boards.
+FIRST_HARD = 15           # nothing before this is graded
+
+# ⚠ Temporary, and flat on purpose. The campaign that ships carries no clock of
+# its own - nothing in the bundle gives its boards a time, and the estimate that
+# stood in for one was wrong in kind rather than in value: the real game authors
+# a number per level, anywhere from 30s to 429s, with no relation to how many
+# people board. Two boards of capacity 26 and 13 both read 2:00 on the HUD. So
+# rather than keep a fitted curve that is wrong everywhere, every board gets one
+# of two numbers until the real ones turn up.
+PLAIN_SECONDS = 300       # 5:00
+HARD_SECONDS = 240        # 4:00, for both grades
+
+def grade(n):
+    """The difficulty of campaign level `n`, 1-based: 0 plain, 1 hard, 2 super.
+
+    Two marks every ten levels, on the 5 and the 9, and nothing else. Levels
+    ending in 0 are not marked, which is why "every multiple of five" is the
+    wrong way to say it: over the shipped table, boards ending in 5 and in 9 are
+    a special vehicle 134 times out of 135 each, and boards ending in 0 are one
+    0 times out of 135. Averaging those two together is what hides the rhythm.
+
+    The 9s take the longer vehicles - Train, Cadillac, Limo - and the 5s spread
+    evenly across all of them, so the 9 is the heavier of the two marks.
+    """
+    if n < FIRST_HARD:
+        return 0
+    if n % 10 == 5:
+        return 1
+    if n % 10 == 9:
+        return 2
+    return 0
 
 
 def tuning(shipped_gold):
@@ -73,6 +127,20 @@ def levels_json():
     # otherwise be the one board in the campaign that did not get the extra.
     for b in boards:
         b["time"] += EXTRA_SECONDS
+    # The grading, over the campaign the player counts through - see grade().
+    # Only where the campaign brought none of its own: the older dump has the
+    # real thing on it, and a rule of ours must never be laid over that.
+    if not any(b.get("diff") for b in boards):
+        n = 0
+        for b in boards:
+            if b.get("variant"):
+                continue
+            n += 1
+            b["diff"] = grade(n)
+            b["time"] = HARD_SECONDS if b["diff"] else PLAIN_SECONDS
+        marked = sum(1 for b in boards if b.get("diff"))
+        print("  tuning    %d of %d levels graded hard, from the level number" % (marked, n))
+        print("  tuning    clock flat: %ds plain, %ds hard" % (PLAIN_SECONDS, HARD_SECONDS))
     print("  campaign  %s, %d boards" % (CAMPAIGN, len(boards)))
     return json.dumps(boards, separators=(",", ":"))
 
@@ -115,9 +183,13 @@ def live_config():
     g = cfg["parameterGroups"]
     num = lambda grp, key: float(g[grp]["parameters"][key]["defaultValue"]["value"])
     out = {
-        "unlock": {k.replace("level_unlock_", ""): int(float(v["defaultValue"]["value"]))
-                   for k, v in g["tutorial"]["parameters"].items()
-                   if k.startswith("level_unlock")},
+        # ⚠ Ours, not the APK's, for booster_area. The shipped gate is 18; 16 is
+        # a deliberate departure and belongs with the others up top, not typed
+        # into remote_config.json, which stays as dumped.
+        "unlock": dict({k.replace("level_unlock_", ""): int(float(v["defaultValue"]["value"]))
+                        for k, v in g["tutorial"]["parameters"].items()
+                        if k.startswith("level_unlock")},
+                       booster_area=AREA_UNLOCK),
         # ⚠ Ours, not the APK's. The shipped game pays 10 for a win at every
         # difficulty - gold_win_normal, _hard and _hardest are all 10 - and the
         # read is kept so that a re-dump which changed it would be noticed.
@@ -132,6 +204,8 @@ def live_config():
                         "uses": int(num("booster", "uses_limit_booster_time"))},
         "boosterJump": {"price": int(num("booster", "booster_jump_price")),
                         "uses": int(num("booster", "uses_limit_booster_jump"))},
+        "boosterArea": {"price": int(num("booster", "booster_area_price")),
+                        "uses": int(num("booster", "uses_limit_booster_area"))},
         "keepPlaying": {"price": int(num("gameplay", "keep_playing_price")),
                         "secs": int(num("gameplay", "keep_playing_time"))},
     }

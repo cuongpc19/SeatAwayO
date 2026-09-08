@@ -281,6 +281,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 }
 #b-time { --b-hi: #ffa63d; --b-lo: #f4801c; --b-dk: #c25f0d; }
 #b-jump { --b-hi: #b06ff0; --b-lo: #8f4ade; --b-dk: #6b32ad; }
+#b-area { --b-hi: #55d98f; --b-lo: #2bb56e; --b-dk: #16794a; }
 .boost:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-dk); }
 .boost .ico { width: 54%; height: 54%; margin-bottom: .35rem; display: block; }
 .boost .ico path, .boost .ico circle, .boost .ico rect {
@@ -901,6 +902,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
           <path d="M12 3.4v11M12 3.4 7.6 8M12 3.4 16.4 8M4.6 18.6h14.8"></path>
         </svg>
         <span class="cost" id="b-jump-cost">600</span>
+      </button>
+      <!-- the board, and a new lane opening on its left -->
+      <button class="boost" id="b-area" aria-label="Add a lane">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.5 4.5h8v15h-8zM16.5 4.5v15"></path>
+          <path d="M6 9.5v8M2 13.5h8"></path>
+        </svg>
+        <span class="cost" id="b-area-cost">1000</span>
       </button>
     </div>
     <div class="coach" id="coach" hidden role="status">
