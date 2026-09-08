@@ -68,7 +68,10 @@ let OPEN_MS = 2000;
    rather than skating over it. */
 const BASE_MS_PER_UNIT = 143;                       // ms per grid unit walked
 const MIN_WALK_MS = 285;                            // a walk is never snappier than this
-const HOP_MS = 217;                                 // the little jump onto the seat
+// The little jump onto the seat. 217 was measured off the recording and is the
+// one beat in the sequence worth stretching: it is the moment the move pays off,
+// and at walking speed it went by before it read as a jump at all.
+const HOP_MS = 300;
 
 const BASE_GAP_MS = 260;                            // pause between passengers - waiting, not walking
 const STRIDE = 0.52;                                // world units per animation frame
