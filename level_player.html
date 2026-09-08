@@ -351,11 +351,22 @@ function fits(g, b, c, r) {
   }
   return true;
 }
-function reachRegion(g) {
+/** The cell a door stands in. Door 0 is the one every board has, on the right
+    wall; door 1 exists only where the level ships a second queue. */
+const doorCell = (g, k) => (g.doors && g.doors[k]) || [g.W - 1, g.door];
+const queueOf = (g, k) => (k ? (g.queue2 || []) : g.queue);
+/** Where the line for a door waits, in world units - outside the wall it is on. */
+function stopAt(g, k) {
+  const [dc, dr] = doorCell(g, k);
+  return [cellW(dc) + (dc === 0 ? -SX * 2.0 : SX * 2.0), cellZ(dr)];
+}
+
+function reachRegion(g, k) {
   const seen = new Uint8Array(g.W * g.H);
-  if (!isFree(g, g.W - 1, g.door)) return seen;
-  seen[idx(g, g.W - 1, g.door)] = 1;
-  const st = [[g.W - 1, g.door]];
+  const [DC, DR] = doorCell(g, k || 0);
+  if (!isFree(g, DC, DR)) return seen;
+  seen[idx(g, DC, DR)] = 1;
+  const st = [[DC, DR]];
   while (st.length) {
     const [c, r] = st.pop();
     for (const [dc, dr] of DIRS) {
@@ -455,8 +466,21 @@ function load(n) {
   }
 
   g.queue = raw.queue.slice();
-  g.total = g.queue.length;
-  g.colours = new Set(raw.queue).size;
+  /* A second line, on the boards that ship one. Which wall its door stands on is
+     a choice rather than a reading: Cadillac and Limo are the only panels that
+     use this and neither carries a second door object - theirs is in the vehicle
+     mesh - so nothing in the bundle says. Facing the first across the floor is
+     what draws two lines a player can tell apart; both on one wall would have
+     them running into each other, and the near one is 20 deep on these boards.
+
+     The two lines are not halves of one. Their colours differ on 77 of the 78
+     boards - each carries a colour the other has none of - so a passenger at the
+     wrong door cannot stand in for one at the right door. */
+  g.queue2 = (raw.queue2 || []).slice();
+  g.doors = g.queue2.length ? [[W - 1, g.door], [0, g.door]] : [[W - 1, g.door]];
+  g.lastDoor = 1;                        // so the first launch comes from door 0
+  g.total = g.queue.length + g.queue2.length;
+  g.colours = new Set(raw.queue.concat(g.queue2)).size;
   g.time = raw.time; g.left = raw.time;
   g.seated = 0; g.phase = "play"; g.moves = 0; g.walkCells = null;
   g.sel = null; g.drag = null; g.anim = []; g.qstep = null;
@@ -478,7 +502,7 @@ function load(n) {
      reach a seat yet is two seconds of a still picture, so that one starts at
      once. INSTANT keeps its synchronous path - headless play-throughs read
      S.seated on the next line and cannot wait out a timer. */
-  const beat = OPEN_MS && g.queue.length && pickSeat(g, g.queue[0]) ? OPEN_MS : 0;
+  const beat = OPEN_MS && nextUp(g) ? OPEN_MS : 0;
   if (INSTANT || !beat) autoBoard();
   else {
     const token = S.token;
@@ -2188,10 +2212,10 @@ function draw() {
   quad(dq, "#7fd2f2");
   }
 
-  const region = reachRegion(g);
+  const region = reachRegion(g, 0);
   const nextCol = g.queue.length ? g.queue[0] : -1;
   const doorBlocked = !isFree(g, g.W - 1, g.door);
-  g.nextSeat = g.queue.length ? pickSeat(g, g.queue[0]) : null;
+  g.nextSeat = (nextUp(g) || {}).spot || null;
 
   // Lighting up every legal destination floods the board, so the only thing that
   // marks a picked-up seat is a glow on its own tile.
@@ -2247,30 +2271,36 @@ function draw() {
     });
   }
 
-  // the stop
-  const laneX = cellW(g.W - 1) + SX * 2.0, qnow = performance.now();
-  for (let i = 0; i < Math.min(g.queue.length, 7); i++) {
-    const st = g.qstep && g.qstep[i];
-    const back = st ? placesBack(st, qnow) : 0;       // places still to walk
-    // Waiting your turn is not walking: until t0 comes round you are carrying the
-    // whole place and standing still, and drawing that as a walk frame turns the
-    // back half of the line to face away for as long as anyone is boarding.
-    const walking = back > 1e-3 && qnow >= st.t0;
-    const pos = i + back, wz = cellZ(g.door) + pos * QUEUE_PITCH;
-    const nm = SPRITE[colName(g.queue[i])] || "grey";
-    // Faded by where they stand rather than by which place they hold, so someone
-    // coming forward brightens as they arrive instead of on the frame they shift.
-    const a = Math.max(.4, 1 - pos * .11);
-    push(laneX, wz, () => {
-      shadow(laneX, wz, .3);
-      if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
-      // Stepping up: away from the camera, and the legs cycle on the distance
-      // covered, the same way they do for someone out on the floor.
-      ctx.globalAlpha = a;
-      blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
-               laneX, 0, wz);
-      ctx.globalAlpha = 1;
-    });
+  // the stop, one line per door
+  const qnow = performance.now();
+  for (let dk = 0; dk < (g.doors ? g.doors.length : 1); dk++) {
+    const q = queueOf(g, dk);
+    const [laneX, laneZ] = stopAt(g, dk);
+    for (let i = 0; i < Math.min(q.length, 7); i++) {
+      // Only the near line animates its shuffle: qstep belongs to it, and the far
+      // one has nobody in front of it to close up behind.
+      const st = dk === 0 && g.qstep && g.qstep[i];
+      const back = st ? placesBack(st, qnow) : 0;       // places still to walk
+      // Waiting your turn is not walking: until t0 comes round you are carrying the
+      // whole place and standing still, and drawing that as a walk frame turns the
+      // back half of the line to face away for as long as anyone is boarding.
+      const walking = back > 1e-3 && qnow >= st.t0;
+      const pos = i + back, wz = laneZ + pos * QUEUE_PITCH;
+      const nm = SPRITE[colName(q[i])] || "grey";
+      // Faded by where they stand rather than by which place they hold, so someone
+      // coming forward brightens as they arrive instead of on the frame they shift.
+      const a = Math.max(.4, 1 - pos * .11);
+      push(laneX, wz, () => {
+        shadow(laneX, wz, .3);
+        if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
+        // Stepping up: away from the camera, and the legs cycle on the distance
+        // covered, the same way they do for someone out on the floor.
+        ctx.globalAlpha = a;
+        blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
+                 laneX, 0, wz);
+        ctx.globalAlpha = 1;
+      });
+    }
   }
   for (const a of g.anim)
     push(a.x, a.z, () => {
@@ -2491,12 +2521,13 @@ addEventListener("pointercancel", () => { if (HELD) { releaseHeld(); draw(); } }
 addEventListener("blur", () => { if (HELD) { releaseHeld(); draw(); } });
 
 /** Walking distance from the door to a cell, through empty floor only. */
-function floorDist(g) {
+function floorDist(g, k) {
   const N = g.W * g.H, d = new Int32Array(N).fill(-1);
-  if (!isFree(g, g.W - 1, g.door)) return d;
-  const start = idx(g, g.W - 1, g.door);
+  const [DC, DR] = doorCell(g, k || 0);
+  if (!isFree(g, DC, DR)) return d;
+  const start = idx(g, DC, DR);
   d[start] = 0;
-  const q = [[g.W - 1, g.door]];
+  const q = [[DC, DR]];
   while (q.length) {
     const [c, r] = q.shift();
     for (const [dc, dr] of DIRS) {
@@ -2514,8 +2545,9 @@ function floorDist(g) {
     is reachable while it sits there - but the passenger is stood right against
     it, and waiting to be told to move a seat they could simply have sat in reads
     as the game being broken rather than as a puzzle. */
-function doorSeat(g, ci) {
-  const id = g.occ[idx(g, g.W - 1, g.door)];
+function doorSeat(g, ci, door) {
+  const [DC, DR] = doorCell(g, door || 0);
+  const id = g.occ[idx(g, DC, DR)];
   if (id < 0) return null;                        // -1 is an empty cell
   const seat = g.seats[id];
   if (!seat || !accepts(seat, ci)) return null;
@@ -2524,18 +2556,19 @@ function doorSeat(g, ci) {
     // only the place that is actually in the doorway: the rest of a long seat is
     // inside the room, and there is no floor to walk round to it on
     const pc = placeCell(seat, k);
-    if (pc[0] === g.W - 1 && pc[1] === g.door)
-      return { seat, k, entry: null };            // no entry tile: they step straight up
+    if (pc[0] === DC && pc[1] === DR)
+      return { seat, k, entry: null, door: door || 0 };
   }
   return null;
 }
 
 /** The nearest place a passenger can actually take: a seat, which of its places,
     and the floor tile they step in from. */
-function pickSeat(g, ci) {
-  const plug = doorSeat(g, ci);
+function pickSeat(g, ci, door) {
+  door = door || 0;
+  const plug = doorSeat(g, ci, door);
   if (plug) return plug;                          // null whenever the doorway is clear
-  const d = floorDist(g);
+  const d = floorDist(g, door);
   let best = null, bestD = Infinity;
   for (const seat of g.seats) {
     if (!accepts(seat, ci)) continue;
@@ -2543,19 +2576,32 @@ function pickSeat(g, ci) {
       if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
       for (const [nc, nr] of cellEntries(g, seat, k)) {
         const dist = d[idx(g, nc, nr)];
-        if (dist >= 0 && dist < bestD) { bestD = dist; best = { seat, k, entry: [nc, nr] }; }
+        if (dist >= 0 && dist < bestD) { bestD = dist; best = { seat, k, entry: [nc, nr], door }; }
       }
     }
   }
   return best;
 }
 
+/** Which line moves next, and through which door. Where both can move they take
+    turns, so one does not empty while the other stands still. */
+function nextUp(g) {
+  const order = g.lastDoor === 0 ? [1, 0] : [0, 1];
+  for (const k of order) {
+    const q = queueOf(g, k);
+    if (!q.length) continue;
+    const spot = pickSeat(g, q[0], k);
+    if (spot) return { door: k, ci: q[0], spot };
+  }
+  return null;
+}
+
 /** The tiles a passenger walks: door -> corridor -> the place itself. Rebuilt
     from the same BFS that decides reachability, so the route on screen is the
     route the rules used. */
-function walkPath(g, seat, k, entry) {
+function walkPath(g, seat, k, entry, door) {
   if (!entry) return null;        // straight off the step onto a seat in the doorway
-  const d = floorDist(g);
+  const d = floorDist(g, door || 0);
   const path = [entry.slice()];
   let [c, r] = entry;
   while (d[idx(g, c, r)] > 0) {
@@ -2603,20 +2649,21 @@ function autoBoard(instant) {
     if (stale() || S.launching || S.anim.length) return;
     S.boarding = false;
     onHud(); draw();
-    if (!S.queue.length && S.seated >= S.total) finish(true);
+    if (!S.queue.length && !(S.queue2 || []).length && S.seated >= S.total) finish(true);
   };
 
   const launch = () => {
     if (stale()) return;
     S.launching = false;
     if (S.phase !== "play") { S.boarding = false; return; }
-    if (!S.queue.length) return done();
-    const ci = S.queue[0];
-    const spot = pickSeat(S, ci);
-    if (!spot) return done();
+    if (!S.queue.length && !(S.queue2 || []).length) return done();
+    const up = nextUp(S);
+    if (!up) return done();
+    const ci = up.ci, spot = up.spot, door = spot.door || 0;
+    S.lastDoor = door;
     const seat = spot.seat, slot = spot.k;
-    S.queue.shift();
-    if (!instant) shuffleUp(S);          // the rest of the line steps up
+    queueOf(S, door).shift();
+    if (!instant && !door) shuffleUp(S);  // the near line steps up; the far one is drawn straight
     seat.pending++;
     (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
     const cell = placeCell(seat, slot);
@@ -2631,8 +2678,8 @@ function autoBoard(instant) {
       onSeated();
     };
     if (instant) { sitDown(); launch(); return; }
-    const path = walkPath(S, seat, slot, spot.entry) || [cell];
-    const pts = [[cellW(S.W - 1) + SX * 2.0, cellZ(S.door)]];        // waiting at the stop
+    const path = walkPath(S, seat, slot, spot.entry, door) || [cell];
+    const pts = [stopAt(S, door)];                                   // waiting at the stop
     for (const [c, r] of path) pts.push([cellW(c), cellZ(r)]);
     pts[pts.length - 1] = [cellW(cell[0]), cellZ(cell[1]) - .04];    // settle onto the seat
 
