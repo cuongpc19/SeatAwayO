@@ -445,6 +445,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #card.on { display: block; }
 #card .design {
   --dy: 0px; --dz: 0px;              /* the room the bar and the streak line need */
+  --dr: 0px;                         /* ...and the room the revive button needs */
   position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
   transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
 }
@@ -479,15 +480,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    line this game has and that one does not: one number, so the card without a
    streak stays exactly the card it already was. */
 .panel {
-  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + 46px);
+  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 36px; background: rgba(29,26,69,.55);
 }
 .panel i {
-  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + 46px);
+  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 34px; background: var(--ms-edge);
 }
 .panel u {
-  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + 46px);
+  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 32px; background: var(--ms-face); overflow: hidden;
 }
 /* The header band: rounded at the top, square where it meets the face. */
@@ -597,9 +598,44 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   font-size: 23px; line-height: 1.4; color: #3b465f; }
 .sum b { color: var(--ms-ink); }
 .sum span { display: block; margin-top: 26px; font-size: 19px; color: #7c88a6; }
-#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+/* Revive sits where the eye already is - the first button under the text - and
+   the other two move down by exactly the gap they already had between them. */
+#c-revive { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
+#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
+#c-revive:active, #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+#c-revive[hidden] { display: none; }
+/* Gold, because it is the one button on the card that costs something. The
+   price rides on its corner the way the boosters' does, rather than inside the
+   label, where "REVIVE +1:00 500" reads as one number too many. */
+.wide-btn.gold { background: linear-gradient(180deg, #ffd76a, #efa326); box-shadow: 0 6px 0 #b9750f; }
+.wide-btn.gold:active { box-shadow: 0 3px 0 #b9750f; }
+#c-revive b { color: #fff3c4; }
+#c-revive .cost {
+  position: absolute; right: -10px; top: -14px;
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  background: linear-gradient(180deg, #5fd472, #3aa94f);
+  box-shadow: 0 3px 0 #2b8039; border-radius: 999px; padding: 3px 12px;
+  font-size: 21px; color: #fff; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
+}
+#c-revive .cost::after {
+  content: ""; width: 17px; height: 17px; border-radius: 50%; -webkit-text-stroke: 0;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+}
+/* Not enough gold. The button stays where it is and stays readable - hiding it
+   would answer "why is this level unwinnable" with nothing - and only the price
+   turns, which is the part that is actually the problem. */
+#c-revive.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 6px 0 #6b6681; }
+#c-revive.broke:active { box-shadow: 0 3px 0 #6b6681; }
+#c-revive.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 3px 0 #a3374a; }
+/* The toast that would normally say why lives under the card, so the refusal
+   has to happen on the button itself. */
+#c-revive.shake { animation: revshake .4s; }
+@keyframes revshake {
+  20% { transform: translate(calc(-50% - 9px), -50%); }
+  50% { transform: translate(calc(-50% + 8px), -50%); }
+  80% { transform: translate(calc(-50% - 5px), -50%); }
+}
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -998,6 +1034,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
       <div class="streak" id="c-streak" hidden></div>
+      <button class="wide-btn gold" id="c-revive" hidden>REVIVE <b>+1:00</b><span class="cost">500</span></button>
       <button class="wide-btn" id="c-next">NEXT LEVEL</button>
       <button class="wide-btn blue" id="c-home">HOME</button>
     </div>
@@ -3953,7 +3990,7 @@ function applyTheme(level) {
 /* ---- the numbers the shipped game runs on -----------------------------
    Injected from its own RemoteConfig at build time. Every threshold, price and
    reward below is the live value, not a guess. */
-const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":8,"booster_jump":14,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":150,"value":30,"uses":-1},"boosterJump":{"price":300,"uses":10},"boosterArea":{"price":500,"uses":3},"keepPlaying":{"price":900,"secs":30}};
+const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":8,"booster_jump":14,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":150,"value":30,"uses":-1},"boosterJump":{"price":300,"uses":10},"boosterArea":{"price":500,"uses":3},"keepPlaying":{"price":500,"secs":60}};
 const unlockedAt = f => { const n = CF.unlock[f]; return n > 0 ? n : Infinity; };
 /* A booster is open once the player has reached the level that opens it.
    `save.unlocked` alone answers that for ordinary play - it is always at or
@@ -5121,6 +5158,8 @@ const SFX = {
   buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
   win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
   lose:   () => { blip(300, .22, "sawtooth", .06); blip(190, .34, "sawtooth", .06, .13); },
+  no:     () => blip(160, .13, "square", .05),
+
 };
 /* Android buzzes. iOS Safari has no Vibration API at all, so there the switch is
    simply inert - which is better than hiding it and guessing wrong about a
@@ -5335,6 +5374,57 @@ function featureBar(feat, cleared) {
   }, 700);
 }
 
+/* ---- revive ------------------------------------------------------------
+   Running out of time is the only way to lose, and starting a board over is a
+   long way back from a board that was nearly done. So the losing card sells a
+   minute. It is not a restart: the seats stay where the player put them, the
+   queue keeps its place, and the clock picks up from where it stopped.
+
+   ⚠ What the loss already took is handed back. onFinish() spends a life and
+   breaks the streak the moment the clock hits zero, because that is the only
+   place that knows the board ended - but a revived board never really ended.
+   Taking it and giving it back, rather than waiting to see whether the player
+   revives, is deliberate: a player who closes the tab on the losing card has
+   still lost, which is not true of a penalty that is only written on TRY AGAIN. */
+let LOST = null;                     // what the last loss cost, until it is spent
+
+/** Show it, price it, and say whether the gold is there. */
+function reviveBtn(losing) {
+  const el = $("c-revive");
+  el.hidden = !losing;
+  // ⚠ Both ways. The variable is written inline on the design, so a card left
+  // holding the losing card's 82px hands the next win a plate with a button's
+  // worth of empty floor under HOME.
+  $("c-card").style.setProperty("--dr", losing ? "82px" : "0px");
+  if (!losing) return;
+  el.querySelector("b").textContent = "+" + fmt(CF.keepPlaying.secs);
+  el.querySelector(".cost").firstChild.textContent = CF.keepPlaying.price;
+  el.classList.toggle("broke", save.coins < CF.keepPlaying.price);
+  el.classList.remove("shake");
+}
+
+function revive() {
+  const el = $("c-revive"), price = CF.keepPlaying.price;
+  if (save.coins < price) {
+    // The toast lives under the card, so the button has to carry the refusal.
+    el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+    SFX.no(); buzz(50);
+    return;
+  }
+  save.coins -= price;
+  if (LOST) { save.streak = LOST.streak; save.hearts = LOST.hearts; save.heartAt = LOST.heartAt; }
+  LOST = null;
+  persist();
+  hideCard();
+  S.phase = "play";
+  S.left += CF.keepPlaying.secs;
+  S.time = Math.max(S.time, S.left);   // the star bar reads left/time - keep it honest
+  RUNNING = true;                      // it was running a moment ago; do not wait to be asked again
+  PLATFORM.gameplayStart();
+  SFX.buy();
+  onHud(); boosterUi(); draw();      // onHud repaints the purse; 500 gone can price a booster out
+}
+
 /** The card itself. `stars` at 0 is the losing face; `feat` is the bar, and
     everything below the stars slides down by one number to make room for it. */
 function overlay(title, stars, coins, streak, sum, feat, cleared) {
@@ -5342,6 +5432,7 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   design.style.setProperty("--dy", (feat ? 66 : 0) + "px");
   design.style.setProperty("--dz", (stars && streak ? 34 : 0) + "px");
   design.classList.toggle("lose", !stars);
+  reviveBtn(!stars);
   $("c-title").textContent = title;
   $("c-rays").hidden = !stars;
   $("c-coins").hidden = !stars;
@@ -5391,9 +5482,11 @@ onFinish = function (won) {
     save.streak++;
     save.coins += pay.total;
   } else {
+    LOST = { streak: save.streak, hearts: save.hearts, heartAt: save.heartAt };
     save.streak = 0;
     if (hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
   }
+  if (won) LOST = null;
   persist();
   // Asked for `lvl`, the level just cleared - the bar is the reward for this
   // game, not for the one being handed over.
@@ -5427,6 +5520,7 @@ $("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null
    wired straight to `show("home")`, so the one control on the HUD that was
    not the clock took the player off the board in a single tap. */
 $("g-menu").onclick = openSettings;
+document.getElementById("c-revive").onclick = revive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
 document.getElementById("c-next").onclick = () =>
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
