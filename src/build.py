@@ -55,6 +55,11 @@ UNLOCKS = {"booster_time": 8, "booster_jump": 14, "booster_area": 16}
 # typed into remote_config.json, which stays as dumped.
 BOOSTER_PRICE = 0.5
 
+# ⚠ Ours. The APK's in-level time booster hands back 15 seconds; 30 here, which
+# is what its own pre-game version already gives. 15 off a flat 300 is barely a
+# reprieve, and a booster the player cannot feel is one they stop pressing.
+BOOSTER_TIME_VALUE = 30
+
 
 # ---- which levels are marked hard ------------------------------------------
 # The APK carried an int per board called `difficultLevel`, 0 to 2, and the game
@@ -216,7 +221,7 @@ def live_config():
         "heartSecs": int(num("features", "heart_recv_time")),
         "heartPrice": int(num("features", "heart_refill_price")),
         "boosterTime": {"price": price("booster_time_price"),
-                        "value": int(num("booster", "booster_time_value")),
+                        "value": BOOSTER_TIME_VALUE,
                         "uses": int(num("booster", "uses_limit_booster_time"))},
         "boosterJump": {"price": price("booster_jump_price"),
                         "uses": int(num("booster", "uses_limit_booster_jump"))},
@@ -226,6 +231,9 @@ def live_config():
                         "secs": int(num("gameplay", "keep_playing_time"))},
     }
     tuning(int(num("gameplay", "gold_win_normal")))
+    shipped_t = int(num("booster", "booster_time_value"))
+    if BOOSTER_TIME_VALUE != shipped_t:
+        print("  tuning    time booster %ds -> %ds" % (shipped_t, BOOSTER_TIME_VALUE))
     if BOOSTER_PRICE != 1:
         keys = ("booster_time_price", "booster_jump_price", "booster_area_price")
         print("  tuning    booster prices x%g: %s -> %s"
