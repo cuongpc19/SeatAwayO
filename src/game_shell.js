@@ -19,6 +19,8 @@ RICH = true;                       // the engine draws a room, not a bare grid
      ?win=1       hand every board a win the moment it opens, so the
                   celebration and the result card can be read on any level
                   without solving one.
+     ?intro=NAME  mark every other piece as met, so NAME's walkthrough is the
+                  one this level owes: grey | twin | jump | time | area
      ?theme=NAME  pin one room and stop the five-level rotation.
                   classroom | station | stadium | concert | cinema
      ?hard=0|1|2  pin the party dressing on any board, rather than taking it
@@ -41,6 +43,11 @@ RICH = true;                       // the engine draws a room, not a bare grid
 const LINK = new URLSearchParams(location.search);
 const flag = k => LINK.has(k) && LINK.get(k) !== "0";
 const RESET_ASKED = flag("reset");
+/* ?intro=NAME  every other piece counts as already met, so NAME is the one this
+   level owes. For reading one walkthrough without playing up to it - ?reset=1
+   on its own hands you the earliest one you have not seen, which is the grey
+   seat from level 7, not the one you came to look at. */
+const INTRO_ONLY = LINK.get("intro");
 const WIN_ASKED = flag("win");
 if (RESET_ASKED) {
   LINK.delete("reset");
@@ -1598,6 +1605,10 @@ let BOOTED = false;
   PLATFORM.loadingStart();
   await PLATFORM.init();
   loadSave();
+  if (INTRO_ONLY) {
+    save.seenBoosters = FEATURES.map(f => f.id).filter(id => id !== INTRO_ONLY);
+    save.coins = Math.max(save.coins, 5000);   // so a locked-out price is not the thing being read
+  }
   PLATFORM.onHostMuteChange(() => syncToggles());
   PLATFORM.loadingStop();
 
