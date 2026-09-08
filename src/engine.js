@@ -165,11 +165,22 @@ function fits(g, b, c, r) {
   }
   return true;
 }
-function reachRegion(g) {
+/** The cell a door stands in. Door 0 is the one every board has, on the right
+    wall; door 1 exists only where the level ships a second queue. */
+const doorCell = (g, k) => (g.doors && g.doors[k]) || [g.W - 1, g.door];
+const queueOf = (g, k) => (k ? (g.queue2 || []) : g.queue);
+/** Where the line for a door waits, in world units - outside the wall it is on. */
+function stopAt(g, k) {
+  const [dc, dr] = doorCell(g, k);
+  return [cellW(dc) + (dc === 0 ? -SX * 2.0 : SX * 2.0), cellZ(dr)];
+}
+
+function reachRegion(g, k) {
   const seen = new Uint8Array(g.W * g.H);
-  if (!isFree(g, g.W - 1, g.door)) return seen;
-  seen[idx(g, g.W - 1, g.door)] = 1;
-  const st = [[g.W - 1, g.door]];
+  const [DC, DR] = doorCell(g, k || 0);
+  if (!isFree(g, DC, DR)) return seen;
+  seen[idx(g, DC, DR)] = 1;
+  const st = [[DC, DR]];
   while (st.length) {
     const [c, r] = st.pop();
     for (const [dc, dr] of DIRS) {
@@ -269,11 +280,25 @@ function load(n) {
   }
 
   g.queue = raw.queue.slice();
-  g.total = g.queue.length;
-  g.colours = new Set(raw.queue).size;
+  /* A second line, on the boards that ship one. Which wall its door stands on is
+     a choice rather than a reading: Cadillac and Limo are the only panels that
+     use this and neither carries a second door object - theirs is in the vehicle
+     mesh - so nothing in the bundle says. Facing the first across the floor is
+     what draws two lines a player can tell apart; both on one wall would have
+     them running into each other, and the near one is 20 deep on these boards.
+
+     The two lines are not halves of one. Their colours differ on 77 of the 78
+     boards - each carries a colour the other has none of - so a passenger at the
+     wrong door cannot stand in for one at the right door. */
+  g.queue2 = (raw.queue2 || []).slice();
+  g.doors = g.queue2.length ? [[W - 1, g.door], [0, g.door]] : [[W - 1, g.door]];
+  g.lastDoor = 1;                        // so the first launch comes from door 0
+  g.total = g.queue.length + g.queue2.length;
+  g.colours = new Set(raw.queue.concat(g.queue2)).size;
   g.time = raw.time; g.left = raw.time;
   g.seated = 0; g.phase = "play"; g.moves = 0; g.walkCells = null;
   g.sel = null; g.drag = null; g.anim = []; g.qstep = null;
+  g.lines = 0;                  // add-line booster: one spare lane per board
   S = g;
   S.boarding = false; S.launching = false;
   FIN = null; SHIFT = [0, 0];   // the last room's ending stops here
@@ -291,7 +316,7 @@ function load(n) {
      reach a seat yet is two seconds of a still picture, so that one starts at
      once. INSTANT keeps its synchronous path - headless play-throughs read
      S.seated on the next line and cannot wait out a timer. */
-  const beat = OPEN_MS && g.queue.length && pickSeat(g, g.queue[0]) ? OPEN_MS : 0;
+  const beat = OPEN_MS && nextUp(g) ? OPEN_MS : 0;
   if (INSTANT || !beat) autoBoard();
   else {
     const token = S.token;
@@ -420,7 +445,7 @@ function frame() {
   const wide = cv.width / cv.height > 1.05;
   // Off the edges on every side, so the room reads as sitting in a place rather
   // than being cropped by the window.
-  const head = (THEMES[THEME] || THEMES.station).head;
+  const head = themeNow().head;
   return wide ? { left: .26, right: .78, top: head, bottom: .93 }
               : { left: .04, right: .95, top: head - .02, bottom: .94 };
 }
@@ -585,8 +610,12 @@ function drawBlock(wx, wz, alpha) {
 /** A seat, or a crate where the board carries one instead. */
 function paintPiece(b, wx, wz, alpha) {
   if (isBlock(b)) return drawBlock(wx, wz, alpha);
+  if (HARD && RICH) seatSheen(b, wx, wz, alpha);
   const per = packing(b);
-  if (per <= 1) return blit(seatFrame(b), wx, 0, wz, alpha);
+  if (per <= 1) {
+    blit(seatFrame(b), wx, 0, wz, alpha);
+    return;
+  }
   // A bench that covers one cell is drawn as its own places, side by side and
   // scaled to fit, rather than as one wide cushion that would cover its
   // neighbours. There is no atlas frame for a four-seater, and this needs none.
@@ -651,7 +680,7 @@ function finale(ms) {
     as one piston. Per-theme amplitude - a class does not do a Mexican wave. */
 function cheerLift(c, r) {
   if (!FIN || FIN.f < .05) return 0;
-  const amp = (THEMES[THEME] || THEMES.station).cheer || 0;
+  const amp = themeNow().cheer || 0;
   const w = Math.sin(Math.PI * 2 * (FIN.f * 2.4 - c * .11 - r * .05));
   return Math.max(0, w) * amp;
 }
@@ -801,7 +830,8 @@ function drawStation(E) {
   // The name board, so the place says what it is. Up past the far end of the
   // carriage, where nobody in the line ever stands, and level with the wall
   // top so it clears the HUD on a phone.
-  nameBoard("STATION", OX + SX * .85, z0 - T * .2);
+  // The party hangs its own, lit, in this spot - see partyStation.
+  if (!HARD) nameBoard("STATION", OX + SX * .85, z0 - T * .2);
 }
 
 /** A sign on a post, drawn as a billboard in canvas space the way the sprites
@@ -1159,6 +1189,726 @@ const THEMES = {
   },
 };
 
+/* ===========================  THE PARTY ROOMS  ===========================
+   The game marks 118 of its 600 boards `difficultLevel` 1 or 2, and the HUD
+   already says so twice - a chip in the topbar and a card on the way in. This
+   is the third telling, and the only one the player reads without being asked
+   to: the SAME room, thrown a party. A tint over the whole place, bunting and a
+   lit sign over the far wall, and colour on the ground in front of the door.
+
+   A party is a PATCH on a theme, never a theme of its own. The walls, the grid,
+   the doorway and the queue lane still have to line up to the pixel, so a patch
+   may do exactly three things: repaint the skin, ask for more headroom, and
+   paint over the ground the theme has already laid. It may not move anything.
+
+   ⚠ Where the dressing goes is decided by the phone, not by the room. On a
+   portrait frame `frame()` leaves .04 of the canvas to the left of the walls and
+   nothing at all to the right past the queue - so the sides are the one place a
+   party must NOT be put, and everything that has to be seen goes above the far
+   wall or on the near ground below the door. Side dressing is drawn as well,
+   and is a gift to the desktop frame, which has a quarter of the canvas either
+   side; nothing on a phone depends on it.
+
+   ⚠ Nothing here is a function of time. The game redraws on taps, not on a
+   clock - see tick() in the shell - so a light written as a function of NOW
+   would sit frozen between moves and lurch on the next one. Every beam, spark
+   and scatter below is fixed, and seeded so it is the same fixed thing on every
+   redraw of the same board.                                                   */
+
+let HARD = 0;              // 0 ordinary, 1 hard, 2 super hard - set by the shell
+
+/* One set of party colours for all five rooms, so a marked level reads the same
+   whichever room it lands in. They are deliberately NOT the seat palette: these
+   sit behind and beside the pieces, and a bunting flag in the sky blue of a seat
+   is one more blue for the player to tell apart. */
+const FEST = ["#ff4d84", "#ffc93c", "#4ecbff", "#a879ff", "#5be6a2"];
+
+/** A scatter that comes out the same every frame. `Math.random` in a painter
+    boils the confetti every time the board is redrawn, which is every tap. */
+const seeded = n => () => (n = (n * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
+/** A tint over everything the room has drawn outside itself. It is the cheapest
+    thing here and it does the most work: on a phone most of the dressing is off
+    the sides of the frame, and this is what still says at a glance that this is
+    not the room the last level was played in.
+
+    Strongest at the head and foot of the canvas and weakest across the middle,
+    where the board is. Flat, it dulled the one bright room - a lilac at even
+    strength over the classroom's tan came out the colour of wet cardboard. */
+function partyWash(rgb, edge, mid) {
+  const g = ctx.createLinearGradient(0, 0, 0, cv.height);
+  g.addColorStop(0, "rgba(" + rgb + "," + edge + ")");
+  g.addColorStop(.38, "rgba(" + rgb + "," + mid + ")");
+  g.addColorStop(.62, "rgba(" + rgb + "," + mid + ")");
+  g.addColorStop(1, "rgba(" + rgb + "," + edge + ")");
+  ctx.save(); ctx.fillStyle = g;
+  ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore();
+}
+
+/** A string of flags between two points on the ground, hung at height `y` with
+    a sag. Canvas space, like nameBoard: at this pitch a flag stood up in world
+    units comes out a couple of pixels tall. */
+function bunting(x0, z0, x1, z1, y, n) {
+  const a = P(x0, y, z0), b = P(x1, y, z1), s = LAY.s;
+  const sag = s * .55;
+  const at = t => [a[0] + (b[0] - a[0]) * t,
+                   a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * sag];
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,.45)";
+  ctx.lineWidth = Math.max(1, s * .020);
+  ctx.beginPath();
+  for (let i = 0; i <= 32; i++) {
+    const p = at(i / 32); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+  }
+  ctx.stroke();
+  const w = s * .15, h = s * .26;
+  for (let i = 0; i < n; i++) {
+    const p = at((i + .5) / n);
+    ctx.fillStyle = FEST[i % FEST.length];
+    ctx.beginPath();
+    ctx.moveTo(p[0] - w / 2, p[1]); ctx.lineTo(p[0] + w / 2, p[1]); ctx.lineTo(p[0], p[1] + h);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* Five balloons and their strings, as offsets from the point they are tied to,
+   in units of the cell size: [across, up, radius]. */
+const BUNCH = [[-.30, -1.62, .19], [.04, -1.88, .22], [.36, -1.58, .18],
+               [-.15, -1.28, .16], [.25, -1.25, .15]];
+
+/** A cluster tied off at a point on the ground. Rises up the canvas, so it is
+    only ever tied BEYOND the far wall: from anywhere nearer, the walls are
+    drawn over it a moment later and the strings come out cut. */
+function balloons(wx, wz, k) {
+  const [px, py] = P(wx, 0, wz), s = LAY.s * (k || 1);
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,.30)";
+  ctx.lineWidth = Math.max(1, s * .018);
+  for (const [dx, dy] of BUNCH) {
+    ctx.beginPath(); ctx.moveTo(px, py);
+    ctx.quadraticCurveTo(px + dx * s * .35, py + dy * s * .55, px + dx * s, py + dy * s);
+    ctx.stroke();
+  }
+  BUNCH.forEach(([dx, dy, r], i) => {
+    ctx.fillStyle = FEST[i % FEST.length];
+    ctx.beginPath();
+    ctx.ellipse(px + dx * s, py + dy * s, r * s, r * s * 1.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.34)";   // the highlight is what makes it round
+    ctx.beginPath();
+    ctx.ellipse(px + (dx - r * .34) * s, py + (dy - r * .46) * s,
+                r * s * .26, r * s * .32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+/** Paper on the floor, over a box of ground. Kept OUTSIDE the room in every
+    theme: on the tiles it would be one more thing on the surface the player is
+    reading seats off.
+
+    ⚠ `litter`, not `confetti`. The shell has a confetti() of its own for the
+    results card and is concatenated AFTER the engine, so a function of that
+    name here is hoisted over by the shell's and this painter draws nothing at
+    all - silently, since both are perfectly good functions.  Every name in this
+    file is shared with the shell; check one before adding it. */
+function litter(x0, z0, x1, z1, y, n, seed) {
+  const rnd = seeded(seed), s = LAY.s;
+  ctx.save(); ctx.globalAlpha = .8;
+  for (let i = 0; i < n; i++) {
+    const [px, py] = P(x0 + rnd() * (x1 - x0), y, z0 + rnd() * (z1 - z0));
+    ctx.save(); ctx.translate(px, py); ctx.rotate(rnd() * Math.PI);
+    ctx.fillStyle = FEST[i % FEST.length];
+    ctx.fillRect(-s * .11, -s * .042, s * .22, s * .085);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/** A coloured wash on the ground, the way finConcert lights the stage. */
+function lightPool(wx, wz, rgb, r, a) {
+  const [px, py] = P(wx, .02, wz), R = LAY.s * r;
+  ctx.save(); ctx.translate(px, py); ctx.scale(1, .42);
+  const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+  gr.addColorStop(0, "rgba(" + rgb + "," + a + ")");
+  gr.addColorStop(1, "rgba(" + rgb + ",0)");
+  ctx.fillStyle = gr;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/** A shaft of light standing up from a point, tilted off vertical, widening and
+    fading as it goes. Run off the top of the canvas rather than to a fixed
+    length: it is meant to leave the frame, and a beam that stops has a lamp at
+    the wrong end.
+
+    Drawn as strips with the alpha falling off across them, not as one wedge: a
+    single filled triangle has two hard edges down the sides, and light has none
+    - as one shape it read as a plank of wood leaning against the screen. */
+function beam(wx, wz, tilt, rgb, a) {
+  const [px, py] = P(wx, 0, wz), s = LAY.s;
+  const len = cv.height * 1.15, N = 9;
+  const tx = px + Math.sin(tilt) * len, ty = py - Math.cos(tilt) * len;
+  const nx = Math.cos(tilt), ny = Math.sin(tilt);
+  const w0 = s * .20, w1 = s * 1.9;
+  ctx.save();
+  for (let i = 0; i < N; i++) {
+    const u0 = i / N - .5, u1 = (i + 1) / N - .5;
+    const k = Math.max(0, 1 - Math.abs(u0 + u1));      // brightest down the middle
+    const gr = ctx.createLinearGradient(px, py, tx, ty);
+    gr.addColorStop(0, "rgba(" + rgb + "," + (a * k) + ")");
+    gr.addColorStop(1, "rgba(" + rgb + ",0)");
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(px + nx * u0 * w0, py + ny * u0 * w0);
+    ctx.lineTo(px + nx * u1 * w0, py + ny * u1 * w0);
+    ctx.lineTo(tx + nx * u1 * w1, ty + ny * u1 * w1);
+    ctx.lineTo(tx + nx * u0 * w1, ty + ny * u0 * w1);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** A burst hung in the sky above a point. Still: see the warning at the top.
+
+    ⚠ `lift` is in cell sizes, and a cell is bigger on a narrow board than on a
+    wide one - so the same lift that cleared the topbar on a 7-wide board was
+    drawn straight through the clock on a 4-wide one. Held below the head of the
+    canvas whatever the arithmetic asks for. */
+function firework(wx, wz, lift, col, n, seed) {
+  const [px, py0] = P(wx, 0, wz), s = LAY.s;
+  const R = s * .85, rnd = seeded(seed);
+  const py = Math.max(py0 - s * lift, cv.height * .085 + R);
+  ctx.save();
+  const gl = ctx.createRadialGradient(px, py, 0, px, py, R * 1.25);
+  gl.addColorStop(0, "rgba(255,255,255,.14)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(px, py, R * 1.25, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineCap = "round";
+  ctx.lineWidth = Math.max(1, s * .022);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 + rnd() * .25, r = R * (.6 + rnd() * .4);
+    const ex = px + Math.cos(a) * r, ey = py + Math.sin(a) * r * .82;
+    ctx.globalAlpha = .45 + rnd() * .5;
+    ctx.beginPath();
+    ctx.moveTo(px + Math.cos(a) * r * .3, py + Math.sin(a) * r * .25);
+    ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(ex, ey, Math.max(1, s * .025), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Gold posts with a rope slung between them, along a line on the ground. */
+function velvetRope(x0, z0, x1, z1, n) {
+  const s = LAY.s, tops = [];
+  ctx.save();
+  ctx.lineCap = "round";
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const [px, py] = P(x0 + (x1 - x0) * t, 0, z0 + (z1 - z0) * t);
+    const ty = py - s * .40;
+    tops.push([px, ty]);
+    ctx.strokeStyle = "#d8b45a"; ctx.lineWidth = Math.max(2, s * .045);
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, ty); ctx.stroke();
+    ctx.fillStyle = "#f2d78d";
+    ctx.beginPath(); ctx.arc(px, ty - s * .04, Math.max(1.5, s * .055), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = "#8e1f2e"; ctx.lineWidth = Math.max(2, s * .05);
+  for (let i = 0; i < n; i++) {
+    const a = tops[i], b = tops[i + 1];
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    ctx.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + s * .24, b[0], b[1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A rounded rectangle as a path, and the points to hang lamps on round it:
+    evenly along the four straight runs, plus one on the outside of each corner.
+    Returned rather than drawn, so the frame and its lamps are laid out once and
+    used twice. */
+function roundRect(l, t, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(l + r, t);
+  ctx.arcTo(l + w, t, l + w, t + h, r);
+  ctx.arcTo(l + w, t + h, l, t + h, r);
+  ctx.arcTo(l, t + h, l, t, r);
+  ctx.arcTo(l, t, l + w, t, r);
+  ctx.closePath();
+}
+function ringPoints(l, t, w, h, r, gap) {
+  const out = [];
+  const runs = [[l + r, t, l + w - r, t], [l + w, t + r, l + w, t + h - r],
+                [l + w - r, t + h, l + r, t + h], [l, t + h - r, l, t + r]];
+  for (const [x0, y0, x1, y1] of runs) {
+    const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / gap));
+    for (let i = 0; i < n; i++) {
+      const u = (i + .5) / n;
+      out.push([x0 + (x1 - x0) * u, y0 + (y1 - y0) * u]);
+    }
+  }
+  const k = r * .7071;
+  out.push([l + r - k, t + r - k], [l + w - r + k, t + r - k],
+           [l + w - r + k, t + h - r + k], [l + r - k, t + h - r + k]);
+  return out;
+}
+
+/** The lit sign. `nameBoard` is the quiet version of this - a board on a post
+    saying where you are; this one is the same idea dressed for the occasion,
+    and it is what makes a marked level read as one from the first frame.
+
+    A gilt frame with a lamp run all the way round it, a dark panel inside with
+    a hairline inset, a crest on top and gold lettering. Every piece of it is
+    struck off `size`, so the whole thing scales as one object between a phone
+    and a desktop rather than coming apart at one of them.
+
+    `lift` is how far above its ground point the board hangs, in cell sizes, and
+    `post` draws the pole under it. Fitted to the canvas rather than set at a
+    fixed size: SUPER BIG EVENT is half again as wide as BIG EVENT and would
+    otherwise run off both sides of a phone. */
+function marquee(text, wx, wz, lift, post) {
+  const [px, py] = P(wx, 0, wz), s = LAY.s;
+  const font = n => '800 ' + n + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+  let size = Math.max(11, s * .34);
+  ctx.save();
+  ctx.font = font(size);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const pad = 1.9;
+  let w = ctx.measureText(text).width + size * pad;
+  const cap = cv.width * .56;
+  if (w > cap) { size *= cap / w; ctx.font = font(size); w = ctx.measureText(text).width + size * pad; }
+
+  const h = size * 2.0, fr = size * .17;        // panel height, frame thickness
+  const crest = size * .62;
+  /* ⚠ Held below the head of the canvas, and inside its sides. The topbar sits
+     across the head of the frame whatever headroom the theme asks for; and the
+     station and the stadium post their sign out on the platform, a hand's width
+     from the right edge, so a board centred on that post runs off the canvas
+     the moment the wording is longer than one short word. The board moves; the
+     post stays where it stands and meets it wherever it now lands. */
+  const cy = Math.max(py - s * lift, cv.height * .075 + h / 2 + fr + crest * 1.8);
+  const m = cv.width * .012;
+  const bx = Math.min(Math.max(px, w / 2 + fr + m), cv.width - w / 2 - fr - m);
+  const L = bx - w / 2, T = cy - h / 2, r = size * .34;
+  const FL = L - fr, FT = T - fr, FW = w + fr * 2, FH = h + fr * 2, FR = r + fr;
+
+  /* The light it throws on whatever is behind it. ⚠ The box has to be at least
+     as big as the gradient's own radius: filled to the frame's height instead,
+     the wash was still at seven-tenths where the box stopped and left two hard
+     edges ruled across the wall. */
+  const GR = FW * .85;
+  const gl = ctx.createRadialGradient(bx, cy, h * .25, bx, cy, GR);
+  gl.addColorStop(0, "rgba(255,196,120,.26)"); gl.addColorStop(1, "rgba(255,196,120,0)");
+  ctx.fillStyle = gl; ctx.fillRect(bx - GR, cy - GR, GR * 2, GR * 2);
+
+  if (post) {
+    shadow(wx, wz, .16);
+    const stem = Math.min(Math.max(px, L + r), L + w - r);
+    ctx.strokeStyle = "#3b3340"; ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(2, s * .06);
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(stem, cy + h * .4); ctx.stroke();
+  }
+
+  // the finial, drawn under the frame so the frame's edge finishes its foot
+  const cg = ctx.createLinearGradient(0, FT - crest * 1.5, 0, FT);
+  cg.addColorStop(0, "#fff4cf"); cg.addColorStop(.55, "#e0ae4c"); cg.addColorStop(1, "#a8761f");
+  ctx.fillStyle = cg;
+  ctx.beginPath();                       // a lozenge standing on the frame
+  ctx.moveTo(bx, FT - crest * 1.30);
+  ctx.lineTo(bx + crest * .52, FT - crest * .55);
+  ctx.lineTo(bx, FT + crest * .10);
+  ctx.lineTo(bx - crest * .52, FT - crest * .55);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();                       // and the ball on top of it
+  ctx.arc(bx, FT - crest * 1.52, crest * .26, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.45)";
+  ctx.beginPath();
+  ctx.arc(bx - crest * .09, FT - crest * 1.60, crest * .09, 0, Math.PI * 2); ctx.fill();
+
+  // it sits off whatever is behind it
+  ctx.save();
+  ctx.globalAlpha = .30; ctx.fillStyle = "#140a18";
+  roundRect(FL + fr * .5, FT + fr * .9, FW, FH, FR); ctx.fill();
+  ctx.restore();
+
+  // the gilt frame: a metal gradient, not one flat gold
+  const fg = ctx.createLinearGradient(0, FT, 0, FT + FH);
+  fg.addColorStop(0, "#fff2c4"); fg.addColorStop(.34, "#dcae45");
+  fg.addColorStop(.62, "#b8842a"); fg.addColorStop(1, "#f7dc9d");
+  roundRect(FL, FT, FW, FH, FR); ctx.fillStyle = fg; ctx.fill();
+
+  // the panel inside it
+  const pg = ctx.createLinearGradient(0, T, 0, T + h);
+  pg.addColorStop(0, "#3d2144"); pg.addColorStop(1, "#170b1c");
+  roundRect(L, T, w, h, r); ctx.fillStyle = pg; ctx.fill();
+  const ins = size * .20;
+  roundRect(L + ins, T + ins, w - ins * 2, h - ins * 2, Math.max(1, r - ins));
+  ctx.strokeStyle = "rgba(240,208,132,.55)";
+  ctx.lineWidth = Math.max(1, size * .05); ctx.stroke();
+
+  // the lamps, all the way round the frame
+  const rr = Math.max(1.3, size * .105);
+  const lamps = ringPoints(FL + fr * .5, FT + fr * .5, FW - fr, FH - fr, FR - fr * .5,
+                           Math.max(size * .52, rr * 4));
+  for (let i = 0; i < lamps.length; i++) {
+    const [lx, ly] = lamps[i];
+    const hg = ctx.createRadialGradient(lx, ly, 0, lx, ly, rr * 3.2);
+    hg.addColorStop(0, "rgba(255,222,152,.55)"); hg.addColorStop(1, "rgba(255,222,152,0)");
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(lx, ly, rr * 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = i % 2 ? "#fff6dc" : "#ffcd79";
+    ctx.beginPath(); ctx.arc(lx, ly, rr, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // the lettering: gold, cut out of the panel by a dark stroke behind it
+  const ty = cy + size * .05;
+  const tg = ctx.createLinearGradient(0, ty - size * .6, 0, ty + size * .6);
+  tg.addColorStop(0, "#fff8e2"); tg.addColorStop(.52, "#ffdc95"); tg.addColorStop(1, "#dda13a");
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(26,10,30,.75)";
+  ctx.lineWidth = Math.max(2, size * .10);
+  ctx.strokeText(text, bx, ty);
+  ctx.fillStyle = tg; ctx.fillText(text, bx, ty);
+  ctx.restore();
+}
+
+/** What the sign says. The two grades read as an escalation of one thing rather
+    than as two unrelated words, the way the topbar's own chip does - Hard, then
+    Super. */
+const partyWord = () => HARD > 1 ? "SUPER BIG EVENT" : "BIG EVENT";
+
+/* ---- the five parties -------------------------------------------------
+   Each one paints over the ground its own theme has just laid. `nz` below is
+   the near ground, the strip between the front wall and the foot of the canvas:
+   with the sides gone on a phone, it and the band beyond the far wall are the
+   whole of the room a party has to work with.                                 */
+
+/** Platform party. Bunting over the line at the far end, the near track lit and
+    littered, and the station's own name board swapped for a lit one. */
+function partyStation(E) {
+  const { x0, x1, z0, z1, T, OX, gx0, gx1, gz0, gz1 } = E;
+  const big = HARD > 1;
+  partyWash("96,44,150", .38, .22);
+  bunting(x0 - T, z0 - T * 2.5, x1 + T, z0 - T * 2.5, 1.5, 9);
+  if (big) bunting(x0 - T * .3, z0 - T * 4.2, x1 + T * .3, z0 - T * 4.2, 2.0, 7);
+  balloons(x0 - T * .5, z0 - T * 1.4, .82);
+  balloons(x1 + T * .5, z0 - T * 1.4, .82);
+
+  const nz = z1 + T * 1.15;
+  lightPool(x0 + SX * 1.1, nz + SZ * .35, "255,77,132", 2.3, big ? .40 : .32);
+  lightPool(x1 - SX * 1.1, nz + SZ * .55, "78,203,255", 2.3, big ? .36 : .28);
+  litter(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.024, big ? 70 : 48, 7);
+  litter(gx0, gz0, x0 - T, gz1, -.024, 40, 11);          // the far track, for a wide frame
+
+  const p0 = OX + SX * 1.25;                                // the platform, likewise
+  lightPool(p0 + SX * .8, (gz0 + gz1) / 2, "255,201,60", 2.8, .30);
+  litter(p0, z0 - T * 2, gx1, z1 + T * 2, -.024, 55, 13);
+  marquee(partyWord(), OX + SX * .85, z0 - T * .2, 1.45, 1);
+}
+
+/** Premiere night. The carpet is laid on the near ground, across the way in,
+    with a rope down both sides of it, and searchlights rake the sky over the
+    sheet. */
+function partyCinema(E) {
+  const { x0, x1, z0, z1, T, OX, gx0, gx1, gz0, gz1 } = E;
+  const big = HARD > 1;
+  partyWash("150,26,52", .34, .14);
+  const sz0 = z0 - T * .95 - SZ * 2.15;   // the screen's far edge, as drawCinema placed it
+  beam(x0 - SX * .6, sz0 - SZ * .4, -.30, "255,236,200", .26);
+  beam(x1 + SX * .6, sz0 - SZ * .4, .30, "255,236,200", .26);
+  if (big) beam((x0 + x1) / 2, sz0 - SZ * .8, .01, "255,236,200", .20);
+  marquee(partyWord(), (x0 + x1) / 2, sz0, 1.05, 0);
+
+  const nz = z1 + T * 1.35;
+  slab(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.026, "#7e1c28");
+  slab(x0 - T, nz, x1 + T, nz + SZ * .12, -.025, "#d8b45a");
+  slab(x0 - T, nz + SZ * 1.88, x1 + T, nz + SZ * 2.0, -.025, "#d8b45a");
+  litter(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.024, big ? 50 : 34, 3);
+  lightPool(x0 + SX * 1.2, nz + SZ * .55, "255,214,150", 2.0, .30);
+  lightPool(x1 - SX * 1.2, nz + SZ * .55, "255,214,150", 2.0, .30);
+  velvetRope(x0 - T, nz + SZ * .30, x1 + T, nz + SZ * .30, 5);
+
+  const c0 = OX + SX * 2.20;                                // for a wide frame
+  slab(c0, gz0, gx1, gz1, -.044, "#5e161f");
+  slab(c0, gz0, c0 + SX * .12, gz1, -.043, "#d8b45a");
+  litter(c0, gz0, gx1, gz1, -.040, 55, 23);
+}
+
+/** Cup final. Fireworks over the pitch, the near concourse lit and littered,
+    and the sign up where a scoreboard would stand. */
+function partyStadium(E) {
+  const { x0, x1, z0, z1, T, OX, gx0, gx1, gz0, gz1 } = E;
+  const big = HARD > 1;
+  partyWash("40,30,90", .34, .16);
+  const tz0 = z0 - T * .6 - SZ * .75;     // the near touchline, as drawStadium placed it
+  /* None of them goes above lift 1.5. The topbar sits across the head of the
+     canvas whatever headroom the theme asks for, and a burst any higher was
+     drawn through the clock. */
+  firework(x0 - SX * .4, tz0 - SZ * .5, .95, "#ff4d84", 13, 5);
+  firework((x0 + x1) / 2 + SX * .6, tz0 - SZ * 1.1, 1.50, "#ffc93c", 15, 9);
+  firework(x1 + SX * .4, tz0 - SZ * .5, .90, "#4ecbff", 12, 3);
+  if (big) {
+    firework(x0 + SX * 1.5, tz0 - SZ * 1.2, 1.45, "#a879ff", 12, 21);
+    firework(x1 - SX * 1.5, tz0 - SZ * 1.3, 1.50, "#5be6a2", 12, 33);
+  }
+  bunting(x0 - T, z0 - T * 1.9, x1 + T, z0 - T * 1.9, 1.1, 9);
+
+  const nz = z1 + T * 1.15;
+  lightPool(x0 + SX * 1.1, nz + SZ * .35, "255,201,60", 2.3, .32);
+  lightPool(x1 - SX * 1.1, nz + SZ * .55, "255,77,132", 2.3, .32);
+  litter(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.024, big ? 75 : 52, 13);
+
+  const p0 = OX + SX * 2.20;                                // for a wide frame
+  lightPool(p0 + SX * 1.0, (gz0 + gz1) / 2, "78,203,255", 2.8, .26);
+  litter(p0, gz0, gx1, gz1, -.024, 55, 27);
+  marquee(partyWord(), OX + SX * .85, z0 - T * .4, 1.45, 1);
+}
+
+/** Festival night. A wall of colour behind the stage, beams off the truss, and
+    the pit lit and littered. */
+function partyConcert(E) {
+  const { x0, x1, z0, z1, T, OX, gx0, gx1, gz0, gz1 } = E;
+  const big = HARD > 1;
+  partyWash("120,40,190", .30, .14);
+  const sz1 = z0 - T * .9, sz0 = sz1 - SZ * 2.4;   // the stage, as drawConcert placed it
+  const sx0 = x0 - SX * .8, sx1 = x1 + SX * .8;
+  const mid = (x0 + x1) / 2;
+  /* The wall behind the act. Eleven narrow panels at half strength, not seven
+     saturated ones: at full colour and full width it was the brightest thing on
+     the screen by a distance, and the eye went to it rather than to the board.
+
+     ⚠ Canvas space, unlike everything else the stage is built from. A cell is
+     bigger on a tall narrow board than on a wide one, so a wall placed the way
+     the stage is - so many cells beyond it - was behind the clock on a 4-wide
+     board and halfway down the screen on a 7-wide one. Here it hangs a fixed
+     distance behind the stage front and stops short of the topbar, and each
+     panel fades out upwards so that stopping short does not read as a cut. */
+  const wa = P(sx0, 0, sz0 - SZ * .15), wb = P(sx1, 0, sz0 - SZ * .15);
+  const yB = wa[1], yT = Math.max(cv.height * .085, yB - LAY.s * 1.05);
+  const wallL = Math.min(wa[0], wb[0]), wallR = Math.max(wa[0], wb[0]);
+  ctx.save();
+  for (let i = 0; i < 11; i++) {
+    const x = wallL + (wallR - wallL) * i / 11, w = (wallR - wallL) * .78 / 11;
+    const gr = ctx.createLinearGradient(0, yT, 0, yB);
+    gr.addColorStop(0, "rgba(255,255,255,0)");
+    gr.addColorStop(1, FEST[i % FEST.length]);
+    ctx.globalAlpha = .55; ctx.fillStyle = gr;
+    ctx.fillRect(x, yT, w, yB - yT);
+  }
+  ctx.restore();
+  beam(mid - SX * 1.9, sz1 - SZ * .3, -.40, "255,77,132", .30);
+  beam(mid, sz1 - SZ * .3, .02, "78,203,255", .26);
+  beam(mid + SX * 1.9, sz1 - SZ * .3, .40, "255,201,60", .30);
+  if (big) {
+    beam(mid - SX * 3.6, sz1 - SZ * .3, -.66, "168,121,255", .26);
+    beam(mid + SX * 3.6, sz1 - SZ * .3, .66, "91,230,162", .26);
+  }
+  litter(sx0, sz1, sx1, sz1 + SZ * 1.2, -.022, big ? 55 : 38, 5);
+  marquee(partyWord(), mid, sz0 - SZ * .15, 1.35, 0);
+
+  const nz = z1 + T * 1.15;
+  lightPool(x0 + SX * 1.1, nz + SZ * .35, "168,121,255", 2.3, .34);
+  lightPool(x1 - SX * 1.1, nz + SZ * .55, "78,203,255", 2.3, .34);
+  litter(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.024, big ? 70 : 48, 17);
+
+  const p0 = OX + SX * 2.20;                                // for a wide frame
+  lightPool(p0 + SX * 1.0, (gz0 + gz1) / 2, "255,77,132", 2.8, .28);
+  litter(p0, gz0, gx1, gz1, -.028, 55, 29);
+}
+
+/** End of term. The one bright room, so the party is paper rather than light: a
+    banner over the board, balloons at both ends of it, and the sign across the
+    front of the class. */
+function partyClassroom(E) {
+  const { x0, x1, z0, z1, T, OX, gx0, gx1, gz0, gz1 } = E;
+  const big = HARD > 1;
+  partyWash("255,110,185", .30, .10);
+  const bz1 = z0 - T * .95, bz0 = bz1 - SZ * 1.5;   // the board, as drawClassroom placed it
+  bunting(x0 - SX * .8, bz0 - SZ * .1, x1 + SX * .8, bz0 - SZ * .1, .95, 10);
+  if (big) bunting(x0 - SX * .3, bz0 - SZ * 1.3, x1 + SX * .3, bz0 - SZ * 1.3, 1.6, 8);
+  balloons(x0 - SX * .55, bz1, .85);
+  balloons(x1 + SX * .55, bz1, .85);
+  marquee(partyWord(), (x0 + x1) / 2, bz0 - SZ * .1, 1.55, 0);
+
+  const nz = z1 + T * 1.15;
+  lightPool(x0 + SX * 1.1, nz + SZ * .35, "255,127,176", 2.3, .30);
+  lightPool(x1 - SX * 1.1, nz + SZ * .55, "255,201,60", 2.3, .26);
+  litter(x0 - T, nz, x1 + T, nz + SZ * 2.0, -.024, big ? 75 : 52, 17);
+  litter(gx0, gz0, x0 - T, gz1, -.044, 40, 23);           // for a wide frame
+
+  const p0 = OX + SX * 2.20;                                // for a wide frame
+  lightPool(p0 + SX * 1.2, (gz0 + gz1) / 2, "168,121,255", 2.8, .24);
+  litter(p0, gz0, gx1, gz1, -.026, 55, 31);
+}
+
+/* ---- the room itself, dressed -----------------------------------------
+   The five painters above all work OUTSIDE the walls, and on a phone that is
+   where most of the frame is. This is the other half: the board, which is the
+   part the player is actually looking at. A wash of light on the floor, a run
+   of bulbs round the wall top with a bracket at each corner, and a pool of
+   light under every seat.
+
+   One set for all five rooms, and one gold, because what it is saying is not
+   "this is a station" but "this one is an occasion" - and that does not change
+   with the room.
+
+   ⚠ Nothing here may touch a seat's colour or lift a tile's contrast: the
+   colours ARE the puzzle, and a decoration that makes two of them harder to
+   tell apart has cost the player the level. So what is left inside the walls is
+   light and nothing else - warm, low, and the same under every seat. Anything
+   with an edge to it belongs on the wall top or beyond it, where the grid is
+   not. */
+const EVENT_GOLD = "#e3bd68";
+
+/** The floor of a Big Event room: a wash that lifts the middle and lets the
+    corners go. Drawn straight after the tiles, so the seats and everybody
+    walking are still to come over the top.
+
+    ⚠ Light only. A gilt border inlaid round the floor was tried here and taken
+    out again: it is a line drawn ACROSS the grid the player is reading, it runs
+    behind the seats rather than round them, and on a full board it is one more
+    edge competing with the only edges that matter. */
+function eventFloor(E) {
+  const { x0, x1, z0, z1 } = E;
+  const c = slabPath(x0, z0, x1, z1, .009);
+  const L = Math.min(...c.map(p => p[0])), R = Math.max(...c.map(p => p[0]));
+  const T = Math.min(...c.map(p => p[1])), B = Math.max(...c.map(p => p[1]));
+  const W = R - L, H = B - T;
+  ctx.save(); ctx.clip();
+  const g = ctx.createRadialGradient(L + W / 2, T + H / 2, Math.min(W, H) * .12,
+                                     L + W / 2, T + H / 2, Math.max(W, H) * .62);
+  g.addColorStop(0, "rgba(255,226,172,.11)");
+  g.addColorStop(.6, "rgba(255,226,172,.02)");
+  g.addColorStop(1, "rgba(28,14,44,.18)");
+  ctx.fillStyle = g; ctx.fillRect(L, T, W, H);
+  ctx.restore();
+}
+
+/** The wall top of a Big Event room: lamps all the way round it and a bracket
+    at each corner. Drawn last, over the doorway cut, so the run reads as one
+    continuous thing rather than as a band the door has been punched through.
+
+    ⚠ The doorway keeps its gap. A lamp standing in the way in is the one place
+    on this wall where a decoration would sit on top of the thing the player is
+    reading - the head of the queue, coming through. */
+function eventWalls(E) {
+  const { x0, x1, z0, z1, T, H, dz0, dz1 } = E;
+  const a = x0 - T + .09, b = x1 + T - .09;
+  const c = z0 - T + .09, d = z1 + T - .09;
+  const step = SX * .62;
+
+  const arm = SX * .90, th = .16;
+  const bracket = (cx, cz, dx, dz) => {
+    slab(Math.min(cx, cx + dx * arm), Math.min(cz, cz + dz * th),
+         Math.max(cx, cx + dx * arm), Math.max(cz, cz + dz * th), H + .005, EVENT_GOLD);
+    slab(Math.min(cx, cx + dx * th), Math.min(cz, cz + dz * arm),
+         Math.max(cx, cx + dx * th), Math.max(cz, cz + dz * arm), H + .005, EVENT_GOLD);
+  };
+  ctx.save(); ctx.globalAlpha = .85;
+  bracket(x0 - T, z0 - T, 1, 1);   bracket(x1 + T, z0 - T, -1, 1);
+  bracket(x0 - T, z1 + T, 1, -1);  bracket(x1 + T, z1 + T, -1, -1);
+  ctx.restore();
+
+  const at = [];
+  for (let x = a; x <= b + 1e-6; x += step) { at.push([x, c]); at.push([x, d]); }
+  for (let z = c + step; z < d - step * .5; z += step) {
+    at.push([a, z]);
+    if (z < dz0 - .25 || z > dz1 + .25) at.push([b, z]);
+  }
+  const r = Math.max(1.2, LAY.s * .050);
+  ctx.save();
+  for (let i = 0; i < at.length; i++) {
+    const [px, py] = P(at[i][0], H + .007, at[i][1]);
+    const gl = ctx.createRadialGradient(px, py, 0, px, py, r * 3.4);
+    gl.addColorStop(0, "rgba(255,212,136,.40)"); gl.addColorStop(1, "rgba(255,212,136,0)");
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(px, py, r * 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = i % 2 ? "#fff5d6" : "#ffcd79";
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The pool of light a seat stands in on a Big Event level. Sized off the seat
+    itself so a three-cell bench gets a three-cell pool, and measured on the
+    canvas rather than guessed at: the two ground axes do not come out the same
+    length on screen under this camera. */
+function seatSheen(b, wx, wz, alpha) {
+  const along = b.len * .52 + .18, across = .52;
+  const hx = (b.dir & 1 ? across : along) * SX;
+  const hz = (b.dir & 1 ? along : across) * SZ;
+  const [px, py] = P(wx, 0, wz);
+  const rx = Math.abs(P(wx + hx, 0, wz)[0] - px);
+  const rz = Math.abs(P(wx, 0, wz + hz)[1] - py);
+  if (rx < 1 || rz < 1) return;
+  ctx.save();
+  ctx.globalAlpha = (alpha == null ? 1 : alpha) * .9;
+  ctx.translate(px, py); ctx.scale(1, rz / rx);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+  g.addColorStop(0, "rgba(255,231,182,.20)");
+  g.addColorStop(.55, "rgba(255,231,182,.09)");
+  g.addColorStop(1, "rgba(255,231,182,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* head / page / cheer, where the party wants them different, and a skin patch
+   laid over the room's own. Only the keys that change are listed: everything
+   else is the theme underneath, which is the point - it is the same room. */
+const PARTY = {
+  station: {
+    head: .15, page: "#3b2452", paint: partyStation,
+    skin: { wall: "#7b3ba8", top: "#9a5fd0", lip: "#4d2470", trim: "#ffc93c",
+            fa: "#efe7f4", fb: "#ded3e8", grout: "#c3b3d0", door: "#ffd75a" },
+  },
+  cinema: {
+    head: .30, page: "#1c0d12", paint: partyCinema, cheer: .10,
+    skin: { wall: "#4a2030", top: "#5d2a3c", lip: "#2c1220", trim: "#d8b45a",
+            fa: "#4d1c22", fb: "#441a1f", grout: "#2c1216", door: "#d8b45a" },
+  },
+  stadium: {
+    head: .26, page: "#191d2b", paint: partyStadium,
+    skin: { wall: "#7e8aa0", top: "#98a4bc", lip: "#5c6474", trim: "#ffc93c",
+            fa: "#b6bccb", fb: "#a6adbd", grout: "#666d7c", door: "#ffc93c" },
+  },
+  concert: {
+    head: .28, page: "#120b1c", paint: partyConcert,
+    skin: { wall: "#3a2450", top: "#4e3268", lip: "#241533", trim: "#ff4d84",
+            fa: "#4a3358", fb: "#3f2b4b", grout: "#2a1c38", door: "#ff4d84" },
+  },
+  classroom: {
+    head: .25, page: "#ddc9e2", paint: partyClassroom, cheer: .16,
+    skin: { wall: "#e7d6ea", top: "#f6ecf7", lip: "#c1a4c8", trim: "#ff7fb0",
+            fa: "#f3ead9", fb: "#e7dccb", grout: "#c0b09c", door: "#ff9ec4" },
+  },
+};
+
+/** The theme as it is actually being played: the room's own entry, with the
+    party laid over it when the board is a marked one. Everything that reads a
+    theme goes through this rather than through THEMES, so a party never has to
+    be remembered at the call site. The merge is worked out once per room. */
+function themeNow() {
+  const base = THEMES[THEME] || THEMES.station;
+  const p = HARD ? PARTY[THEME] : null;
+  if (!p) return base;
+  return p.on || (p.on = Object.assign({}, base, {
+    head: p.head == null ? base.head : p.head,
+    page: p.page || base.page,
+    cheer: p.cheer == null ? base.cheer : p.cheer,
+    // A painted plate is the ordinary platform and nothing else. A party
+    // repaints the ground, so it has to draw its own room out there.
+    plate: false,
+    skin: Object.assign({}, base.skin, p.skin),
+    party: p.paint,
+    // the same two for every room - see the dressing block above
+    dressFloor: eventFloor,
+    dressWalls: eventWalls,
+  }));
+}
+
 function drawRoom(g) {
   // A painted plate replaces the ground OUTSIDE the room. The walls, the floor
   // and the doorway stay drawn: they have to line up with the grid to the pixel,
@@ -1174,7 +1924,7 @@ function drawRoom(g) {
   // ---- outside the room ----
   const gx0 = x0 - T - SX * 9, gx1 = x1 + T + SX * 9;
   const gz0 = z0 - T - SZ * 9, gz1 = z1 + T + SZ * 9;
-  const TH = THEMES[THEME] || THEMES.station;
+  const TH = themeNow();
   const f = FIN ? FIN.f : null;
   const E = { g, x0, x1, z0, z1, T, H, OX, dz0, dz1, gx0, gx1, gz0, gz1, SKIN: TH.skin };
   ROOME = E;
@@ -1184,6 +1934,7 @@ function drawRoom(g) {
   // A painted plate stands in for the station ground and nothing else: the other
   // themes draw a whole building out there, which no ground tile can replace.
   if (!(painted && TH.plate)) TH.outside(E);
+  if (TH.party) TH.party(E);          // the hard-level dressing, see PARTY
   if (f != null && TH.finale) TH.finale(E, f, "back");
   SHIFT = moved;
 
@@ -1217,6 +1968,7 @@ function drawRoom(g) {
     if (g.hole[idx(g, c, r)]) continue;
     quad(tileQuad(c, r, .006), (r + c) % 2 ? SKIN.fa : SKIN.fb);
   }
+  if (TH.dressFloor) TH.dressFloor(E);
   // the inner faces of the walls, seen almost edge-on: a dark lip is what sells them
   const L = .17;
   slab(x0 - L, z0 - L, x1 + L, z0, .0, SKIN.lip);
@@ -1231,6 +1983,7 @@ function drawRoom(g) {
   // three of them stacked up into bars across the way in.
   slab(x1 - .02, dz0, OX + .02, dz1, H + .004, SKIN.door);
 
+  if (TH.dressWalls) TH.dressWalls(E);
   if (f != null && TH.finale) TH.finale(E, f, "room");
 }
 
@@ -1241,7 +1994,7 @@ function draw() {
   fitCanvas(g);
   LAY = layout();
   if (!ready) return;
-  const TH = THEMES[THEME] || THEMES.station;
+  const TH = themeNow();
   if (FIN) FIN.f = Math.min(1, (performance.now() - FIN.t0) / FIN.ms);
   SHIFT = FIN && RICH && TH.shift ? TH.shift(FIN.f) : [0, 0];
   if (RICH) { ctx.fillStyle = ROOM.ground; ctx.fillRect(0, 0, cv.width, cv.height); }
@@ -1273,10 +2026,10 @@ function draw() {
   quad(dq, "#7fd2f2");
   }
 
-  const region = reachRegion(g);
+  const region = reachRegion(g, 0);
   const nextCol = g.queue.length ? g.queue[0] : -1;
   const doorBlocked = !isFree(g, g.W - 1, g.door);
-  g.nextSeat = g.queue.length ? pickSeat(g, g.queue[0]) : null;
+  g.nextSeat = (nextUp(g) || {}).spot || null;
 
   // Lighting up every legal destination floods the board, so the only thing that
   // marks a picked-up seat is a glow on its own tile.
@@ -1332,30 +2085,36 @@ function draw() {
     });
   }
 
-  // the stop
-  const laneX = cellW(g.W - 1) + SX * 2.0, qnow = performance.now();
-  for (let i = 0; i < Math.min(g.queue.length, 7); i++) {
-    const st = g.qstep && g.qstep[i];
-    const back = st ? placesBack(st, qnow) : 0;       // places still to walk
-    // Waiting your turn is not walking: until t0 comes round you are carrying the
-    // whole place and standing still, and drawing that as a walk frame turns the
-    // back half of the line to face away for as long as anyone is boarding.
-    const walking = back > 1e-3 && qnow >= st.t0;
-    const pos = i + back, wz = cellZ(g.door) + pos * QUEUE_PITCH;
-    const nm = SPRITE[colName(g.queue[i])] || "grey";
-    // Faded by where they stand rather than by which place they hold, so someone
-    // coming forward brightens as they arrive instead of on the frame they shift.
-    const a = Math.max(.4, 1 - pos * .11);
-    push(laneX, wz, () => {
-      shadow(laneX, wz, .3);
-      if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
-      // Stepping up: away from the camera, and the legs cycle on the distance
-      // covered, the same way they do for someone out on the floor.
-      ctx.globalAlpha = a;
-      blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
-               laneX, 0, wz);
-      ctx.globalAlpha = 1;
-    });
+  // the stop, one line per door
+  const qnow = performance.now();
+  for (let dk = 0; dk < (g.doors ? g.doors.length : 1); dk++) {
+    const q = queueOf(g, dk);
+    const [laneX, laneZ] = stopAt(g, dk);
+    for (let i = 0; i < Math.min(q.length, 7); i++) {
+      // Only the near line animates its shuffle: qstep belongs to it, and the far
+      // one has nobody in front of it to close up behind.
+      const st = dk === 0 && g.qstep && g.qstep[i];
+      const back = st ? placesBack(st, qnow) : 0;       // places still to walk
+      // Waiting your turn is not walking: until t0 comes round you are carrying the
+      // whole place and standing still, and drawing that as a walk frame turns the
+      // back half of the line to face away for as long as anyone is boarding.
+      const walking = back > 1e-3 && qnow >= st.t0;
+      const pos = i + back, wz = laneZ + pos * QUEUE_PITCH;
+      const nm = SPRITE[colName(q[i])] || "grey";
+      // Faded by where they stand rather than by which place they hold, so someone
+      // coming forward brightens as they arrive instead of on the frame they shift.
+      const a = Math.max(.4, 1 - pos * .11);
+      push(laneX, wz, () => {
+        shadow(laneX, wz, .3);
+        if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
+        // Stepping up: away from the camera, and the legs cycle on the distance
+        // covered, the same way they do for someone out on the floor.
+        ctx.globalAlpha = a;
+        blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
+                 laneX, 0, wz);
+        ctx.globalAlpha = 1;
+      });
+    }
   }
   for (const a of g.anim)
     push(a.x, a.z, () => {
@@ -1576,12 +2335,13 @@ addEventListener("pointercancel", () => { if (HELD) { releaseHeld(); draw(); } }
 addEventListener("blur", () => { if (HELD) { releaseHeld(); draw(); } });
 
 /** Walking distance from the door to a cell, through empty floor only. */
-function floorDist(g) {
+function floorDist(g, k) {
   const N = g.W * g.H, d = new Int32Array(N).fill(-1);
-  if (!isFree(g, g.W - 1, g.door)) return d;
-  const start = idx(g, g.W - 1, g.door);
+  const [DC, DR] = doorCell(g, k || 0);
+  if (!isFree(g, DC, DR)) return d;
+  const start = idx(g, DC, DR);
   d[start] = 0;
-  const q = [[g.W - 1, g.door]];
+  const q = [[DC, DR]];
   while (q.length) {
     const [c, r] = q.shift();
     for (const [dc, dr] of DIRS) {
@@ -1599,8 +2359,9 @@ function floorDist(g) {
     is reachable while it sits there - but the passenger is stood right against
     it, and waiting to be told to move a seat they could simply have sat in reads
     as the game being broken rather than as a puzzle. */
-function doorSeat(g, ci) {
-  const id = g.occ[idx(g, g.W - 1, g.door)];
+function doorSeat(g, ci, door) {
+  const [DC, DR] = doorCell(g, door || 0);
+  const id = g.occ[idx(g, DC, DR)];
   if (id < 0) return null;                        // -1 is an empty cell
   const seat = g.seats[id];
   if (!seat || !accepts(seat, ci)) return null;
@@ -1609,18 +2370,19 @@ function doorSeat(g, ci) {
     // only the place that is actually in the doorway: the rest of a long seat is
     // inside the room, and there is no floor to walk round to it on
     const pc = placeCell(seat, k);
-    if (pc[0] === g.W - 1 && pc[1] === g.door)
-      return { seat, k, entry: null };            // no entry tile: they step straight up
+    if (pc[0] === DC && pc[1] === DR)
+      return { seat, k, entry: null, door: door || 0 };
   }
   return null;
 }
 
 /** The nearest place a passenger can actually take: a seat, which of its places,
     and the floor tile they step in from. */
-function pickSeat(g, ci) {
-  const plug = doorSeat(g, ci);
+function pickSeat(g, ci, door) {
+  door = door || 0;
+  const plug = doorSeat(g, ci, door);
   if (plug) return plug;                          // null whenever the doorway is clear
-  const d = floorDist(g);
+  const d = floorDist(g, door);
   let best = null, bestD = Infinity;
   for (const seat of g.seats) {
     if (!accepts(seat, ci)) continue;
@@ -1628,19 +2390,32 @@ function pickSeat(g, ci) {
       if (seat.occ[k] != null || (seat.claim && seat.claim.has(k))) continue;
       for (const [nc, nr] of cellEntries(g, seat, k)) {
         const dist = d[idx(g, nc, nr)];
-        if (dist >= 0 && dist < bestD) { bestD = dist; best = { seat, k, entry: [nc, nr] }; }
+        if (dist >= 0 && dist < bestD) { bestD = dist; best = { seat, k, entry: [nc, nr], door }; }
       }
     }
   }
   return best;
 }
 
+/** Which line moves next, and through which door. Where both can move they take
+    turns, so one does not empty while the other stands still. */
+function nextUp(g) {
+  const order = g.lastDoor === 0 ? [1, 0] : [0, 1];
+  for (const k of order) {
+    const q = queueOf(g, k);
+    if (!q.length) continue;
+    const spot = pickSeat(g, q[0], k);
+    if (spot) return { door: k, ci: q[0], spot };
+  }
+  return null;
+}
+
 /** The tiles a passenger walks: door -> corridor -> the place itself. Rebuilt
     from the same BFS that decides reachability, so the route on screen is the
     route the rules used. */
-function walkPath(g, seat, k, entry) {
+function walkPath(g, seat, k, entry, door) {
   if (!entry) return null;        // straight off the step onto a seat in the doorway
-  const d = floorDist(g);
+  const d = floorDist(g, door || 0);
   const path = [entry.slice()];
   let [c, r] = entry;
   while (d[idx(g, c, r)] > 0) {
@@ -1688,20 +2463,21 @@ function autoBoard(instant) {
     if (stale() || S.launching || S.anim.length) return;
     S.boarding = false;
     onHud(); draw();
-    if (!S.queue.length && S.seated >= S.total) finish(true);
+    if (!S.queue.length && !(S.queue2 || []).length && S.seated >= S.total) finish(true);
   };
 
   const launch = () => {
     if (stale()) return;
     S.launching = false;
     if (S.phase !== "play") { S.boarding = false; return; }
-    if (!S.queue.length) return done();
-    const ci = S.queue[0];
-    const spot = pickSeat(S, ci);
-    if (!spot) return done();
+    if (!S.queue.length && !(S.queue2 || []).length) return done();
+    const up = nextUp(S);
+    if (!up) return done();
+    const ci = up.ci, spot = up.spot, door = spot.door || 0;
+    S.lastDoor = door;
     const seat = spot.seat, slot = spot.k;
-    S.queue.shift();
-    if (!instant) shuffleUp(S);          // the rest of the line steps up
+    queueOf(S, door).shift();
+    if (!instant && !door) shuffleUp(S);  // the near line steps up; the far one is drawn straight
     seat.pending++;
     (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
     const cell = placeCell(seat, slot);
@@ -1716,8 +2492,8 @@ function autoBoard(instant) {
       onSeated();
     };
     if (instant) { sitDown(); launch(); return; }
-    const path = walkPath(S, seat, slot, spot.entry) || [cell];
-    const pts = [[cellW(S.W - 1) + SX * 2.0, cellZ(S.door)]];        // waiting at the stop
+    const path = walkPath(S, seat, slot, spot.entry, door) || [cell];
+    const pts = [stopAt(S, door)];                                   // waiting at the stop
     for (const [c, r] of path) pts.push([cellW(c), cellZ(r)]);
     pts[pts.length - 1] = [cellW(cell[0]), cellZ(cell[1]) - .04];    // settle onto the seat
 
@@ -1819,6 +2595,38 @@ function freeSlot(seat) {
   for (let k = 0; k < seat.cap; k++)
     if (seat.occ[k] == null && !(seat.claim && seat.claim.has(k))) return k;
   return -1;
+}
+
+/** The add-line booster: one more column of floor down the left-hand side.
+
+    The board is not being invented wider - it is being let out to the width the
+    panel already has. Every SeatPanel in the bundle carries an extra grid strip
+    on its lowest-x column with scaleX 0, switched off, and nothing in 2676
+    levels ever puts a seat, a hole or an obstacle there. convert_163.py drops
+    that column on the way in; this hands it back.
+
+    One per board, because one is all the panel has. The door stays where it is:
+    it is drawn at column W-1, everything shifted right by one, so the cell under
+    it moved with it.
+
+    ⚠ Refused while anybody is walking. A walker's path is world coordinates
+    worked out when they set off, and widening the board moves every cell under
+    their feet. It costs nothing in practice - the booster is for a board that
+    has stopped, which is a board with nobody on the floor. */
+function addLine(g) {
+  if (!g || g.phase !== "play") return false;
+  if (g.anim.length || g.launching || g.lines) return false;
+  const W = g.W + 1;
+  const hole = new Uint8Array(W * g.H);
+  for (let r = 0; r < g.H; r++)
+    for (let c = 0; c < g.W; c++) hole[r * W + c + 1] = g.hole[r * g.W + c];
+  for (const b of g.seats) b.c++;
+  g.W = W; g.hole = hole; g.lines = 1;
+  g.occ = new Int16Array(W * g.H).fill(-1);
+  for (const b of g.seats) for (const [c, r] of cellsOf(b)) g.occ[idx(g, c, r)] = b.id;
+  g.sel = null; g.drag = null; g.walkCells = null;
+  fitCanvas(g); LAY = layout();
+  return true;
 }
 
 /** Fly the front of the queue into `seat`. False when they cannot sit there,
