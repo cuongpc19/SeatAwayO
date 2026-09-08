@@ -12,11 +12,18 @@
     python build.py            editor + game
     python build.py crazy      the upload bundle, and the checks that go with it
 """
-import json, pathlib, re, sys, time
+import json, pathlib, re, subprocess, sys, time
 
 ART = pathlib.Path("../art")
 DATA = open("data_slots.js", encoding="utf-8").read()
 ENGINE = open("engine.js", encoding="utf-8").read()
+# The two telemetry files. Compiled into the game only - see build(). They sit
+# between the platform door and the shell, sharing one scope with both, so a
+# name either of them already uses would be silently overridden; analytics.js
+# and telemetry.js both carry that warning at the top.
+ANALYTICS = open("analytics.js", encoding="utf-8").read()
+TELEMETRY = open("telemetry.js", encoding="utf-8").read()
+PRIVACY = open("privacy.html", encoding="utf-8").read()
 
 KEEP = ("w", "h", "time", "holes", "seats", "queue")   # what a board cannot do without
 
@@ -89,6 +96,15 @@ FIRST_HARD = 15           # nothing before this is graded
 # of two numbers until the real ones turn up.
 PLAIN_SECONDS = 300       # 5:00
 HARD_SECONDS = 240        # 4:00, for both grades
+
+# ⚠ Ours. Lives are switched off. The APK gates every board on a heart, refills
+# one every fifteen minutes and sells refills - a meter that decides when the
+# player is allowed to play, which is a thing to tune against a live audience
+# rather than something to carry while the levels themselves are still moving.
+# Off means: a loss costs nothing, no board is ever refused, and the counter
+# leaves the home screen rather than standing there showing a number that never
+# changes. Every heart value below is still built, so this is one flag to flip.
+LIVES = False
 
 # ⚠ Ours. The APK sells its keep-playing at 900 gold for 30 seconds, which on a
 # 300s board buys back a tenth of the level for six wins' worth of gold. Ours is
@@ -211,6 +227,61 @@ def cover_uri():
     return inline("../art/home_cover.png", "image/png")
 
 
+def build_stamp():
+    """The commit every telemetry row is stamped with.
+
+    ⚠ A dirty tree is stamped `<hash>+`, and says so on the build line. Marble
+    Sort's note says to commit before building; the plus is there because that
+    instruction gets forgotten and a row claiming to be a commit it was not
+    played on is worse than one that admits it. `build` is the column reached
+    for when two versions of a level disagree - see ANALYTICS.md."""
+    def git(*a):
+        try:
+            r = subprocess.run(("git",) + a, capture_output=True, text=True, cwd="..")
+            return r.stdout.strip() if r.returncode == 0 else ""
+        except Exception:
+            return ""
+    h = git("rev-parse", "--short", "HEAD") or "nogit"
+    return h + ("+" if git("status", "--porcelain") else "")
+
+
+BUILD = build_stamp()
+
+
+def privacy_page():
+    """The hosted copy of the policy, for the CrazyGames submission form.
+
+    ⚠ Written on every build from the same fragment the game inlines, so the two
+    cannot drift. The form's copy is the one a reviewer reads; the in-game copy
+    is the one a player reaches from Settings. Both have to be right, which is
+    why neither is edited by hand - src/privacy.html is."""
+    page = """<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seat Away - Privacy Policy</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 40px 22px 80px; background: #f6f7fb; color: #22283a;
+         font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; }
+  h1 { font-size: 1.9rem; margin: 0 0 .2em; }
+  h2 { font-size: 1.15rem; margin: 2em 0 .5em; color: #39415c; }
+  .upd { color: #6b7288; margin: 0 0 2em; font-size: .92rem; }
+  code { background: #e7eaf3; border-radius: 5px; padding: .1em .38em; font-size: .92em; }
+  ul { padding-left: 1.3em; }
+  li { margin: .3em 0; }
+</style>
+</head><body><main>
+%s
+</main></body></html>
+""" % PRIVACY
+    out = pathlib.Path("../public/privacy.html")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(page.replace("/*__BUILT__*/", time.strftime("%Y-%m-%d")), encoding="utf-8")
+    print("%-24s %6.0f KB" % (out.as_posix(), len(page) / 1024))
+
+
 def live_config():
     """The numbers the shipped game runs on, read out of its own RemoteConfig so
     they cannot drift from the source by being retyped."""
@@ -232,6 +303,7 @@ def live_config():
         "goldWin": GOLD_WIN,
         "streakGold": [[int(num("gameplay", "win_streak_gold_%d_level" % i)),
                         int(num("gameplay", "win_streak_gold_%d_value" % i))] for i in (1, 2, 3, 4)],
+        "lives": LIVES,
         "heartMax": int(num("features", "heart_max_stack")),
         "heartSecs": int(num("features", "heart_recv_time")),
         "heartPrice": int(num("features", "heart_refill_price")),
@@ -245,6 +317,8 @@ def live_config():
         "keepPlaying": {"price": KEEP_PLAYING_PRICE, "secs": KEEP_PLAYING_SECS},
     }
     tuning(int(num("gameplay", "gold_win_normal")))
+    if not LIVES:
+        print("  tuning    lives off: a loss costs nothing and nothing is gated")
     shipped_k = (int(num("gameplay", "keep_playing_price")),
                  int(num("gameplay", "keep_playing_time")))
     if shipped_k != (KEEP_PLAYING_PRICE, KEEP_PLAYING_SECS):
@@ -270,13 +344,19 @@ def build(head_file, shell_file, out, host="none"):
     platform_base.js. The editor has no shell that talks to a host at all."""
     head = open(head_file, encoding="utf-8").read()
     shell = open(shell_file, encoding="utf-8").read()
-    plat = ""
+    plat = tele = ""
     if shell_file == "game_shell.js":
         plat = (open("platform_base.js", encoding="utf-8").read() + "\n"
                 + open("platform_%s.js" % host, encoding="utf-8").read() + "\n")
-    page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + plat + shell + "\n</script>\n"
+        # ⚠ The game only. The editor opens hundreds of boards a session and
+        # never finishes one honestly, so telemetry from it would be noise at
+        # best - and it has no PLATFORM to name as the source either.
+        tele = ANALYTICS + "\n" + TELEMETRY + "\n"
+    page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + plat + tele + shell + "\n</script>\n"
     page = (fill(page).replace("/*__MOVIE__*/", movie_uri())
                       .replace("/*__COVER__*/", cover_uri())
+                      .replace("/*__PRIVACY__*/", PRIVACY if tele else "")
+                      .replace("/*__BUILD__*/", BUILD)
                       .replace("/*__BUILT__*/", time.strftime("%Y-%m-%d"))
                       .replace("/*__CONFIG__*/", live_config()))
     pathlib.Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -303,12 +383,28 @@ def check_crazy(page, out):
     # Their SDK is fetched by URL at runtime and must not be bundled, so what is
     # checked is that the code which fetches it made it in.
     sdk = "sdk.crazygames.com" in page
+    # ⚠ Both of these have gone missing before by being switched off "just for a
+    # test" and shipped that way. A build with no telemetry looks perfect and
+    # reports nothing, and the first sign of it is an empty dashboard a week
+    # later - which reads as a bug in the reading, not in the build.
+    ga = "googletagmanager.com/gtag/js" in page
+    runs = "firebasedatabase.app/runs.json" in page
+    # The submission form demands a privacy policy and the reviewer follows the
+    # in-game route to it. Shipping without it is a failed review, not a retry.
+    priv = "Privacy Policy" in page
+    # A placeholder that reached the bundle is a policy that names no one.
+    holes = [s for s in ("PASTE_A_CONTACT_EMAIL", "PASTE_YOUR_UID") if s in page]
 
     rows = [(size <= 20 * 1024 * 1024, "under 20 MB - keeps the mobile front page",
              "%.2f MB, over the 20 MB limit" % (size / 1048576)),
             (not absolute, "relative paths only",
              "absolute paths: " + " ".join(absolute[:4])),
             (sdk, "CrazyGames SDK wired", "no CrazyGames SDK in the bundle"),
+            (ga, "Google Analytics wired", "no gtag.js loader in the bundle"),
+            (runs, "telemetry endpoint wired", "no Realtime Database URL in the bundle"),
+            (priv, "privacy policy carried", "no privacy policy in the bundle"),
+            (not holes, "no unfilled placeholders",
+             "placeholders shipped: " + ", ".join(holes)),
             (not strays, "no dev tools", "dev tools rode in: " + ", ".join(strays))]
 
     print("")
@@ -323,9 +419,14 @@ def check_crazy(page, out):
 
 
 targets = sys.argv[1:] or ["editor", "game"]
+# ⚠ Printed, not silent. `+` means the tree was dirty and every telemetry row
+# from this build will name the PREVIOUS commit as the one it was played on.
+print("  build     %s%s" % (BUILD, "   <- dirty tree; commit before a build you will read numbers from"
+                                    if BUILD.endswith("+") else ""))
 if "editor" in targets:
     build("editor_head.html", "editor_shell.js", "../level_player.html")
 if "game" in targets:
+    privacy_page()          # the hosted copy, from the same fragment the game inlines
     page = build("game_head.html", "game_shell.js", "../index.html")
     # ⚠ Proved, not assumed: the plain web build must carry no host SDK at all.
     if "sdk.crazygames.com" in page:

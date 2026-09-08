@@ -187,6 +187,11 @@ const totalStars = () => Object.values(save.stars).reduce((a, v) => a + v, 0);
 /* Hearts refill on the clock whether the page is open or not, so the count is
    worked out from the stored timestamp rather than ticked down. */
 function hearts() {
+  /* ⚠ Lives off - see LIVES in build.py. Full, always, and the save is not
+     touched: the stored count and the timestamp are left exactly as they are so
+     that turning lives back on picks up whatever the player had rather than
+     handing everyone a fresh set. */
+  if (!CF.lives) return CF.heartMax;
   if (save.hearts >= CF.heartMax) { save.heartAt = 0; return save.hearts; }
   const now = Date.now();
   if (!save.heartAt) { save.heartAt = now + CF.heartSecs * 1000; persist(); }
@@ -196,7 +201,7 @@ function hearts() {
   }
   return save.hearts;
 }
-const heartIn = () => (save.hearts >= CF.heartMax || !save.heartAt) ? 0
+const heartIn = () => (!CF.lives || save.hearts >= CF.heartMax || !save.heartAt) ? 0
   : Math.max(0, Math.ceil((save.heartAt - Date.now()) / 1000));
 
 /** What a win pays: a flat purse, plus the win-streak bonus once it is unlocked. */
@@ -320,6 +325,7 @@ function refreshHome() {
   $("h-star-icon").innerHTML = STAR_ON;
   const left = hearts(), w = heartIn();
   const heart = $("h-hearts");
+  heart.hidden = !CF.lives;          // a counter that cannot move is furniture
   heart.classList.toggle("full", left >= CF.heartMax);
   heart.querySelector("b").textContent = left;
   // A badge that is always on is furniture within a day, so the countdown only
@@ -1668,7 +1674,7 @@ onFinish = function (won) {
   } else {
     LOST = { streak: save.streak, hearts: save.hearts, heartAt: save.heartAt };
     save.streak = 0;
-    if (hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
+    if (CF.lives && hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
   }
   if (won) LOST = null;
   persist();

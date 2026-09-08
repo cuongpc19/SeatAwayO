@@ -146,6 +146,7 @@ body {
 .round span { position: relative; font-size: 26px; line-height: 1; }
 .round:active i { transform: translateY(3px); box-shadow: 0 3px 0 #c67a06; }
 #h-hearts { left: calc(var(--corner-l) * 1px); top: 70px; transform: translate(-50%, -50%); }
+#h-hearts[hidden] { display: none; }   /* lives off - .round sets display, so [hidden] alone loses */
 #h-levels { left: calc(var(--corner-r) * 1px); top: 70px; transform: translate(-50%, -50%); }
 /* "there is something here" - a badge that is always on is furniture within a
    day, so it only lights when the count is actually below full. */
