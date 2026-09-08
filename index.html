@@ -1421,11 +1421,15 @@ function extents(g) {
   // step and the head of the queue - the platform behind that can run off-screen.
   const pad = RICH ? .72 : 1.4;
   const right = RICH ? 2.45 : pad + 2.6;
+  // A second line stands the same distance off the far wall, so the view has to
+  // reach as far that way as it does towards the stop. Without this the whole
+  // lane is outside the frame and the players in it are simply not drawn.
+  const left = (g.doors && g.doors.length > 1) ? right : pad;
   const high = RICH ? 1.55 : 2.2;
   const x0 = -(g.W - 1) / 2 * SX, z0 = -(g.H - 1) / 2 * SZ;
   const pts = [];
-  for (const [cc, rr] of [[-pad, -pad], [g.W - 1 + right, -pad],
-                          [-pad, g.H - 1 + pad], [g.W - 1 + right, g.H - 1 + pad]])
+  for (const [cc, rr] of [[-left, -pad], [g.W - 1 + right, -pad],
+                          [-left, g.H - 1 + pad], [g.W - 1 + right, g.H - 1 + pad]])
     pts.push(view(x0 + cc * SX, 0, z0 + rr * SZ));
   pts.push(view(x0, high, z0 - pad * SZ));
   const xs = pts.map(p => p[0]), ys = pts.map(p => -p[1]);
@@ -1464,6 +1468,12 @@ function frame() {
   // Off the edges on every side, so the room reads as sitting in a place rather
   // than being cropped by the window.
   const head = themeNow().head;
+  // Two lines want room on both sides, so the grid gives some back rather than
+  // running to the edge. It costs the board a little width; a queue nobody can
+  // see costs the player the level.
+  const two = !!(S && S.doors && S.doors.length > 1);
+  if (two) return wide ? { left: .30, right: .74, top: head, bottom: .93 }
+                       : { left: .17, right: .83, top: head - .02, bottom: .94 };
   return wide ? { left: .26, right: .78, top: head, bottom: .93 }
               : { left: .04, right: .95, top: head - .02, bottom: .94 };
 }
