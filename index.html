@@ -4219,19 +4219,22 @@ function gaLevelEnd(lvl, won, seconds, stars) {
    ⚠ Nothing here may throw, block, or hold up a card. A player whose network
    refuses the write must not be able to tell. */
 
-/** ⚠ This URL exists TWICE - here and, minus `/runs.json`, in
-    scripts/pull_runs.py. They cannot share a constant: this one ships to
-    browsers and the other must never. Change one, change both.
+/** ⚠ The one place the endpoint is spelled out. scripts/pull_runs.py points the
+    Firebase CLI at the instance by NAME instead of repeating this, and
+    public/stats.html is configured by the SDK, so a region change is a one-line
+    change here plus the instance name there - not a hunt.
 
     The region is in the hostname, so it is not cosmetic: a database created in
     us-central1 is `...-default-rtdb.firebaseio.com` with no region segment and
-    this URL would 404 forever. See ANALYTICS.md §1. */
+    this URL would 404 forever, silently, because nothing here reports a failed
+    write. Probed rather than assumed: this project's instance answers on
+    asia-southeast1 and the other two hostnames redirect to it. ANALYTICS.md §1. */
 const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app/runs.json";
 
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "a3fc8f9+";
+const BUILD = "c2fc598+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -4798,6 +4801,11 @@ function featureProgress(cleared) {
 function startLevel(n) {
   PLATFORM.gameplayStart();
   if (hearts() <= 0) {
+    /* ⚠ The card that asked for this is still up, and show() does not touch it.
+       Without this, TRY AGAIN on the loss that spent the last life left OUT OF
+       TIME standing over the home screen with no button on it that worked, and
+       the toast saying why underneath it. */
+    hideCard();
     show("home");
     say("Out of lives - one comes back every " + Math.round(CF.heartSecs / 60) + " minutes.");
     return;
