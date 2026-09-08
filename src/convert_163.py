@@ -54,24 +54,19 @@ PANELS = "lv/panels_163.json"
 DOORS = "lv/doors_163.json"
 OUT = "lv/boards_163.json"
 
-# ⚠ The ladder is a table, not a range. `TimerData` in the bundle - and its twin
-# `TimerDataRemoteManager` - is 1350 records of (level, board, seconds), and that
-# is both the campaign order and the clock. The board column is scattered, not
-# sequential: level 10 is board 25, level 13 is board 124, level 20 is board 62.
-#
-# Three captures off the real game confirm it, each on three channels at once -
-# layout, colours and the clock on the HUD:
-#
-#   level 13 -> board 124, 140s, and the capture reads 2:20
-#   level 20 -> board  62, 100s, and the capture reads 1:40
-#   level 21 -> board 390, 120s, and the capture reads 2:00, a 7-wide grid whose
-#               empty middle column is the gap between the train's two carriages
-#
-# Two earlier readings of the order were wrong. Raw ID order looked right because
-# IDs 0..8 happen to be the tutorial in sequence, and it falls apart at level 10.
-# A sequential run from ID 1005 fitted a batch of captures but nothing in the
-# bundle gives those boards a clock, because they are not the campaign.
-TIMERS = "lv/timerdata.json"
+# ⚠ The ladder does not start at ID 0. The bundle carries two campaigns: an
+# older one in IDs 0..1004, still ramping 2, 3, 4, 5 seats from the front like a
+# tutorial, and the one 1.63.1 actually plays from 1005 on. Captures taken off
+# this very APK pin it: its level 3 is ID 1007 and its level 4 is ID 1008, each
+# matching cell for cell and each the only board in the whole set that does. So
+# the displayed level is ID - 1004, and the old block is left out of the ladder
+# rather than shipped in front of it, which is what made the first thousand
+# levels a second, easier tutorial.
+FIRST_ID = 1005
+LAST_ID = 2508      # 5000+ is event content, not the campaign
+
+SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
+MIN_SECONDS = 60
 
 # ⚠ Colour 0 is not free to use. The engine reads a seat of colour 0 as a grey
 # fixture: it never moves, and it only ever takes the first colour. That was
@@ -150,6 +145,11 @@ def grids():
     return out
 
 
+def clock(riders):
+    """A time limit for a board that ships without one, at the old game's pace."""
+    return max(MIN_SECONDS, int(round(SECONDS_PER_RIDER * riders / 5)) * 5)
+
+
 def capacity(s):
     return 4 if s["fourSeater"] else 3 if s["tripleSeat"] else 2 if s["doubleSeat"] else 1
 
@@ -157,13 +157,9 @@ def capacity(s):
 def convert():
     G = grids()
     doors = json.load(open(DOORS))
-    order = json.load(open(TIMERS))          # (level, board, seconds), level 1..1350
-    levels = {r["id"]: r for r in json.load(open(LEVELS))}
     boards, flags, dropped = [], collections.Counter(), []
-    for level, board, seconds in order:
-        r = levels.get(board)
-        if r is None:
-            dropped.append(board)
+    for r in json.load(open(LEVELS)):
+        if not (FIRST_ID <= r["id"] <= LAST_ID):
             continue
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
@@ -206,8 +202,8 @@ def convert():
             dropped.append(r["id"])
             continue
         boards.append({
-            "id": "Level_%05d" % level,
-            "name": "Level_%05d" % level,
+            "id": "Level_%05d" % (r["id"] - FIRST_ID + 1),
+            "name": "Level_%05d" % (r["id"] - FIRST_ID + 1),
             "sourceId": r["id"],
             "track": "campaign",
             # The shell builds its campaign ladder by filtering on variant 0 and
@@ -222,7 +218,7 @@ def convert():
             # on 987 of these boards.
             "door": doors[str(r["panel"])]["entryRow"],
             "panel": r["panel"], "w": W, "h": H,
-            "time": seconds,               # authored, straight out of TimerData
+            "time": clock(len(r["queue"]) + len(r["queue2"])),
             "moves": r["moveCount"],
             "holes": [],                     # every cell is floor; benches sit on it
             "seats": seats,                  # c, r, capacity, colour, dir
