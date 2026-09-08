@@ -452,6 +452,11 @@ function featureProgress(cleared) {
 function startLevel(n) {
   PLATFORM.gameplayStart();
   if (hearts() <= 0) {
+    /* ⚠ The card that asked for this is still up, and show() does not touch it.
+       Without this, TRY AGAIN on the loss that spent the last life left OUT OF
+       TIME standing over the home screen with no button on it that worked, and
+       the toast saying why underneath it. */
+    hideCard();
     show("home");
     say("Out of lives - one comes back every " + Math.round(CF.heartSecs / 60) + " minutes.");
     return;
