@@ -36,7 +36,11 @@ KEEP = ("w", "h", "time", "holes", "seats", "queue")   # what a board cannot do 
 CAMPAIGN = "lv/boards_163.json"
 LEGACY = "lv/boards_campaign.json"
 
-EXTRA_SECONDS = 30    # added to every board's clock
+# 0 since the campaign started carrying its own clocks. Every board's time now
+# comes from TimerData, authored per level, so padding it here would bend the
+# one number this build finally has the real value for. Set it back to 30 to
+# make the game easier again - it is one line, and the build prints it.
+EXTRA_SECONDS = 0
 GOLD_WIN = 100        # paid for a win, whatever the difficulty
 
 
