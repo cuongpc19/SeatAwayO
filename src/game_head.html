@@ -299,6 +299,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   content: ""; width: 11px; height: 11px; border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #ffe89a, var(--gold) 55%, var(--gold-dk));
 }
+/* goes in hand, not a price: no coin. The chip stays green and the number
+   stands on its own - see costChip() in the shell. */
+.boost .cost.own::after { display: none; }
+.boost .cost.own { padding-inline: .62rem; }
 .boost.armed { outline: 3px solid var(--gold); outline-offset: 3px; }
 /* too poor to press it: the tile stays lit, only the price turns */
 .boost.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 2px 0 #a3374a; }
@@ -441,6 +445,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #card.on { display: block; }
 #card .design {
   --dy: 0px; --dz: 0px;              /* the room the bar and the streak line need */
+  --dr: 0px;                         /* ...and the room the revive button needs */
   position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
   transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
 }
@@ -475,15 +480,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    line this game has and that one does not: one number, so the card without a
    streak stays exactly the card it already was. */
 .panel {
-  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + 46px);
+  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 36px; background: rgba(29,26,69,.55);
 }
 .panel i {
-  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + 46px);
+  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 34px; background: var(--ms-edge);
 }
 .panel u {
-  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + 46px);
+  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + var(--dr) + 46px);
   border-radius: 32px; background: var(--ms-face); overflow: hidden;
 }
 /* The header band: rounded at the top, square where it meets the face. */
@@ -593,9 +598,44 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   font-size: 23px; line-height: 1.4; color: #3b465f; }
 .sum b { color: var(--ms-ink); }
 .sum span { display: block; margin-top: 26px; font-size: 19px; color: #7c88a6; }
-#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+/* Revive sits where the eye already is - the first button under the text - and
+   the other two move down by exactly the gap they already had between them. */
+#c-revive { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
+#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
+#c-revive:active, #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+#c-revive[hidden] { display: none; }
+/* Gold, because it is the one button on the card that costs something. The
+   price rides on its corner the way the boosters' does, rather than inside the
+   label, where "REVIVE +1:00 500" reads as one number too many. */
+.wide-btn.gold { background: linear-gradient(180deg, #ffd76a, #efa326); box-shadow: 0 6px 0 #b9750f; }
+.wide-btn.gold:active { box-shadow: 0 3px 0 #b9750f; }
+#c-revive b { color: #fff3c4; }
+#c-revive .cost {
+  position: absolute; right: -10px; top: -14px;
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  background: linear-gradient(180deg, #5fd472, #3aa94f);
+  box-shadow: 0 3px 0 #2b8039; border-radius: 999px; padding: 3px 12px;
+  font-size: 21px; color: #fff; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
+}
+#c-revive .cost::after {
+  content: ""; width: 17px; height: 17px; border-radius: 50%; -webkit-text-stroke: 0;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+}
+/* Not enough gold. The button stays where it is and stays readable - hiding it
+   would answer "why is this level unwinnable" with nothing - and only the price
+   turns, which is the part that is actually the problem. */
+#c-revive.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 6px 0 #6b6681; }
+#c-revive.broke:active { box-shadow: 0 3px 0 #6b6681; }
+#c-revive.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 3px 0 #a3374a; }
+/* The toast that would normally say why lives under the card, so the refusal
+   has to happen on the button itself. */
+#c-revive.shake { animation: revshake .4s; }
+@keyframes revshake {
+  20% { transform: translate(calc(-50% - 9px), -50%); }
+  50% { transform: translate(calc(-50% + 8px), -50%); }
+  80% { transform: translate(calc(-50% - 5px), -50%); }
+}
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -617,9 +657,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   .feat .fill { transition: none; }
 }
 
-/* A 390px phone cannot hold two 44px buttons and three pills at full size: the
-   restart button fell off the right edge. Everything in the bar steps down a
-   size rather than anything being dropped. */
+/* A 390px phone could not hold what this bar used to carry at full size, and
+   the answer was to step everything down a size rather than drop anything. The
+   restart button that forced it has since gone from the bar - it lives in
+   Settings, where the rest of the level's controls are - but the step-down
+   stays: the gear, three pills and the difficulty chip are still more than a
+   small phone holds comfortably at 44px. */
 @media (max-width: 26rem) {
   .topbar { gap: .35rem;
     padding-left: calc(.45rem + var(--safe-l)); padding-right: calc(.45rem + var(--safe-r)); }
@@ -888,7 +931,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="hud-side end">
         <div class="pill pill-gold"><span class="pill-val" id="g-coins">0</span><i class="disc"></i></div>
-        <button class="icon-btn" id="g-retry" aria-label="Restart">&#8635;</button>
       </div>
     </div>
 
@@ -992,6 +1034,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
       <div class="streak" id="c-streak" hidden></div>
+      <button class="wide-btn gold" id="c-revive" hidden>REVIVE <b>+1:00</b><span class="cost">500</span></button>
       <button class="wide-btn" id="c-next">NEXT LEVEL</button>
       <button class="wide-btn blue" id="c-home">HOME</button>
     </div>

@@ -90,6 +90,14 @@ FIRST_HARD = 15           # nothing before this is graded
 PLAIN_SECONDS = 300       # 5:00
 HARD_SECONDS = 240        # 4:00, for both grades
 
+# ⚠ Ours. The APK sells its keep-playing at 900 gold for 30 seconds, which on a
+# 300s board buys back a tenth of the level for six wins' worth of gold. Ours is
+# a minute for 500: enough time to be worth the press, and priced so that two
+# clean levels pay for one. The button it feeds is the only thing standing
+# between running out of time and starting the board over.
+KEEP_PLAYING_PRICE = 500
+KEEP_PLAYING_SECS = 60
+
 # ⚠ Ours, and only for testing: a level number -> its clock, overriding the two
 # numbers above. Level 1000 is here so the run-out-of-time screen can be reached
 # in five seconds instead of five minutes. Empty this before it matters.
@@ -234,10 +242,14 @@ def live_config():
                         "uses": int(num("booster", "uses_limit_booster_jump"))},
         "boosterArea": {"price": price("booster_area_price"),
                         "uses": int(num("booster", "uses_limit_booster_area"))},
-        "keepPlaying": {"price": int(num("gameplay", "keep_playing_price")),
-                        "secs": int(num("gameplay", "keep_playing_time"))},
+        "keepPlaying": {"price": KEEP_PLAYING_PRICE, "secs": KEEP_PLAYING_SECS},
     }
     tuning(int(num("gameplay", "gold_win_normal")))
+    shipped_k = (int(num("gameplay", "keep_playing_price")),
+                 int(num("gameplay", "keep_playing_time")))
+    if shipped_k != (KEEP_PLAYING_PRICE, KEEP_PLAYING_SECS):
+        print("  tuning    revive %dg/%ds -> %dg/%ds"
+              % (shipped_k + (KEEP_PLAYING_PRICE, KEEP_PLAYING_SECS)))
     shipped_t = int(num("booster", "booster_time_value"))
     if BOOSTER_TIME_VALUE != shipped_t:
         print("  tuning    time booster %ds -> %ds" % (shipped_t, BOOSTER_TIME_VALUE))

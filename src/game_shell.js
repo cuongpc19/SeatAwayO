@@ -1285,6 +1285,8 @@ const SFX = {
   buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
   win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
   lose:   () => { blip(300, .22, "sawtooth", .06); blip(190, .34, "sawtooth", .06, .13); },
+  no:     () => blip(160, .13, "square", .05),
+
 };
 /* Android buzzes. iOS Safari has no Vibration API at all, so there the switch is
    simply inert - which is better than hiding it and guessing wrong about a
@@ -1499,6 +1501,57 @@ function featureBar(feat, cleared) {
   }, 700);
 }
 
+/* ---- revive ------------------------------------------------------------
+   Running out of time is the only way to lose, and starting a board over is a
+   long way back from a board that was nearly done. So the losing card sells a
+   minute. It is not a restart: the seats stay where the player put them, the
+   queue keeps its place, and the clock picks up from where it stopped.
+
+   ⚠ What the loss already took is handed back. onFinish() spends a life and
+   breaks the streak the moment the clock hits zero, because that is the only
+   place that knows the board ended - but a revived board never really ended.
+   Taking it and giving it back, rather than waiting to see whether the player
+   revives, is deliberate: a player who closes the tab on the losing card has
+   still lost, which is not true of a penalty that is only written on TRY AGAIN. */
+let LOST = null;                     // what the last loss cost, until it is spent
+
+/** Show it, price it, and say whether the gold is there. */
+function reviveBtn(losing) {
+  const el = $("c-revive");
+  el.hidden = !losing;
+  // ⚠ Both ways. The variable is written inline on the design, so a card left
+  // holding the losing card's 82px hands the next win a plate with a button's
+  // worth of empty floor under HOME.
+  $("c-card").style.setProperty("--dr", losing ? "82px" : "0px");
+  if (!losing) return;
+  el.querySelector("b").textContent = "+" + fmt(CF.keepPlaying.secs);
+  el.querySelector(".cost").firstChild.textContent = CF.keepPlaying.price;
+  el.classList.toggle("broke", save.coins < CF.keepPlaying.price);
+  el.classList.remove("shake");
+}
+
+function revive() {
+  const el = $("c-revive"), price = CF.keepPlaying.price;
+  if (save.coins < price) {
+    // The toast lives under the card, so the button has to carry the refusal.
+    el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+    SFX.no(); buzz(50);
+    return;
+  }
+  save.coins -= price;
+  if (LOST) { save.streak = LOST.streak; save.hearts = LOST.hearts; save.heartAt = LOST.heartAt; }
+  LOST = null;
+  persist();
+  hideCard();
+  S.phase = "play";
+  S.left += CF.keepPlaying.secs;
+  S.time = Math.max(S.time, S.left);   // the star bar reads left/time - keep it honest
+  RUNNING = true;                      // it was running a moment ago; do not wait to be asked again
+  PLATFORM.gameplayStart();
+  SFX.buy();
+  onHud(); boosterUi(); draw();      // onHud repaints the purse; 500 gone can price a booster out
+}
+
 /** The card itself. `stars` at 0 is the losing face; `feat` is the bar, and
     everything below the stars slides down by one number to make room for it. */
 function overlay(title, stars, coins, streak, sum, feat, cleared) {
@@ -1506,6 +1559,7 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   design.style.setProperty("--dy", (feat ? 66 : 0) + "px");
   design.style.setProperty("--dz", (stars && streak ? 34 : 0) + "px");
   design.classList.toggle("lose", !stars);
+  reviveBtn(!stars);
   $("c-title").textContent = title;
   $("c-rays").hidden = !stars;
   $("c-coins").hidden = !stars;
@@ -1555,9 +1609,11 @@ onFinish = function (won) {
     save.streak++;
     save.coins += pay.total;
   } else {
+    LOST = { streak: save.streak, hearts: save.hearts, heartAt: save.heartAt };
     save.streak = 0;
     if (hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
   }
+  if (won) LOST = null;
   persist();
   // Asked for `lvl`, the level just cleared - the bar is the reward for this
   // game, not for the one being handed over.
@@ -1591,6 +1647,7 @@ $("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null
    wired straight to `show("home")`, so the one control on the HUD that was
    not the clock took the player off the board in a single tap. */
 $("g-menu").onclick = openSettings;
+document.getElementById("c-revive").onclick = revive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
 document.getElementById("c-next").onclick = () =>
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
