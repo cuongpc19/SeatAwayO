@@ -1310,7 +1310,7 @@ function load(n) {
   g.colours = new Set(raw.queue.concat(g.queue2)).size;
   g.time = raw.time; g.left = raw.time;
   g.seated = 0; g.phase = "play"; g.moves = 0; g.walkCells = null;
-  g.sel = null; g.drag = null; g.anim = []; g.qstep = null;
+  g.sel = null; g.drag = null; g.anim = []; g.qsteps = [null, null];
   g.lines = 0;                  // add-line booster: one spare lane per board
   S = g;
   S.boarding = false; S.launching = false;
@@ -1365,11 +1365,13 @@ function placesBack(st, now) {
     one frame. Now each keeps the distance they are still carrying and walks it
     off, and they start one after another - the person behind you does not move
     until you have. */
-function shuffleUp(g) {
-  const now = performance.now(), was = g.qstep;
+function shuffleUp(g, k) {
+  k = k || 0;
+  const steps = g.qsteps || (g.qsteps = [null, null]);
+  const now = performance.now(), was = steps[k];
   //  was[i + 1] is this same person a moment ago: the line has already shifted,
   //  so what is now place i held place i + 1 when that state was written.
-  g.qstep = g.queue.map((_, i) => {
+  steps[k] = queueOf(g, k).map((_, i) => {
     const carry = was && was[i + 1] ? placesBack(was[i + 1], now) : 0;
     return {
       from: carry + 1,
@@ -1382,10 +1384,12 @@ function shuffleUp(g) {
   if (g.qraf) return;                 // one loop is enough; it reads whatever is current
   g.qraf = true;
   const tick = () => {
-    if (S !== g || !g.qstep) { g.qraf = false; return; }
+    if (S !== g || !g.qsteps) { g.qraf = false; return; }
     const now2 = performance.now();
-    if (g.qstep.some(st => placesBack(st, now2) > 1e-3)) { draw(); requestAnimationFrame(tick); }
-    else { g.qstep = null; g.qraf = false; draw(); }
+    // both lines share the one loop: it runs while either still has ground to cover
+    const busy = g.qsteps.some(ss => ss && ss.some(st => placesBack(st, now2) > 1e-3));
+    if (busy) { draw(); requestAnimationFrame(tick); }
+    else { g.qsteps = [null, null]; g.qraf = false; draw(); }
   };
   requestAnimationFrame(tick);
 }
@@ -3115,9 +3119,7 @@ function draw() {
     const q = queueOf(g, dk);
     const [laneX, laneZ] = stopAt(g, dk);
     for (let i = 0; i < Math.min(q.length, 7); i++) {
-      // Only the near line animates its shuffle: qstep belongs to it, and the far
-      // one has nobody in front of it to close up behind.
-      const st = dk === 0 && g.qstep && g.qstep[i];
+      const st = g.qsteps && g.qsteps[dk] && g.qsteps[dk][i];
       const back = st ? placesBack(st, qnow) : 0;       // places still to walk
       // Waiting your turn is not walking: until t0 comes round you are carrying the
       // whole place and standing still, and drawing that as a walk frame turns the
@@ -3501,7 +3503,7 @@ function autoBoard(instant) {
     S.lastDoor = door;
     const seat = spot.seat, slot = spot.k;
     queueOf(S, door).shift();
-    if (!instant && !door) shuffleUp(S);  // the near line steps up; the far one is drawn straight
+    if (!instant) shuffleUp(S, door);     // whichever line just lost its head closes up
     seat.pending++;
     (seat.claim || (seat.claim = new Set())).add(slot);   // nobody else takes this place
     const cell = placeCell(seat, slot);
