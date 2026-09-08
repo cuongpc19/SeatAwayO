@@ -280,7 +280,7 @@ function load(n) {
   }
 
   g.queue = raw.queue.slice();
-  /* A second line, on the boards that ship one. Which wall its door stands on is
+  /* A second line, on the boards that ship one. Where its door stands is read
      a choice rather than a reading: Cadillac and Limo are the only panels that
      use this and neither carries a second door object - theirs is in the vehicle
      mesh - so nothing in the bundle says. Facing the first across the floor is
@@ -291,7 +291,8 @@ function load(n) {
      boards - each carries a colour the other has none of - so a passenger at the
      wrong door cannot stand in for one at the right door. */
   g.queue2 = (raw.queue2 || []).slice();
-  g.doors = g.queue2.length ? [[W - 1, g.door], [0, g.door]] : [[W - 1, g.door]];
+  const d2 = raw.door2 == null ? g.door : Math.max(0, Math.min(H - 1, raw.door2));
+  g.doors = g.queue2.length ? [[W - 1, g.door], [0, d2]] : [[W - 1, g.door]];
   g.lastDoor = 1;                        // so the first launch comes from door 0
   g.total = g.queue.length + g.queue2.length;
   g.colours = new Set(raw.queue.concat(g.queue2)).size;

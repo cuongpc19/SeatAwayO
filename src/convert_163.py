@@ -172,6 +172,31 @@ def grids():
     return out
 
 
+def second_row(doors, panel, H):
+    """The row the far door stands in: the front, the same row as the near one.
+
+    Nothing in the bundle says outright. Cadillac and Limo are the only panels
+    that use a second queue and neither carries a second door object; theirs is
+    in the vehicle mesh. Firecar does carry a BusDoor_2 - far wall, two rows off
+    the back - and it looked like the answer until the boards were asked.
+
+    The boards answer it, because seats were laid out around wherever the door
+    really is. Trying every cell on both walls across all 78 of them, counting
+    where the second line can walk straight in with nothing moved:
+
+        col 0 row 0   37 boards        <- the front of the far wall
+        col 0 row 1   27
+        col 0 row 4   19
+        col 0 row 8    7               <- where Firecar puts its BusDoor_2
+        col 0 row 9    5
+
+    Five times the boards open at the front than at Firecar's row, so Firecar's
+    is not this door - a fire engine's rear hatch is not where passengers get
+    on. The front of the far wall it is, facing the near door across the floor.
+    """
+    return 0
+
+
 def clock(riders):
     """A time limit for a board that ships without one, at the old game's pace."""
     return max(MIN_SECONDS, int(round(SECONDS_PER_RIDER * riders / 5)) * 5)
@@ -252,6 +277,14 @@ def convert():
             # only while nothing is parked in it - and something is parked in it
             # on 987 of these boards.
             "door": doors[str(r["panel"])]["entryRow"],
+            # Where the second line walks in, on the boards that ship one. Only
+            # Firecar carries a BusDoor_2 - far wall, two rows off the back of a
+            # 6x10 - and it is the only place in the bundle that says where this
+            # game puts a second way in. Cadillac and Limo are the panels that
+            # actually use a second queue, both 6x10 like Firecar, and neither
+            # has a door object of its own: theirs is in the vehicle mesh. So
+            # they take Firecar's row rather than a symmetry of our own.
+            "door2": second_row(doors, r["panel"], H) if r["queue2"] else None,
             "panel": r["panel"], "w": W, "h": H,
             "time": clock(len(r["queue"]) + len(r["queue2"])),
             "moves": r["moveCount"],
