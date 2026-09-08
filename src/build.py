@@ -90,6 +90,11 @@ FIRST_HARD = 15           # nothing before this is graded
 PLAIN_SECONDS = 300       # 5:00
 HARD_SECONDS = 240        # 4:00, for both grades
 
+# ⚠ Ours, and only for testing: a level number -> its clock, overriding the two
+# numbers above. Level 1000 is here so the run-out-of-time screen can be reached
+# in five seconds instead of five minutes. Empty this before it matters.
+TEST_CLOCK = {1000: 5}
+
 def grade(n):
     """The difficulty of campaign level `n`, 1-based: 0 plain, 1 hard, 2 super.
 
@@ -157,10 +162,12 @@ def levels_json():
                 continue
             n += 1
             b["diff"] = grade(n)
-            b["time"] = HARD_SECONDS if b["diff"] else PLAIN_SECONDS
+            b["time"] = TEST_CLOCK.get(n, HARD_SECONDS if b["diff"] else PLAIN_SECONDS)
         marked = sum(1 for b in boards if b.get("diff"))
         print("  tuning    %d of %d levels graded hard, from the level number" % (marked, n))
         print("  tuning    clock flat: %ds plain, %ds hard" % (PLAIN_SECONDS, HARD_SECONDS))
+        for lv in sorted(TEST_CLOCK):
+            print("  TEST      level %d clock forced to %ds" % (lv, TEST_CLOCK[lv]))
     print("  campaign  %s, %d boards" % (CAMPAIGN, len(boards)))
     return json.dumps(boards, separators=(",", ":"))
 
