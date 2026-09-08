@@ -41,7 +41,13 @@ LEGACY = "lv/boards_campaign.json"
 # that is not true. It still applies to LEGACY, which carries real times.
 EXTRA_SECONDS = 0
 GOLD_WIN = 100        # paid for a win, whatever the difficulty
-AREA_UNLOCK = 16      # the add-line booster; the APK opens it at 18
+# ⚠ Ours, not the APK's. Where a booster is taught is where it unlocks, so this
+# table is also the teaching order. The APK opens jump at 8 and time at 14; the
+# two are swapped here because time is the one that explains itself in a
+# sentence - seconds go back on the clock - and jump is the one worth saving for
+# a player who has met a board they cannot walk into. Add-line opens at 18 in
+# the APK.
+UNLOCKS = {"booster_time": 8, "booster_jump": 14, "booster_area": 16}
 
 
 # ---- which levels are marked hard ------------------------------------------
@@ -100,6 +106,8 @@ def tuning(shipped_gold):
         print("  tuning    every clock +%ds" % EXTRA_SECONDS)
     if GOLD_WIN != shipped_gold:
         print("  tuning    gold per win %d -> %d" % (shipped_gold, GOLD_WIN))
+    print("  tuning    unlocks " + ", ".join("%s %d" % (k.replace("booster_", ""), v)
+                                             for k, v in UNLOCKS.items()))
 
 
 def levels_json():
@@ -189,7 +197,7 @@ def live_config():
         "unlock": dict({k.replace("level_unlock_", ""): int(float(v["defaultValue"]["value"]))
                         for k, v in g["tutorial"]["parameters"].items()
                         if k.startswith("level_unlock")},
-                       booster_area=AREA_UNLOCK),
+                       **UNLOCKS),
         # ⚠ Ours, not the APK's. The shipped game pays 10 for a win at every
         # difficulty - gold_win_normal, _hard and _hardest are all 10 - and the
         # read is kept so that a re-dump which changed it would be noticed.
