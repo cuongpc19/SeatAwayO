@@ -49,6 +49,12 @@ GOLD_WIN = 100        # paid for a win, whatever the difficulty
 # the APK.
 UNLOCKS = {"booster_time": 8, "booster_jump": 14, "booster_area": 16}
 
+# ⚠ Ours. The APK charges 300, 600 and 1000; halved here, and only the three
+# boosters - keep-playing and a heart refill are not boosters and keep their
+# own prices. It belongs up here with the other departures rather than being
+# typed into remote_config.json, which stays as dumped.
+BOOSTER_PRICE = 0.5
+
 
 # ---- which levels are marked hard ------------------------------------------
 # The APK carried an int per board called `difficultLevel`, 0 to 2, and the game
@@ -108,6 +114,7 @@ def tuning(shipped_gold):
         print("  tuning    gold per win %d -> %d" % (shipped_gold, GOLD_WIN))
     print("  tuning    unlocks " + ", ".join("%s %d" % (k.replace("booster_", ""), v)
                                              for k, v in UNLOCKS.items()))
+
 
 
 def levels_json():
@@ -190,6 +197,7 @@ def live_config():
     cfg = json.load(open("remote_config.json", encoding="utf-8"))
     g = cfg["parameterGroups"]
     num = lambda grp, key: float(g[grp]["parameters"][key]["defaultValue"]["value"])
+    price = lambda key: int(round(num("booster", key) * BOOSTER_PRICE))
     out = {
         # ⚠ Ours, not the APK's, for booster_area. The shipped gate is 18; 16 is
         # a deliberate departure and belongs with the others up top, not typed
@@ -207,17 +215,22 @@ def live_config():
         "heartMax": int(num("features", "heart_max_stack")),
         "heartSecs": int(num("features", "heart_recv_time")),
         "heartPrice": int(num("features", "heart_refill_price")),
-        "boosterTime": {"price": int(num("booster", "booster_time_price")),
+        "boosterTime": {"price": price("booster_time_price"),
                         "value": int(num("booster", "booster_time_value")),
                         "uses": int(num("booster", "uses_limit_booster_time"))},
-        "boosterJump": {"price": int(num("booster", "booster_jump_price")),
+        "boosterJump": {"price": price("booster_jump_price"),
                         "uses": int(num("booster", "uses_limit_booster_jump"))},
-        "boosterArea": {"price": int(num("booster", "booster_area_price")),
+        "boosterArea": {"price": price("booster_area_price"),
                         "uses": int(num("booster", "uses_limit_booster_area"))},
         "keepPlaying": {"price": int(num("gameplay", "keep_playing_price")),
                         "secs": int(num("gameplay", "keep_playing_time"))},
     }
     tuning(int(num("gameplay", "gold_win_normal")))
+    if BOOSTER_PRICE != 1:
+        keys = ("booster_time_price", "booster_jump_price", "booster_area_price")
+        print("  tuning    booster prices x%g: %s -> %s"
+              % (BOOSTER_PRICE, [int(num("booster", k)) for k in keys],
+                 [price(k) for k in keys]))
     return json.dumps(out, separators=(",", ":"))
 
 
