@@ -146,6 +146,7 @@ body {
 .round span { position: relative; font-size: 26px; line-height: 1; }
 .round:active i { transform: translateY(3px); box-shadow: 0 3px 0 #c67a06; }
 #h-hearts { left: calc(var(--corner-l) * 1px); top: 70px; transform: translate(-50%, -50%); }
+#h-hearts[hidden] { display: none; }   /* lives off - .round sets display, so [hidden] alone loses */
 #h-levels { left: calc(var(--corner-r) * 1px); top: 70px; transform: translate(-50%, -50%); }
 /* "there is something here" - a badge that is always on is furniture within a
    day, so it only lights when the count is actually below full. */
@@ -1160,10 +1161,14 @@ stores and sends.</p>
 
 <h2>Saved on your own device</h2>
 <p>Your progress is kept in your browser's local storage under the key
-<code>seatawayo.save.v1</code>: the level you have reached, your stars, your
-gold, your lives, your boosters, and the sound and vibration switches. It never
-leaves your device except as described under <em>Cloud save</em> below, and
-clearing your browser's site data deletes it.</p>
+<code>seatawayo.save.v1</code>: the level you have reached, your stars, your gold,
+your boosters, and the sound and vibration switches. It never leaves your device
+except as described under <em>Cloud save</em> below, and clearing your browser's
+site data deletes it.</p>
+<!-- ⚠ Do not list features by name here beyond what the player can see. An
+     earlier draft named lives, which build.py had switched off (LIVES = False),
+     so the policy described a counter the game no longer shows. -->
+
 
 <h2>Cloud save</h2>
 <p>When the game is played on CrazyGames, that same saved progress is also
@@ -4234,7 +4239,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "c2fc598+";
+const BUILD = "91c0a95+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -4466,7 +4471,7 @@ function applyTheme(level) {
 /* ---- the numbers the shipped game runs on -----------------------------
    Injected from its own RemoteConfig at build time. Every threshold, price and
    reward below is the live value, not a guess. */
-const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":8,"booster_jump":14,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":150,"value":30,"uses":-1},"boosterJump":{"price":300,"uses":10},"boosterArea":{"price":500,"uses":3},"keepPlaying":{"price":500,"secs":60}};
+const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":8,"booster_jump":14,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"lives":false,"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":150,"value":30,"uses":-1},"boosterJump":{"price":300,"uses":10},"boosterArea":{"price":500,"uses":3},"keepPlaying":{"price":500,"secs":60}};
 const unlockedAt = f => { const n = CF.unlock[f]; return n > 0 ? n : Infinity; };
 /* A booster is open once the player has reached the level that opens it.
    `save.unlocked` alone answers that for ordinary play - it is always at or
@@ -4536,6 +4541,11 @@ const totalStars = () => Object.values(save.stars).reduce((a, v) => a + v, 0);
 /* Hearts refill on the clock whether the page is open or not, so the count is
    worked out from the stored timestamp rather than ticked down. */
 function hearts() {
+  /* ⚠ Lives off - see LIVES in build.py. Full, always, and the save is not
+     touched: the stored count and the timestamp are left exactly as they are so
+     that turning lives back on picks up whatever the player had rather than
+     handing everyone a fresh set. */
+  if (!CF.lives) return CF.heartMax;
   if (save.hearts >= CF.heartMax) { save.heartAt = 0; return save.hearts; }
   const now = Date.now();
   if (!save.heartAt) { save.heartAt = now + CF.heartSecs * 1000; persist(); }
@@ -4545,7 +4555,7 @@ function hearts() {
   }
   return save.hearts;
 }
-const heartIn = () => (save.hearts >= CF.heartMax || !save.heartAt) ? 0
+const heartIn = () => (!CF.lives || save.hearts >= CF.heartMax || !save.heartAt) ? 0
   : Math.max(0, Math.ceil((save.heartAt - Date.now()) / 1000));
 
 /** What a win pays: a flat purse, plus the win-streak bonus once it is unlocked. */
@@ -4669,6 +4679,7 @@ function refreshHome() {
   $("h-star-icon").innerHTML = STAR_ON;
   const left = hearts(), w = heartIn();
   const heart = $("h-hearts");
+  heart.hidden = !CF.lives;          // a counter that cannot move is furniture
   heart.classList.toggle("full", left >= CF.heartMax);
   heart.querySelector("b").textContent = left;
   // A badge that is always on is furniture within a day, so the countdown only
@@ -6017,7 +6028,7 @@ onFinish = function (won) {
   } else {
     LOST = { streak: save.streak, hearts: save.hearts, heartAt: save.heartAt };
     save.streak = 0;
-    if (hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
+    if (CF.lives && hearts() > 0) { save.hearts--; if (!save.heartAt) save.heartAt = Date.now() + CF.heartSecs * 1000; }
   }
   if (won) LOST = null;
   persist();
