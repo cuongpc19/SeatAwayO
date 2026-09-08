@@ -1153,7 +1153,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
      the row written by teleEnd(). -->
 
 <h1>Privacy Policy</h1>
-<p class="upd">Seat Away &middot; last updated <span>2026-09-08</span></p>
+<p class="upd">Seat Match &middot; last updated <span>2026-09-08</span></p>
 
 <p>This game is free, has no accounts, and never asks for your name, e-mail
 address or any other personal detail. What follows is the whole of what it
@@ -1161,7 +1161,7 @@ stores and sends.</p>
 
 <h2>Saved on your own device</h2>
 <p>Your progress is kept in your browser's local storage under the key
-<code>seatawayo.save.v1</code>: the level you have reached, your stars, your gold,
+<code>seatmatch.save.v2</code>: the level you have reached, your stars, your gold,
 your boosters, and the sound and vibration switches. It never leaves your device
 except as described under <em>Cloud save</em> below, and clearing your browser's
 site data deletes it.</p>
@@ -1226,7 +1226,7 @@ gameplay rows carry no identifier, there is no way to single out or delete an
 individual player's rows &mdash; there is nothing in them to search on.</p>
 
 <h2>Contact</h2>
-<p>Questions about this policy: <code>PASTE_A_CONTACT_EMAIL</code></p>
+<p>Questions about this policy: <code>binhp8973@gmail.com</code></p>
 </div>
     </div>
   </div>
@@ -4239,7 +4239,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "91c0a95+";
+const BUILD = "9e6cbcb+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -4484,23 +4484,29 @@ const has = f => Math.max(save.unlocked, CUR || 0) >= unlockedAt(f);
 /* ⚠ This name is fixed from launch on. CrazyGames' Progress Save backs up
    localStorage verbatim, so renaming the key later restores the old name into a
    game that reads the new one and every player loses everything. The window in
-   which a rename is free is before anyone has played, and this build spends it.
+   which a rename is free is before anyone has played, and this build spends it:
+   renamed from `seatawayo.save.v1` on 8 Sep 2026, deliberately, to carry the
+   game's real title instead of the repo's folder name.
 
-   The name carries the repo, not the game's title, because localStorage is
-   keyed by origin and pays no attention to path. Both builds are served from
-   https://cuongpc19.github.io - /SeatAway/ and /SeatAwayO/ - so they share one
-   storage area, and any name the two have in common is one save played by two
-   different games. `seatmatch.save.v1` was exactly that: the older deploy is
-   still reading and writing it.
+   ⚠ `.v2`, and NOT `seatmatch.save.v1`, which looks like the obvious name and
+   is already taken. localStorage is keyed by origin and pays no attention to
+   path, so everything under https://cuongpc19.github.io shares one storage
+   area, and the sibling port in ../../seataway writes `seatmatch.save.v1` from
+   its own source. Its deploy answers 404 today, which makes the collision look
+   theoretical - it is one redeploy away from being two different campaigns
+   writing one save. The suffix is what keeps them apart, so do not "tidy" it.
 
    OLD_KEYS is empty on purpose, and stays empty. Adopting a key is the same
-   mistake in slower motion - it would copy the older game's progress into this
-   one on first load, and levels do not mean the same thing across the two, so
-   an `unlocked` from over there is a number this campaign never earned.
+   mistake in slower motion - it would copy another campaign's progress into
+   this one on first load, and levels do not mean the same thing across the two,
+   so an `unlocked` from over there is a number this campaign never earned. That
+   applies to `seatawayo.save.v1` as well: the rename above is a fresh start,
+   not a migration, and any test progress under the old name is meant to be left
+   behind rather than carried over.
 
    Keeping it empty also settles the other direction: a reset here clears this
-   key alone, and cannot reach into a save that belongs to the other build. */
-const SAVE_KEY = "seatawayo.save.v1";
+   key alone, and cannot reach into a save that belongs to another build. */
+const SAVE_KEY = "seatmatch.save.v2";
 const OLD_KEYS = [];
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
