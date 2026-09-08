@@ -651,14 +651,16 @@ function boosterUi() {
   const aOpen = lockChip(a, "b-area-cost", "booster_area");
   if (tOpen) $("b-time-cost").textContent = save.freeTime > 0 ? "FREE" : CF.boosterTime.price;
   if (jOpen) $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + "x" : CF.boosterJump.price;
-  // "USED" rather than a price once the lane is out: the board has one to give,
-  // and a button quoting a price it will refuse to take is a worse lie than a
-  // greyed-out one.
-  if (aOpen) $("b-area-cost").textContent = S && S.lines ? "USED"
-    : save.lines > 0 ? save.lines + "x" : CF.boosterArea.price;
+  // The chip is hidden once the lane is out - see .boost.spent in the head. A
+  // button that quotes a price it will refuse to take is a lie, and a word in
+  // its place is just a quieter one; the dimmed tile says it without either.
+  const spent = !!(S && S.lines);
+  a.classList.toggle("spent", aOpen && spent);
+  if (aOpen) $("b-area-cost").textContent =
+    save.lines > 0 ? save.lines + "x" : CF.boosterArea.price;
   t.classList.toggle("broke", tOpen && !save.freeTime && save.coins < CF.boosterTime.price);
   j.classList.toggle("broke", jOpen && save.jumps === 0 && save.coins < CF.boosterJump.price);
-  a.classList.toggle("broke", aOpen && !(S && S.lines)
+  a.classList.toggle("broke", aOpen && !spent
     && save.lines === 0 && save.coins < CF.boosterArea.price);
   j.classList.toggle("armed", JUMP);
 }
