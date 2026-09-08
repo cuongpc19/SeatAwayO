@@ -1592,7 +1592,6 @@ function paintPiece(b, wx, wz, alpha) {
   const per = packing(b);
   if (per <= 1) {
     blit(seatFrame(b), wx, 0, wz, alpha);
-    if (HARD && RICH) seatStars(b, wx, wz, alpha);
     return;
   }
   // A bench that covers one cell is drawn as its own places, side by side and
@@ -1603,7 +1602,6 @@ function paintPiece(b, wx, wz, alpha) {
     blit(seatFrame(b), wx + (b.dir & 1 ? 0 : off * SX), 0,
          wz + (b.dir & 1 ? off * SZ : 0), alpha, 1 / per);
   }
-  if (HARD && RICH) seatStars(b, wx, wz, alpha);
 }
 
 /* ---------------- the room ----------------
@@ -2811,68 +2809,6 @@ function eventWalls(E) {
   ctx.restore();
 }
 
-/** A five-pointed star, drawn flat in canvas space. Gold, and outlined: the
-    seats come in twelve colours and three of them are within a shade of this
-    one, so an unoutlined star vanishes on exactly the seats it is meant to
-    decorate. */
-function starAt(px, py, r, alpha) {
-  ctx.save();
-  ctx.globalAlpha = alpha == null ? 1 : alpha;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a = -Math.PI / 2 + i * Math.PI / 5;
-    const q = (i % 2 ? r * .44 : r);
-    const x = px + Math.cos(a) * q, y = py + Math.sin(a) * q;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-  }
-  ctx.closePath();
-  const g = ctx.createLinearGradient(0, py - r, 0, py + r);
-  g.addColorStop(0, "#fff0b4"); g.addColorStop(.5, "#ffcf55"); g.addColorStop(1, "#e09c1c");
-  ctx.fillStyle = g; ctx.fill();
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = "rgba(122,78,12,.65)";
-  ctx.lineWidth = Math.max(1, r * .16);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/** The seat, badged: a star standing on the top rail of the backrest, one per
-    place, turning with the seat.
-
-    This is the original game's own mark, not one of ours. 1.63.1 gives every
-    level a vehicle and every vehicle its own seat, and the party bus - panel 8,
-    which is what levels 15 and 19 are - carries `PartySeat_*`: a ribbed cushion
-    with a five-pointed star standing up off the back of it. The star is the
-    part that survives being shrunk to a cell on a phone, so the star is what
-    this takes.
-
-    ⚠ Struck off the seat's own geometry in room units and then projected. The
-    rail it stands on is where art/assets.py puts it - a third of a unit behind
-    the seat centre, a unit and a half up - so the badge turns and foreshortens
-    with the seat instead of sliding off on three of the four rotations. */
-function seatStars(b, wx, wz, alpha) {
-  const per = packing(b), sc = per > 1 ? 1 / per : 1;
-  const s = LAY.s, [fx, fz] = FACING[b.dir];
-  const r = s * .19 * sc;
-  if (r < 3) return;                     // below this it is a gold smudge
-  const n = per > 1 ? per : b.len;
-  const step = b.dir & 1 ? SZ : SX, along = !!(b.dir & 1);
-  const at = i => (per > 1 ? (i - (per - 1) / 2) / per : i - (n - 1) / 2) * step;
-  /* ⚠ Set BACK from what it does on the SCREEN, not from where the rail is.
-     Depth outruns height four to one at this pitch, so a badge put out at the
-     rail's real distance behind the seat lands a quarter of the way up the
-     cushion on a seat facing away and clean off the top edge on one facing the
-     camera - and a board carries both. Pulled in to a tenth of a unit, it still
-     leans back the way the original does and both rotations sit on the seat. */
-  const BACK = .12, RAIL = 1.20;
-  for (let i = 0; i < n; i++) {
-    const o = at(i);
-    const [px, py] = P(wx + (along ? 0 : o) - fx * BACK, RAIL,
-                       wz + (along ? o : 0) - fz * BACK);
-    starAt(px, py, r, alpha);
-  }
-}
-
 /** The pool of light a seat stands in on a Big Event level. Sized off the seat
     itself so a three-cell bench gets a three-cell pool, and measured on the
     canvas rather than guessed at: the two ground axes do not come out the same
@@ -3801,6 +3737,8 @@ RICH = true;                       // the engine draws a room, not a bare grid
      ?win=1       hand every board a win the moment it opens, so the
                   celebration and the result card can be read on any level
                   without solving one.
+     ?intro=NAME  mark every other piece as met, so NAME's walkthrough is the
+                  one this level owes: grey | twin | jump | time | area
      ?theme=NAME  pin one room and stop the five-level rotation.
                   classroom | station | stadium | concert | cinema
      ?hard=0|1|2  pin the party dressing on any board, rather than taking it
@@ -3823,6 +3761,11 @@ RICH = true;                       // the engine draws a room, not a bare grid
 const LINK = new URLSearchParams(location.search);
 const flag = k => LINK.has(k) && LINK.get(k) !== "0";
 const RESET_ASKED = flag("reset");
+/* ?intro=NAME  every other piece counts as already met, so NAME is the one this
+   level owes. For reading one walkthrough without playing up to it - ?reset=1
+   on its own hands you the earliest one you have not seen, which is the grey
+   seat from level 7, not the one you came to look at. */
+const INTRO_ONLY = LINK.get("intro");
 const WIN_ASKED = flag("win");
 if (RESET_ASKED) {
   LINK.delete("reset");
@@ -5380,6 +5323,10 @@ let BOOTED = false;
   PLATFORM.loadingStart();
   await PLATFORM.init();
   loadSave();
+  if (INTRO_ONLY) {
+    save.seenBoosters = FEATURES.map(f => f.id).filter(id => id !== INTRO_ONLY);
+    save.coins = Math.max(save.coins, 5000);   // so a locked-out price is not the thing being read
+  }
   PLATFORM.onHostMuteChange(() => syncToggles());
   PLATFORM.loadingStop();
 
