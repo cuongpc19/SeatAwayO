@@ -3840,7 +3840,7 @@ function applyTheme(level) {
 /* ---- the numbers the shipped game runs on -----------------------------
    Injected from its own RemoteConfig at build time. Every threshold, price and
    reward below is the live value, not a guess. */
-const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":14,"booster_jump":8,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":300,"value":15,"uses":-1},"boosterJump":{"price":600,"uses":10},"boosterArea":{"price":1000,"uses":3},"keepPlaying":{"price":900,"secs":30}};
+const CF = {"unlock":{"winstreak":5,"gray_seat":7,"booster_time":8,"booster_jump":14,"booster_area":16,"booster_pre_x2_ticket":20,"booster_pre_time":15,"booster_pre_jump":9,"daily_quest":-1,"build_skin":5,"roulette_spin":-1,"battle_pass":16,"badge_league":30,"level_race":10,"shop_special":26,"event_spin":999999,"challenge":50},"goldWin":100,"streakGold":[[3,10],[5,15],[7,20],[10,25]],"heartMax":5,"heartSecs":900,"heartPrice":700,"boosterTime":{"price":300,"value":15,"uses":-1},"boosterJump":{"price":600,"uses":10},"boosterArea":{"price":1000,"uses":3},"keepPlaying":{"price":900,"secs":30}};
 const unlockedAt = f => { const n = CF.unlock[f]; return n > 0 ? n : Infinity; };
 /* A booster is open once the player has reached the level that opens it.
    `save.unlocked` alone answers that for ordinary play - it is always at or
