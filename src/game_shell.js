@@ -1524,7 +1524,7 @@ function reviveBtn(losing) {
   // worth of empty floor under HOME.
   $("c-card").style.setProperty("--dr", losing ? "82px" : "0px");
   if (!losing) return;
-  el.querySelector("b").textContent = "+" + fmt(CF.keepPlaying.secs);
+  el.querySelector("b").textContent = fmt(CF.keepPlaying.secs);
   el.querySelector(".cost").firstChild.textContent = CF.keepPlaying.price;
   el.classList.toggle("broke", save.coins < CF.keepPlaying.price);
   el.classList.remove("shake");
@@ -1621,9 +1621,8 @@ onFinish = function (won) {
   const card = () => gen === cardGen &&
     overlay(won ? "LEVEL COMPLETE!" : "OUT OF TIME", stars, "+" + pay.total,
     has("winstreak") && pay.bonus ? save.streak + " IN A ROW · +" + pay.bonus + " BONUS" : "",
-    "The show started with <b>" + S.queue.length + "</b> still outside."
-      + "<span>" + (has("booster_time") ? "There is more time on the booster row, if the gold is there."
-                                        : "Clear the doorway first - the queue does the rest.") + "</span>",
+    has("booster_time") ? "There is more time on the booster row, if the gold is there."
+                        : "Clear the doorway first - the queue does the rest.",
     featureProgress(lvl), lvl);
   if (won) { cheer(); setTimeout(card, CHEER_MS); } else card();
 };

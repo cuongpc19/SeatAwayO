@@ -610,7 +610,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    label, where "REVIVE +1:00 500" reads as one number too many. */
 .wide-btn.gold { background: linear-gradient(180deg, #ffd76a, #efa326); box-shadow: 0 6px 0 #b9750f; }
 .wide-btn.gold:active { box-shadow: 0 3px 0 #b9750f; }
+/* Three things on one line, so the label is laid out rather than centred as a
+   run of text. The price chip is absolute and stays out of it. */
+#c-revive { display: flex; align-items: center; justify-content: center; gap: 8px; }
 #c-revive b { color: #fff3c4; }
+#c-revive .clk { width: 34px; height: 34px; flex: none; margin-top: -2px; }
+#c-revive .clk g { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#c-revive .clk .ink { stroke: var(--ms-ink); stroke-width: 6.4; }
+#c-revive .clk .lit { stroke: #fff; stroke-width: 2.6; }
 #c-revive .cost {
   position: absolute; right: -10px; top: -14px;
   display: flex; align-items: center; gap: 5px; white-space: nowrap;
@@ -1034,7 +1041,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
       <div class="streak" id="c-streak" hidden></div>
-      <button class="wide-btn gold" id="c-revive" hidden>REVIVE <b>+1:00</b><span class="cost">500</span></button>
+      <!-- the stopwatch is the boosters' own, drawn twice: the dark pass is the
+           button label's 6px ink stroke, which SVG has no text-stroke for -->
+      <button class="wide-btn gold" id="c-revive" hidden>REVIVE<svg class="clk" viewBox="0 0 24 24"
+        aria-hidden="true"><g class="ink"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g><g class="lit"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g></svg><b>1:00</b><span class="cost">500</span></button>
       <button class="wide-btn" id="c-next">NEXT LEVEL</button>
       <button class="wide-btn blue" id="c-home">HOME</button>
     </div>
