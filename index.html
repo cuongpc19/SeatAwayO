@@ -2933,6 +2933,11 @@ function drawRoom(g) {
   const T = .90, H = .78;                        // wall thickness, wall height
   const dz0 = cellZ(g.door) - SZ * .42, dz1 = cellZ(g.door) + SZ * .42;
   const OX = x1 + T;                             // outside face of the door wall
+  // A board with two lines has a doorway in the far wall as well, at the same
+  // row, and OX2 is that wall's outside face. Everything below that draws the
+  // near doorway is mirrored across the room for it.
+  const twoDoors = !!(g.doors && g.doors.length > 1);
+  const OX2 = x0 - T;
 
   // ---- outside the room ----
   const gx0 = x0 - T - SX * 9, gx1 = x1 + T + SX * 9;
@@ -2986,7 +2991,12 @@ function drawRoom(g) {
   const L = .17;
   slab(x0 - L, z0 - L, x1 + L, z0, .0, SKIN.lip);
   slab(x0 - L, z1, x1 + L, z1 + L, .0, SKIN.lip);
-  slab(x0 - L, z0, x0, z1, .0, SKIN.lip);
+  if (twoDoors) {                                // the far lip parts for its own way in
+    slab(x0 - L, z0, x0, dz0, .0, SKIN.lip);
+    slab(x0 - L, dz1, x0, z1, .0, SKIN.lip);
+  } else {
+    slab(x0 - L, z0, x0, z1, .0, SKIN.lip);
+  }
   slab(x1, z0, x1 + L, dz0, .0, SKIN.lip);
   slab(x1, dz1, x1 + L, z1 + L, .0, SKIN.lip);
 
@@ -2995,6 +3005,7 @@ function drawRoom(g) {
   // drawn at floor level, so under this camera they landed BELOW the cut and the
   // three of them stacked up into bars across the way in.
   slab(x1 - .02, dz0, OX + .02, dz1, H + .004, SKIN.door);
+  if (twoDoors) slab(OX2 - .02, dz0, x0 + .02, dz1, H + .004, SKIN.door);
 
   if (TH.dressWalls) TH.dressWalls(E);
   if (f != null && TH.finale) TH.finale(E, f, "room");
