@@ -445,7 +445,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #card.on { display: block; }
 #card .design {
   --dy: 0px; --dz: 0px;              /* the room the bar and the streak line need */
-  --dr: 0px;                         /* ...and the room the revive button needs */
   position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
   transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
 }
@@ -480,15 +479,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    line this game has and that one does not: one number, so the card without a
    streak stays exactly the card it already was. */
 .panel {
-  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + 46px);
   border-radius: 36px; background: rgba(29,26,69,.55);
 }
 .panel i {
-  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + 46px);
   border-radius: 34px; background: var(--ms-edge);
 }
 .panel u {
-  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + 46px);
   border-radius: 32px; background: var(--ms-face); overflow: hidden;
 }
 /* The header band: rounded at the top, square where it meets the face. */
@@ -598,51 +597,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   font-size: 23px; line-height: 1.4; color: #3b465f; }
 .sum b { color: var(--ms-ink); }
 .sum span { display: block; margin-top: 26px; font-size: 19px; color: #7c88a6; }
-/* Revive sits where the eye already is - the first button under the text - and
-   the other two move down by exactly the gap they already had between them. */
-#c-revive { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
-#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
-#c-revive:active, #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
-#c-revive[hidden] { display: none; }
-/* Gold, because it is the one button on the card that costs something. The
-   price rides on its corner the way the boosters' does, rather than inside the
-   label, where "REVIVE +1:00 500" reads as one number too many. */
-.wide-btn.gold { background: linear-gradient(180deg, #ffd76a, #efa326); box-shadow: 0 6px 0 #b9750f; }
-.wide-btn.gold:active { box-shadow: 0 3px 0 #b9750f; }
-/* Three things on one line, so the label is laid out rather than centred as a
-   run of text. The price chip is absolute and stays out of it. */
-#c-revive { display: flex; align-items: center; justify-content: center; gap: 8px; }
-#c-revive b { color: #fff3c4; }
-#c-revive .clk { width: 34px; height: 34px; flex: none; margin-top: -2px; }
-#c-revive .clk g { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-#c-revive .clk .ink { stroke: var(--ms-ink); stroke-width: 6.4; }
-#c-revive .clk .lit { stroke: #fff; stroke-width: 2.6; }
-#c-revive .cost {
-  position: absolute; right: -10px; top: -14px;
-  display: flex; align-items: center; gap: 5px; white-space: nowrap;
-  background: linear-gradient(180deg, #5fd472, #3aa94f);
-  box-shadow: 0 3px 0 #2b8039; border-radius: 999px; padding: 3px 12px;
-  font-size: 21px; color: #fff; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
-}
-#c-revive .cost::after {
-  content: ""; width: 17px; height: 17px; border-radius: 50%; -webkit-text-stroke: 0;
-  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
-}
-/* Not enough gold. The button stays where it is and stays readable - hiding it
-   would answer "why is this level unwinnable" with nothing - and only the price
-   turns, which is the part that is actually the problem. */
-#c-revive.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 6px 0 #6b6681; }
-#c-revive.broke:active { box-shadow: 0 3px 0 #6b6681; }
-#c-revive.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 3px 0 #a3374a; }
-/* The toast that would normally say why lives under the card, so the refusal
-   has to happen on the button itself. */
-#c-revive.shake { animation: revshake .4s; }
-@keyframes revshake {
-  20% { transform: translate(calc(-50% - 9px), -50%); }
-  50% { transform: translate(calc(-50% + 8px), -50%); }
-  80% { transform: translate(calc(-50% - 5px), -50%); }
-}
+#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -773,7 +730,152 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #set-home   { top: 695px; }
 #set-resume { top: 785px; }
 
+/* Underneath the three buttons, inside the panel, and deliberately quiet: it is
+   something a player looks for rather than something offered to them. */
+.set-link {
+  left: 270px; top: 843px; transform: translate(-50%, -50%);
+  padding: 6px 14px; border: 0; background: none; cursor: pointer;
+  font-family: var(--ms); font-size: 20px; letter-spacing: .04em;
+  color: rgba(43,53,80,.5); text-decoration: underline;
+}
+.set-link:active { color: var(--ms-ink); }
 
+/* ---------- the privacy policy ----------
+   Plain document styling, and its own scroll. z-index above Settings, which
+   stays open behind it so closing this lands back where it was opened from. */
+#privacy { position: absolute; inset: 0; display: none; z-index: 30; }
+#privacy.on { display: block; }
+#privacy .dim { background: rgba(16,26,51,.72); }
+.pv-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92%, 40rem); height: min(88%, 46rem); border-radius: 18px;
+  background: #fbfbfe; box-shadow: 0 18px 44px rgba(0,0,0,.45); overflow: hidden;
+}
+.pv-body {
+  position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 26px 24px 40px; color: #22283a;
+  font: 15px/1.62 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.pv-body h1 { font-size: 1.55rem; margin: 0 0 .2em; padding-right: 46px; }
+.pv-body h2 { font-size: 1.06rem; margin: 1.7em 0 .45em; color: #39415c; }
+.pv-body .upd { color: #6b7288; margin: 0 0 1.6em; font-size: .9rem; }
+.pv-body code { background: #e7eaf3; border-radius: 5px; padding: .1em .38em; font-size: .92em;
+  overflow-wrap: anywhere; }
+.pv-body ul { padding-left: 1.25em; }
+.pv-body li { margin: .28em 0; }
+/* The hosted copy links these two out; in here they must stay plain text -
+   an outbound link in the UI is the thing that is banned. */
+.pv-body .host { font-style: italic; }
+.pv-x {
+  position: absolute; right: 12px; top: 12px; z-index: 1; width: 38px; height: 38px;
+  padding: 0; cursor: pointer; border: 0; border-radius: 50%;
+  background: #e7eaf3; color: #39415c; font-family: var(--ms); font-size: 17px; line-height: 1;
+}
+.pv-x:active { background: #d5d9e8; }
+
+
+/* ---------- the revive offer ----------
+   Its own screen, ahead of the results card. Running out of time is a question
+   before it is a verdict - the board is still standing, the seats are where the
+   player left them, and a minute is for sale - so the card that says TRY AGAIN
+   and HOME does not appear until that question has been answered with the X.
+
+   Built as a plate rather than as one more button on the card because the thing
+   being sold needs a picture: "+1:00" as a line of text on a button is a price
+   with nothing attached to it. */
+#revive { position: absolute; inset: 0; display: none; z-index: 23; font-family: var(--ms); }
+#revive.on { display: block; }
+#revive .dim { position: absolute; inset: 0; background: rgba(13,10,42,.78); }
+#revive .design {
+  position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
+  transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
+}
+#revive .design > * { position: absolute; }
+/* gold rim, blue face, and a lighter band down the inside of the rim */
+.rv-plate { left: 54px; top: 322px; width: 432px; height: 578px; border-radius: 52px;
+  background: linear-gradient(180deg, #ffd25a, #eda31c); box-shadow: 0 10px 0 rgba(0,0,0,.22); }
+.rv-plate i { position: absolute; inset: 11px; border-radius: 42px; background: #1c56c4; }
+.rv-plate u { position: absolute; inset: 18px; border-radius: 36px;
+  background: linear-gradient(180deg, #3d8bf5, #2266d8); }
+/* The title rides the rim rather than sitting inside it, which is what stops the
+   plate reading as a form. */
+.rv-banner {
+  left: 62px; top: 288px; width: 416px; height: 96px; border-radius: 38px;
+  background: linear-gradient(180deg, #ffd25a, #f2a81d);
+  box-shadow: 0 7px 0 #c47a0c, inset 0 -5px 0 rgba(0,0,0,.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px; color: #fff; -webkit-text-stroke: 9px #b1690a; paint-order: stroke fill;
+}
+.rv-x {
+  left: 424px; top: 296px; width: 74px; height: 74px; border: 0; border-radius: 50%; padding: 0;
+  cursor: pointer; background: linear-gradient(180deg, #f2604f, #cf2f28);
+  box-shadow: 0 6px 0 #9c1f1a; display: flex; align-items: center; justify-content: center;
+}
+.rv-x:active { transform: translateY(3px); box-shadow: 0 3px 0 #9c1f1a; }
+.rv-x svg { width: 34px; height: 34px; }
+.rv-x path { stroke: #fff; stroke-width: 5.5; stroke-linecap: round; fill: none; }
+/* The picture. Warm paper with a slow sunburst, so the clock is standing in a
+   light rather than pasted on a rectangle. */
+.rv-art { left: 100px; top: 424px; width: 340px; height: 286px; border-radius: 28px;
+  background: #f7efdd; box-shadow: inset 0 4px 0 rgba(0,0,0,.07); overflow: hidden; }
+.rv-art .burst {
+  position: absolute; left: 50%; top: 52%; width: 520px; height: 520px;
+  transform: translate(-50%, -50%); animation: spin 34s linear infinite;
+  background: repeating-conic-gradient(#ffe4ae 0deg 11deg, transparent 11deg 22deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 10%, rgba(0,0,0,.5) 48%, transparent 92%);
+  mask-image: radial-gradient(circle closest-side, #000 10%, rgba(0,0,0,.5) 48%, transparent 92%);
+}
+.rv-art .clock { position: absolute; left: 50%; top: 45%; width: 218px; height: 218px;
+  transform: translate(-50%, -50%); }
+.rv-art .plus {
+  position: absolute; left: 0; bottom: 20px; width: 100%; text-align: center;
+  font-size: 62px; color: #ffcf3d; -webkit-text-stroke: 11px #a8281c; paint-order: stroke fill;
+}
+.rv-say {
+  left: 84px; top: 736px; width: 372px; height: 62px; border-radius: 18px;
+  background: rgba(9,38,96,.38);
+  /* ⚠ Not flex. Every child of a flex box is an item, and the spaces either
+     side of the number are whitespace-only text nodes, which are not - so the
+     line came out as "Add60seconds". Centred text keeps its own spaces. */
+  text-align: center; line-height: 62px;
+  font-size: 25px; color: #fff; -webkit-text-stroke: 5px #123a86; paint-order: stroke fill;
+}
+.rv-say b { color: #ffd23c; }
+/* Two lines: what it does, and what it costs. A price on its own row is the one
+   arrangement where neither has to be read past to find the other. */
+#rv-go {
+  left: 270px; top: 852px; transform: translate(-50%, -50%);
+  width: 268px; height: 104px; border: 0; border-radius: 26px; padding: 0; cursor: pointer;
+  font-family: var(--ms); color: #fff;
+  background: linear-gradient(180deg, #7fe06a, #3fb43f); box-shadow: 0 7px 0 #2c8330;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+#rv-go:active { transform: translate(-50%, calc(-50% + 3px)); box-shadow: 0 4px 0 #2c8330; }
+#rv-go .lab { font-size: 31px; -webkit-text-stroke: 7px #22682a; paint-order: stroke fill; }
+#rv-go .cost {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 26px; color: #ffe27a; -webkit-text-stroke: 6px #22682a; paint-order: stroke fill;
+}
+#rv-go .cost::after {
+  content: ""; width: 26px; height: 26px; border-radius: 50%; -webkit-text-stroke: 0;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.2);
+}
+/* Not enough gold. The button keeps its place and its words - taking it away
+   would answer "why can I not keep playing" with nothing - and only the price
+   turns, which is the part that is the problem. */
+#rv-go.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 7px 0 #6b6681; }
+#rv-go.broke:active { box-shadow: 0 4px 0 #6b6681; }
+#rv-go.broke .lab { -webkit-text-stroke-color: #5a5570; }
+#rv-go.broke .cost { color: #ffb3bf; -webkit-text-stroke-color: #5a5570; }
+/* The toast that would normally say why lives under this, so the refusal has to
+   happen on the button itself. */
+#rv-go.shake { animation: rvshake .4s; }
+@keyframes rvshake {
+  20% { transform: translate(calc(-50% - 10px), -50%); }
+  50% { transform: translate(calc(-50% + 9px), -50%); }
+  80% { transform: translate(calc(-50% - 5px), -50%); }
+}
 /* ---------- the feature walkthroughs ----------
    Not one card that says everything at once: a short run of steps, each one
    pointing at a single thing and stopping there.
@@ -1021,6 +1123,59 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       <button class="wide-btn set-btn" id="set-retry">RESTART LEVEL</button>
       <button class="wide-btn blue set-btn" id="set-home">HOME</button>
       <button class="wide-btn set-btn" id="set-resume">RESUME</button>
+      <!-- ⚠ A button, never an <a href>. CrazyGames bans outbound links, and
+           the policy the submission form points at is hosted separately - this
+           one opens the copy that ships inside the bundle, same page, no
+           navigation. See CRAZYGAMES.md. -->
+      <button class="set-link" id="set-privacy">PRIVACY</button>
+    </div>
+  </div>
+
+  <!-- The policy itself. Deliberately outside the 540x1160 design box every
+       other overlay is laid out in: it is a document, not a game screen, so it
+       wants real text flow and a scrollbar rather than absolute positions that
+       would clip whichever paragraph grew. -->
+  <div id="privacy">
+    <div class="dim" id="pv-dim"></div>
+    <div class="pv-card">
+      <button class="pv-x" id="pv-close" aria-label="Close">&#10005;</button>
+      <div class="pv-body">/*__PRIVACY__*/</div>
+    </div>
+  </div>
+
+  <div id="revive">
+    <div class="dim"></div>
+    <div class="design">
+      <div class="rv-plate"><i></i><u></u></div>
+      <div class="rv-banner">Time Out!</div>
+      <button class="rv-x" id="rv-x" aria-label="No thanks">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+      <div class="rv-art">
+        <div class="burst"></div>
+        <!-- drawn, not an image: the file would be the one asset in the build
+             that is not either the board's atlas or a stroked icon -->
+        <svg class="clock" viewBox="0 0 140 140" aria-hidden="true">
+          <g stroke="#a8281c" stroke-width="5" stroke-linejoin="round">
+            <path d="M34 116 24 133M106 116l10 17" stroke-width="13" stroke-linecap="round" fill="none"></path>
+            <ellipse cx="30" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(-32 30 33)"></ellipse>
+            <ellipse cx="110" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(32 110 33)"></ellipse>
+            <rect x="63" y="16" width="14" height="16" rx="5" fill="#ffc63a"></rect>
+            <circle cx="70" cy="82" r="47" fill="#e23b30"></circle>
+            <circle cx="70" cy="82" r="35" fill="#fff8ec" stroke-width="4"></circle>
+          </g>
+          <g fill="#d8cfc0">
+            <circle cx="70" cy="55" r="3"></circle><circle cx="97" cy="82" r="3"></circle>
+            <circle cx="70" cy="109" r="3"></circle><circle cx="43" cy="82" r="3"></circle>
+          </g>
+          <path d="M70 82 62 60M70 82l19 11" stroke="#f5a01e" stroke-width="8"
+            stroke-linecap="round" fill="none"></path>
+          <circle cx="70" cy="82" r="6" fill="#e23b30"></circle>
+        </svg>
+        <div class="plus" id="rv-plus">+60</div>
+      </div>
+      <div class="rv-say">Add <b id="rv-secs">60</b> seconds to keep playing!</div>
+      <button id="rv-go"><span class="lab">Continue</span><span class="cost">500</span></button>
     </div>
   </div>
 
@@ -1041,10 +1196,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
       <div class="streak" id="c-streak" hidden></div>
-      <!-- the stopwatch is the boosters' own, drawn twice: the dark pass is the
-           button label's 6px ink stroke, which SVG has no text-stroke for -->
-      <button class="wide-btn gold" id="c-revive" hidden>REVIVE<svg class="clk" viewBox="0 0 24 24"
-        aria-hidden="true"><g class="ink"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g><g class="lit"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g></svg><b>1:00</b><span class="cost">500</span></button>
       <button class="wide-btn" id="c-next">NEXT LEVEL</button>
       <button class="wide-btn blue" id="c-home">HOME</button>
     </div>

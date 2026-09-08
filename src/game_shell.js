@@ -460,6 +460,17 @@ function startLevel(n) {
   closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
   openBoard();
+  /* ⚠ After openBoard(), so the board being fingerprinted is the one that has
+     actually loaded, and before the warning card, so the clock covers the whole
+     time the level was on screen.
+
+     Fires again on a retry, which is deliberate: a retry is a second game of
+     the same level and the data should say so rather than folding two attempts
+     into one. gaLevelStart also brings gtag.js up - the first level is the
+     earliest it may load, see ANALYTICS.md §7. */
+  const tb = boardOf(CUR);
+  teleStart(CUR, tb);
+  gaLevelStart(CUR, tb ? tb.diff | 0 : 0);
   // The warning first, then anything new on the board. Chained rather than run
   // side by side: both stop the clock and hold the queue, and two overlays that
   // each let go on their own way out leave the board running under the second.
@@ -692,6 +703,10 @@ $("b-time").onclick = () => {
   const freeT = save.freeTime > 0;
   if (!freeT && save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
   if (freeT) save.freeTime--; else save.coins -= CF.boosterTime.price;
+  // A free go and a bought one are told apart: the free ones come from the
+  // walkthrough, so counting them as spending would make the tutorial look like
+  // a board people had to pay to get past.
+  teleBooster(freeT ? "time-free" : "time");
   SFX.buy(); buzz(14);
   S.left += CF.boosterTime.value;
   S.time = Math.max(S.time, S.left);          // keep the bar honest
@@ -742,6 +757,7 @@ $("b-area").onclick = () => {
     save.coins -= CF.boosterArea.price;
     if (CF.boosterArea.uses > 1) save.lines = CF.boosterArea.uses - 1;
   }
+  teleBooster("area");
   SFX.buy(); buzz(14);
   persist(); say("A lane opens down the left."); onHud(); draw();
   autoBoard();
@@ -765,6 +781,10 @@ onSeatPick = seat => {
   }
   JUMP = false;
   save.jumps = Math.max(0, save.jumps - 1);
+  // ⚠ Where the charge is actually spent, not where the button was pressed.
+  // Arming and then changing your mind is free, and a row saying otherwise
+  // would put jumps on boards nobody jumped on.
+  teleBooster("jump");
   persist(); buzz(16); onHud(); draw();
   introSaw("jumped");
   return true;
@@ -1359,6 +1379,12 @@ $("set-home").onclick = () => { closeSettings(); hideCard(); show("home"); };
    close disc in the corner, the one obvious thing to press was HOME, so
    opening the settings meant leaving the level. */
 $("set-resume").onclick = closeSettings;
+/* ⚠ Settings stays open behind it, so closing the policy lands back where it
+   was opened from rather than dropping the player onto a running board. The
+   panel is a div in this same page, never a link out - see CRAZYGAMES.md. */
+$("set-privacy").onclick = () => $("privacy").classList.add("on");
+$("pv-close").onclick = () => $("privacy").classList.remove("on");
+$("pv-dim").onclick = () => $("privacy").classList.remove("on");
 
 /* ---- the result card ---------------------------------------------------
    Marble Sort's `GameScene.overlay`, ported: the sunburst, the three-plate
@@ -1370,7 +1396,12 @@ const cardEl = document.getElementById("card");
    be left inside it - by a retry, or by anything that starts a level. Without
    this the card would arrive over whatever came next. */
 let cardGen = 0;
-function hideCard() { cardGen++; cardEl.classList.remove("on", "cheer"); }
+function hideCard() {
+  cardGen++; cardEl.classList.remove("on", "cheer");
+  // Everything that tears the card down - a retry, HOME, the next level - is
+  // also leaving the board the offer was about, so the offer goes with it.
+  $("revive").classList.remove("on"); REVIVE_THEN = null;
+}
 onNewLevel = hideCard;
 
 /* The star is Marble Sort's: a flat gold ten-point path with one darker outline,
@@ -1515,29 +1546,41 @@ function featureBar(feat, cleared) {
    still lost, which is not true of a penalty that is only written on TRY AGAIN. */
 let LOST = null;                     // what the last loss cost, until it is spent
 
-/** Show it, price it, and say whether the gold is there. */
-function reviveBtn(losing) {
-  const el = $("c-revive");
-  el.hidden = !losing;
-  // ⚠ Both ways. The variable is written inline on the design, so a card left
-  // holding the losing card's 82px hands the next win a plate with a button's
-  // worth of empty floor under HOME.
-  $("c-card").style.setProperty("--dr", losing ? "82px" : "0px");
-  if (!losing) return;
-  el.querySelector("b").textContent = fmt(CF.keepPlaying.secs);
-  el.querySelector(".cost").firstChild.textContent = CF.keepPlaying.price;
-  el.classList.toggle("broke", save.coins < CF.keepPlaying.price);
-  el.classList.remove("shake");
+/* The results card, held back until the offer has been answered. The X is the
+   only way to it, which is the whole point of the order: a player who has just
+   run out of time is asked whether they want to keep this board before being
+   shown the two ways of leaving it. */
+let REVIVE_THEN = null;
+
+/** Put the offer up, priced, ahead of `then`. */
+function offerRevive(then) {
+  REVIVE_THEN = then;
+  const go = $("rv-go"), secs = CF.keepPlaying.secs;
+  $("rv-plus").textContent = "+" + secs;
+  $("rv-secs").textContent = secs;
+  go.querySelector(".cost").textContent = CF.keepPlaying.price;
+  go.classList.toggle("broke", save.coins < CF.keepPlaying.price);
+  go.classList.remove("shake");
+  $("revive").classList.add("on");
+}
+
+/** Turned down: on to the card that was waiting behind it. */
+function declineRevive() {
+  $("revive").classList.remove("on");
+  const then = REVIVE_THEN; REVIVE_THEN = null;
+  if (then) then();
 }
 
 function revive() {
-  const el = $("c-revive"), price = CF.keepPlaying.price;
+  const go = $("rv-go"), price = CF.keepPlaying.price;
   if (save.coins < price) {
-    // The toast lives under the card, so the button has to carry the refusal.
-    el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+    // The toast lives under this, so the button has to carry the refusal.
+    go.classList.remove("shake"); void go.offsetWidth; go.classList.add("shake");
     SFX.no(); buzz(50);
     return;
   }
+  REVIVE_THEN = null;                  // the card behind this is not wanted now
+  $("revive").classList.remove("on");
   save.coins -= price;
   if (LOST) { save.streak = LOST.streak; save.hearts = LOST.hearts; save.heartAt = LOST.heartAt; }
   LOST = null;
@@ -1547,6 +1590,11 @@ function revive() {
   S.left += CF.keepPlaying.secs;
   S.time = Math.max(S.time, S.left);   // the star bar reads left/time - keep it honest
   RUNNING = true;                      // it was running a moment ago; do not wait to be asked again
+  /* ⚠ onFinish has already posted the losing row by the time this runs, so the
+     run's clock has to be re-armed or the bought game would report nothing at
+     all. Two rows is the honest account: a loss, then a second game carrying
+     `revive` in `used`. See telemetry.js. */
+  teleResume("revive");
   PLATFORM.gameplayStart();
   SFX.buy();
   onHud(); boosterUi(); draw();      // onHud repaints the purse; 500 gone can price a booster out
@@ -1559,7 +1607,6 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   design.style.setProperty("--dy", (feat ? 66 : 0) + "px");
   design.style.setProperty("--dz", (stars && streak ? 34 : 0) + "px");
   design.classList.toggle("lose", !stars);
-  reviveBtn(!stars);
   $("c-title").textContent = title;
   $("c-rays").hidden = !stars;
   $("c-coins").hidden = !stars;
@@ -1603,6 +1650,11 @@ onFinish = function (won) {
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;
   const pay = purse();
+  /* ⚠ Here, while `S` is still the board that was just played - teleEnd reads
+     `S.moves` off it, and the next startLevel replaces it. The row goes out
+     before the card so a player who closes the tab on the win still counts.
+     teleEnd hands back the run's length so GA and the database agree. */
+  gaLevelEnd(lvl, won, Math.round(teleEnd(won, stars) / 1000), stars);
   if (won) {
     if (stars > (save.stars[lvl] || 0)) save.stars[lvl] = stars;   // only ever raises
     if (lvl + 1 > save.unlocked) save.unlocked = Math.min(CAMPAIGN.length, lvl + 1);
@@ -1624,7 +1676,7 @@ onFinish = function (won) {
     has("booster_time") ? "There is more time on the booster row, if the gold is there."
                         : "Clear the doorway first - the queue does the rest.",
     featureProgress(lvl), lvl);
-  if (won) { cheer(); setTimeout(card, CHEER_MS); } else card();
+  if (won) { cheer(); setTimeout(card, CHEER_MS); } else offerRevive(card);
 };
 
 /* ---- wiring ------------------------------------------------------------ */
@@ -1646,7 +1698,8 @@ $("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null
    wired straight to `show("home")`, so the one control on the HUD that was
    not the clock took the player off the board in a single tap. */
 $("g-menu").onclick = openSettings;
-document.getElementById("c-revive").onclick = revive;
+document.getElementById("rv-go").onclick = revive;
+document.getElementById("rv-x").onclick = declineRevive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
 document.getElementById("c-next").onclick = () =>
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
