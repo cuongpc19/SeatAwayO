@@ -1975,6 +1975,17 @@ function drawRoom(g) {
   if (!(painted && TH.plate)) TH.outside(E);
   if (TH.party) TH.party(E);          // the hard-level dressing, see PARTY
   if (f != null && TH.finale) TH.finale(E, f, "back");
+  // A deck for the far line, on the boards that have one. Without it they are
+  // stood on the track: a sprite that fades with its place in the queue, against
+  // dark ground, is a line nobody can read - and the near line has had a
+  // platform under it since the beginning. Built from the room's own colours, so
+  // it belongs to whichever theme is up rather than being a station in a cinema.
+  if (twoDoors) {
+    const K = TH.skin;
+    slab(gx0, gz0, OX2, gz1, -.030, K.lip);                        // the drop to the track
+    slab(gx0, gz0, OX2 - SX * .13, gz1, -.028, K.fa);              // the deck
+    slab(OX2 - SX * .42, gz0, OX2 - SX * .30, gz1, -.026, K.trim); // the line you stand behind
+  }
   SHIFT = moved;
 
   // ---- the carriage ----
@@ -2144,9 +2155,12 @@ function draw() {
       const walking = back > 1e-3 && qnow >= st.t0;
       const pos = i + back, wz = laneZ + pos * QUEUE_PITCH * queueDir(g, dk);
       const nm = SPRITE[colName(q[i])] || "grey";
-      // Faded by where they stand rather than by which place they hold, so someone
-      // coming forward brightens as they arrive instead of on the frame they shift.
-      const a = Math.max(.4, 1 - pos * .11);
+      // No fade. It was there to push the tail of the line back behind the head,
+      // but the line is information - who is coming, in what colour, in what
+      // order - and a player reading the back of it was reading it through a
+      // veil. The far line made that plain: over dark ground the tail was simply
+      // not there.
+      const a = 1;
       push(laneX, wz, () => {
         shadow(laneX, wz, .3);
         if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
