@@ -21,6 +21,9 @@ RICH = true;                       // the engine draws a room, not a bare grid
                   without solving one.
      ?theme=NAME  pin one room and stop the five-level rotation.
                   classroom | station | stadium | concert | cinema
+     ?hard=0|1|2  pin the party dressing on any board, rather than taking it
+                  from the board's own grading - the five party rooms are
+                  otherwise only reachable on the levels that carry them.
      ?bg=NAME     swap the procedural room for a painted bg/NAME.png.
 
    None of them is a way round the campaign: the level still has to be won to
@@ -54,6 +57,7 @@ const BUILT = "/*__BUILT__*/";           // the stamp on the home screen's foot
 const THEME_RUN = 5;                    // levels before the room changes
 const THEME_ORDER = ["classroom", "station", "stadium", "concert", "cinema"];
 const pinnedTheme = LINK.get("theme");
+const pinnedHard = LINK.get("hard");
 
 /** The still on the cinema screen. Loaded once at boot rather than when a cinema
     level comes up: it is inlined in the build, so there is nothing to wait for,
@@ -73,9 +77,21 @@ function themeFor(level) {
 
 function applyTheme(level) {
   THEME = themeFor(level);
+  /* A marked board is played in the same room with the party thrown in it - see
+     PARTY in the engine. Read off the board, exactly like the chip and the
+     warning card, so the three of them cannot disagree about which levels are
+     hard: a list of level numbers written here would be a second copy of the
+     grading, and the campaign numbering has already moved once. */
+  const b = boardOf(level);
+  // A bare ?hard counts as grade 1, the way a bare flag counts everywhere else
+  // in this block - it is the form a person types first.
+  HARD = pinnedHard == null ? (b ? b.diff | 0 : 0)
+       : pinnedHard === "" ? 1
+       : Math.max(0, Math.min(2, +pinnedHard || 0));
   // whatever the canvas does not cover should be the room's own colour, not the
-  // one left behind by the level before it
-  const page = THEMES[THEME].page;
+  // one left behind by the level before it. themeNow(), not THEMES: a party
+  // paints a different page behind the same room.
+  const page = themeNow().page;
   document.getElementById("play").style.background = page || "#98a1ab";
 }
 
@@ -519,7 +535,11 @@ function openBoard() {
   hideCard();
   show("play");
   // the opening beat is there to teach the boarding, so it stops with the lesson
-  OPEN_MS = CUR <= 2 ? 2000 : 0;
+  // Only board 1. The beat is there so a first-time player watches somebody walk
+  // on and hop into a seat instead of opening the level to find them sitting -
+  // that is a lesson, and one board is where it lands. On board 2 it is two
+  // seconds of a still picture shown to a player who has just seen it.
+  OPEN_MS = CUR <= 1 ? 1000 : 0;
   /* Set before load(), not in showIntro(): with no opening beat, load() starts
      the queue on the frame the board appears, which is before the walkthrough
      that is meant to hold them has been put up. */
