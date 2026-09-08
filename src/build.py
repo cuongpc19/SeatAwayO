@@ -116,7 +116,12 @@ KEEP_PLAYING_SECS = 60
 
 # ⚠ Ours, and only for testing: a level number -> its clock, overriding the two
 # numbers above. Level 1000 is here so the run-out-of-time screen can be reached
-# in five seconds instead of five minutes. Empty this before it matters.
+# in five seconds instead of four minutes.
+#
+# ⚠ Never in a store bundle. A build for a host ships the campaign without this,
+# so a five-second level cannot ride out to players on the strength of nobody
+# having remembered to empty the dict - see levels_json(test=...) and the SHIP
+# line in build(). It is in the web build, where the test links live.
 TEST_CLOCK = {1000: 5}
 
 def grade(n):
@@ -151,7 +156,7 @@ def tuning(shipped_gold):
 
 
 
-def levels_json():
+def levels_json(test=True):
     """The campaign boards, with any hand-edited ones laid over the top.
 
     lv/boards_campaign.json is what came out of the APK and stays that way; an
@@ -186,21 +191,25 @@ def levels_json():
                 continue
             n += 1
             b["diff"] = grade(n)
-            b["time"] = TEST_CLOCK.get(n, HARD_SECONDS if b["diff"] else PLAIN_SECONDS)
+            b["time"] = HARD_SECONDS if b["diff"] else PLAIN_SECONDS
+            if test and n in TEST_CLOCK: b["time"] = TEST_CLOCK[n]
         marked = sum(1 for b in boards if b.get("diff"))
         print("  tuning    %d of %d levels graded hard, from the level number" % (marked, n))
         print("  tuning    clock flat: %ds plain, %ds hard" % (PLAIN_SECONDS, HARD_SECONDS))
-        for lv in sorted(TEST_CLOCK):
+        for lv in sorted(TEST_CLOCK) if test else []:
             print("  TEST      level %d clock forced to %ds" % (lv, TEST_CLOCK[lv]))
     print("  campaign  %s, %d boards" % (CAMPAIGN, len(boards)))
     return json.dumps(boards, separators=(",", ":"))
 
 
 LEVELS = levels_json()
+# Built only when a host bundle is actually being made - it is the same 1497
+# boards a second time, and the web build has no use for it.
+SHIP_LEVELS = None
 
 
-def fill(html):
-    return (html.replace("/*__LEVELS__*/", LEVELS)
+def fill(html, levels=None):
+    return (html.replace("/*__LEVELS__*/", levels or LEVELS)
                 .replace("/*__META__*/", open(ART / "seat_atlas.json", encoding="utf-8").read())
                 .replace("/*__ATLAS__*/", open(ART / "seat_atlas_b64.txt", encoding="utf-8").read().strip())
                 .replace("/*__WMETA__*/", open(ART / "walk_atlas.json", encoding="utf-8").read())
@@ -357,7 +366,15 @@ def build(head_file, shell_file, out, host="none"):
         # best - and it has no PLATFORM to name as the source either.
         tele = ANALYTICS + "\n" + TELEMETRY + "\n"
     page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + plat + tele + shell + "\n</script>\n"
-    page = (fill(page).replace("/*__MOVIE__*/", movie_uri())
+    # ⚠ A bundle for a host carries the campaign without the test clocks. Built
+    # here rather than filtered out afterwards, because "afterwards" is the step
+    # that gets skipped - see TEST_CLOCK.
+    global SHIP_LEVELS
+    ship = None
+    if host != "none":
+        if SHIP_LEVELS is None: SHIP_LEVELS = levels_json(test=False)
+        ship = SHIP_LEVELS
+    page = (fill(page, ship).replace("/*__MOVIE__*/", movie_uri())
                       .replace("/*__COVER__*/", cover_uri())
                       .replace("/*__PRIVACY__*/", PRIVACY if tele else "")
                       .replace("/*__BUILD__*/", BUILD)
@@ -398,6 +415,12 @@ def check_crazy(page, out):
     priv = "Privacy Policy" in page
     # A placeholder that reached the bundle is a policy that names no one.
     holes = [s for s in ("PASTE_A_CONTACT_EMAIL", "PASTE_YOUR_UID") if s in page]
+    # ⚠ A test clock that reached a store is a level nobody can finish, found by
+    # a player rather than by a build. Read off the campaign rather than off
+    # TEST_CLOCK, so it also catches a clock that got in some other way.
+    floor = min(PLAIN_SECONDS, HARD_SECONDS)
+    clocks = [int(n) for n in re.findall(r'"time":(\d+)', page)]
+    quick = sorted({c for c in clocks if c < floor})
 
     rows = [(size <= 20 * 1024 * 1024, "under 20 MB - keeps the mobile front page",
              "%.2f MB, over the 20 MB limit" % (size / 1048576)),
@@ -409,6 +432,8 @@ def check_crazy(page, out):
             (priv, "privacy policy carried", "no privacy policy in the bundle"),
             (not holes, "no unfilled placeholders",
              "placeholders shipped: " + ", ".join(holes)),
+            (clocks and not quick, "no test clocks - every board at least %ds" % floor,
+             "boards under %ds shipped: %s" % (floor, quick)),
             (not strays, "no dev tools", "dev tools rode in: " + ", ".join(strays))]
 
     print("")
