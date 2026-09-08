@@ -62,7 +62,19 @@ OUT = "lv/boards_163.json"
 # the displayed level is ID - 1004, and the old block is left out of the ladder
 # rather than shipped in front of it, which is what made the first thousand
 # levels a second, easier tutorial.
-FIRST_ID = 1005
+# Level 1 is the two-seat board, and it is board 0 rather than 1005. 1005 opens
+# on 25 seats with five grey fixtures and five two-seaters, which is no way to
+# start and is not even the shape of a tutorial. It also jams the front of the
+# campaign: the shell introduces a feature the level it first appears on, so
+# both the fixed-seat card and the double-seat card came due at level 1, one ran
+# there and the other spilled onto level 2, where it holds the queue outside
+# while it plays. That is the wait before the first passenger on board 2.
+#
+# Board 0 is the game's own opener - two single seats, two riders, no fixture
+# and no double - so the two cards fall back to the levels that actually
+# introduce those seats, and level 2 starts moving straight away.
+TUTORIAL_ID = 0
+FIRST_ID = 1006
 LAST_ID = 2508      # 5000+ is event content, not the campaign
 
 SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
@@ -173,9 +185,10 @@ def convert():
     G = grids()
     doors = json.load(open(DOORS))
     boards, flags, dropped = [], collections.Counter(), []
-    for r in json.load(open(LEVELS)):
-        if not (FIRST_ID <= r["id"] <= LAST_ID):
-            continue
+    src = json.load(open(LEVELS))
+    ordered = ([r for r in src if r["id"] == TUTORIAL_ID]
+               + [r for r in src if FIRST_ID <= r["id"] <= LAST_ID])
+    for pos, r in enumerate(ordered, 1):
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
         # the carriage gap, as cell indices the engine reads as not-floor
@@ -224,8 +237,8 @@ def convert():
             dropped.append(r["id"])
             continue
         boards.append({
-            "id": "Level_%05d" % (r["id"] - FIRST_ID + 1),
-            "name": "Level_%05d" % (r["id"] - FIRST_ID + 1),
+            "id": "Level_%05d" % pos,
+            "name": "Level_%05d" % pos,
             "sourceId": r["id"],
             "track": "campaign",
             # The shell builds its campaign ladder by filtering on variant 0 and
