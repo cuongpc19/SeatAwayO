@@ -445,7 +445,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #card.on { display: block; }
 #card .design {
   --dy: 0px; --dz: 0px;              /* the room the bar and the streak line need */
-  --dr: 0px;                         /* ...and the room the revive button needs */
   position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
   transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
 }
@@ -480,15 +479,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    line this game has and that one does not: one number, so the card without a
    streak stays exactly the card it already was. */
 .panel {
-  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  left: 58px; top: 368px; width: 424px; height: calc(408px + var(--dy) + var(--dz) + 46px);
   border-radius: 36px; background: rgba(29,26,69,.55);
 }
 .panel i {
-  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  position: absolute; left: 2px; top: -6px; width: 420px; height: calc(400px + var(--dy) + var(--dz) + 46px);
   border-radius: 34px; background: var(--ms-edge);
 }
 .panel u {
-  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + var(--dr) + 46px);
+  position: absolute; left: 8px; top: -12px; width: 408px; height: calc(392px + var(--dy) + var(--dz) + 46px);
   border-radius: 32px; background: var(--ms-face); overflow: hidden;
 }
 /* The header band: rounded at the top, square where it meets the face. */
@@ -598,51 +597,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   font-size: 23px; line-height: 1.4; color: #3b465f; }
 .sum b { color: var(--ms-ink); }
 .sum span { display: block; margin-top: 26px; font-size: 19px; color: #7c88a6; }
-/* Revive sits where the eye already is - the first button under the text - and
-   the other two move down by exactly the gap they already had between them. */
-#c-revive { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
-#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
-#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz) + var(--dr)); transform: translate(-50%, -50%); }
-#c-revive:active, #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
-#c-revive[hidden] { display: none; }
-/* Gold, because it is the one button on the card that costs something. The
-   price rides on its corner the way the boosters' does, rather than inside the
-   label, where "REVIVE +1:00 500" reads as one number too many. */
-.wide-btn.gold { background: linear-gradient(180deg, #ffd76a, #efa326); box-shadow: 0 6px 0 #b9750f; }
-.wide-btn.gold:active { box-shadow: 0 3px 0 #b9750f; }
-/* Three things on one line, so the label is laid out rather than centred as a
-   run of text. The price chip is absolute and stays out of it. */
-#c-revive { display: flex; align-items: center; justify-content: center; gap: 8px; }
-#c-revive b { color: #fff3c4; }
-#c-revive .clk { width: 34px; height: 34px; flex: none; margin-top: -2px; }
-#c-revive .clk g { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-#c-revive .clk .ink { stroke: var(--ms-ink); stroke-width: 6.4; }
-#c-revive .clk .lit { stroke: #fff; stroke-width: 2.6; }
-#c-revive .cost {
-  position: absolute; right: -10px; top: -14px;
-  display: flex; align-items: center; gap: 5px; white-space: nowrap;
-  background: linear-gradient(180deg, #5fd472, #3aa94f);
-  box-shadow: 0 3px 0 #2b8039; border-radius: 999px; padding: 3px 12px;
-  font-size: 21px; color: #fff; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
-}
-#c-revive .cost::after {
-  content: ""; width: 17px; height: 17px; border-radius: 50%; -webkit-text-stroke: 0;
-  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
-}
-/* Not enough gold. The button stays where it is and stays readable - hiding it
-   would answer "why is this level unwinnable" with nothing - and only the price
-   turns, which is the part that is actually the problem. */
-#c-revive.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 6px 0 #6b6681; }
-#c-revive.broke:active { box-shadow: 0 3px 0 #6b6681; }
-#c-revive.broke .cost { background: linear-gradient(180deg, #e8798a, #cf4a60); box-shadow: 0 3px 0 #a3374a; }
-/* The toast that would normally say why lives under the card, so the refusal
-   has to happen on the button itself. */
-#c-revive.shake { animation: revshake .4s; }
-@keyframes revshake {
-  20% { transform: translate(calc(-50% - 9px), -50%); }
-  50% { transform: translate(calc(-50% + 8px), -50%); }
-  80% { transform: translate(calc(-50% - 5px), -50%); }
-}
+#c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
+#c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -773,7 +730,152 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #set-home   { top: 695px; }
 #set-resume { top: 785px; }
 
+/* Underneath the three buttons, inside the panel, and deliberately quiet: it is
+   something a player looks for rather than something offered to them. */
+.set-link {
+  left: 270px; top: 843px; transform: translate(-50%, -50%);
+  padding: 6px 14px; border: 0; background: none; cursor: pointer;
+  font-family: var(--ms); font-size: 20px; letter-spacing: .04em;
+  color: rgba(43,53,80,.5); text-decoration: underline;
+}
+.set-link:active { color: var(--ms-ink); }
 
+/* ---------- the privacy policy ----------
+   Plain document styling, and its own scroll. z-index above Settings, which
+   stays open behind it so closing this lands back where it was opened from. */
+#privacy { position: absolute; inset: 0; display: none; z-index: 30; }
+#privacy.on { display: block; }
+#privacy .dim { background: rgba(16,26,51,.72); }
+.pv-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92%, 40rem); height: min(88%, 46rem); border-radius: 18px;
+  background: #fbfbfe; box-shadow: 0 18px 44px rgba(0,0,0,.45); overflow: hidden;
+}
+.pv-body {
+  position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 26px 24px 40px; color: #22283a;
+  font: 15px/1.62 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.pv-body h1 { font-size: 1.55rem; margin: 0 0 .2em; padding-right: 46px; }
+.pv-body h2 { font-size: 1.06rem; margin: 1.7em 0 .45em; color: #39415c; }
+.pv-body .upd { color: #6b7288; margin: 0 0 1.6em; font-size: .9rem; }
+.pv-body code { background: #e7eaf3; border-radius: 5px; padding: .1em .38em; font-size: .92em;
+  overflow-wrap: anywhere; }
+.pv-body ul { padding-left: 1.25em; }
+.pv-body li { margin: .28em 0; }
+/* The hosted copy links these two out; in here they must stay plain text -
+   an outbound link in the UI is the thing that is banned. */
+.pv-body .host { font-style: italic; }
+.pv-x {
+  position: absolute; right: 12px; top: 12px; z-index: 1; width: 38px; height: 38px;
+  padding: 0; cursor: pointer; border: 0; border-radius: 50%;
+  background: #e7eaf3; color: #39415c; font-family: var(--ms); font-size: 17px; line-height: 1;
+}
+.pv-x:active { background: #d5d9e8; }
+
+
+/* ---------- the revive offer ----------
+   Its own screen, ahead of the results card. Running out of time is a question
+   before it is a verdict - the board is still standing, the seats are where the
+   player left them, and a minute is for sale - so the card that says TRY AGAIN
+   and HOME does not appear until that question has been answered with the X.
+
+   Built as a plate rather than as one more button on the card because the thing
+   being sold needs a picture: "+1:00" as a line of text on a button is a price
+   with nothing attached to it. */
+#revive { position: absolute; inset: 0; display: none; z-index: 23; font-family: var(--ms); }
+#revive.on { display: block; }
+#revive .dim { position: absolute; inset: 0; background: rgba(13,10,42,.78); }
+#revive .design {
+  position: absolute; left: 50%; top: 50%; width: 540px; height: 1160px;
+  transform: translate(-50%, -50%) scale(var(--k)); transform-origin: 50% 50%;
+}
+#revive .design > * { position: absolute; }
+/* gold rim, blue face, and a lighter band down the inside of the rim */
+.rv-plate { left: 54px; top: 322px; width: 432px; height: 578px; border-radius: 52px;
+  background: linear-gradient(180deg, #ffd25a, #eda31c); box-shadow: 0 10px 0 rgba(0,0,0,.22); }
+.rv-plate i { position: absolute; inset: 11px; border-radius: 42px; background: #1c56c4; }
+.rv-plate u { position: absolute; inset: 18px; border-radius: 36px;
+  background: linear-gradient(180deg, #3d8bf5, #2266d8); }
+/* The title rides the rim rather than sitting inside it, which is what stops the
+   plate reading as a form. */
+.rv-banner {
+  left: 62px; top: 288px; width: 416px; height: 96px; border-radius: 38px;
+  background: linear-gradient(180deg, #ffd25a, #f2a81d);
+  box-shadow: 0 7px 0 #c47a0c, inset 0 -5px 0 rgba(0,0,0,.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px; color: #fff; -webkit-text-stroke: 9px #b1690a; paint-order: stroke fill;
+}
+.rv-x {
+  left: 424px; top: 296px; width: 74px; height: 74px; border: 0; border-radius: 50%; padding: 0;
+  cursor: pointer; background: linear-gradient(180deg, #f2604f, #cf2f28);
+  box-shadow: 0 6px 0 #9c1f1a; display: flex; align-items: center; justify-content: center;
+}
+.rv-x:active { transform: translateY(3px); box-shadow: 0 3px 0 #9c1f1a; }
+.rv-x svg { width: 34px; height: 34px; }
+.rv-x path { stroke: #fff; stroke-width: 5.5; stroke-linecap: round; fill: none; }
+/* The picture. Warm paper with a slow sunburst, so the clock is standing in a
+   light rather than pasted on a rectangle. */
+.rv-art { left: 100px; top: 424px; width: 340px; height: 286px; border-radius: 28px;
+  background: #f7efdd; box-shadow: inset 0 4px 0 rgba(0,0,0,.07); overflow: hidden; }
+.rv-art .burst {
+  position: absolute; left: 50%; top: 52%; width: 520px; height: 520px;
+  transform: translate(-50%, -50%); animation: spin 34s linear infinite;
+  background: repeating-conic-gradient(#ffe4ae 0deg 11deg, transparent 11deg 22deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 10%, rgba(0,0,0,.5) 48%, transparent 92%);
+  mask-image: radial-gradient(circle closest-side, #000 10%, rgba(0,0,0,.5) 48%, transparent 92%);
+}
+.rv-art .clock { position: absolute; left: 50%; top: 45%; width: 218px; height: 218px;
+  transform: translate(-50%, -50%); }
+.rv-art .plus {
+  position: absolute; left: 0; bottom: 20px; width: 100%; text-align: center;
+  font-size: 62px; color: #ffcf3d; -webkit-text-stroke: 11px #a8281c; paint-order: stroke fill;
+}
+.rv-say {
+  left: 84px; top: 736px; width: 372px; height: 62px; border-radius: 18px;
+  background: rgba(9,38,96,.38);
+  /* ⚠ Not flex. Every child of a flex box is an item, and the spaces either
+     side of the number are whitespace-only text nodes, which are not - so the
+     line came out as "Add60seconds". Centred text keeps its own spaces. */
+  text-align: center; line-height: 62px;
+  font-size: 25px; color: #fff; -webkit-text-stroke: 5px #123a86; paint-order: stroke fill;
+}
+.rv-say b { color: #ffd23c; }
+/* Two lines: what it does, and what it costs. A price on its own row is the one
+   arrangement where neither has to be read past to find the other. */
+#rv-go {
+  left: 270px; top: 852px; transform: translate(-50%, -50%);
+  width: 268px; height: 104px; border: 0; border-radius: 26px; padding: 0; cursor: pointer;
+  font-family: var(--ms); color: #fff;
+  background: linear-gradient(180deg, #7fe06a, #3fb43f); box-shadow: 0 7px 0 #2c8330;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+#rv-go:active { transform: translate(-50%, calc(-50% + 3px)); box-shadow: 0 4px 0 #2c8330; }
+#rv-go .lab { font-size: 31px; -webkit-text-stroke: 7px #22682a; paint-order: stroke fill; }
+#rv-go .cost {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 26px; color: #ffe27a; -webkit-text-stroke: 6px #22682a; paint-order: stroke fill;
+}
+#rv-go .cost::after {
+  content: ""; width: 26px; height: 26px; border-radius: 50%; -webkit-text-stroke: 0;
+  background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.2);
+}
+/* Not enough gold. The button keeps its place and its words - taking it away
+   would answer "why can I not keep playing" with nothing - and only the price
+   turns, which is the part that is the problem. */
+#rv-go.broke { background: linear-gradient(180deg, #b9b3cd, #8d87a5); box-shadow: 0 7px 0 #6b6681; }
+#rv-go.broke:active { box-shadow: 0 4px 0 #6b6681; }
+#rv-go.broke .lab { -webkit-text-stroke-color: #5a5570; }
+#rv-go.broke .cost { color: #ffb3bf; -webkit-text-stroke-color: #5a5570; }
+/* The toast that would normally say why lives under this, so the refusal has to
+   happen on the button itself. */
+#rv-go.shake { animation: rvshake .4s; }
+@keyframes rvshake {
+  20% { transform: translate(calc(-50% - 10px), -50%); }
+  50% { transform: translate(calc(-50% + 9px), -50%); }
+  80% { transform: translate(calc(-50% - 5px), -50%); }
+}
 /* ---------- the feature walkthroughs ----------
    Not one card that says everything at once: a short run of steps, each one
    pointing at a single thing and stopping there.
@@ -1021,6 +1123,142 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       <button class="wide-btn set-btn" id="set-retry">RESTART LEVEL</button>
       <button class="wide-btn blue set-btn" id="set-home">HOME</button>
       <button class="wide-btn set-btn" id="set-resume">RESUME</button>
+      <!-- ⚠ A button, never an <a href>. CrazyGames bans outbound links, and
+           the policy the submission form points at is hosted separately - this
+           one opens the copy that ships inside the bundle, same page, no
+           navigation. See CRAZYGAMES.md. -->
+      <button class="set-link" id="set-privacy">PRIVACY</button>
+    </div>
+  </div>
+
+  <!-- The policy itself. Deliberately outside the 540x1160 design box every
+       other overlay is laid out in: it is a document, not a game screen, so it
+       wants real text flow and a scrollbar rather than absolute positions that
+       would clip whichever paragraph grew. -->
+  <div id="privacy">
+    <div class="dim" id="pv-dim"></div>
+    <div class="pv-card">
+      <button class="pv-x" id="pv-close" aria-label="Close">&#10005;</button>
+      <div class="pv-body"><!-- The privacy policy, as a body fragment.
+
+     ⚠ ONE source, two destinations. build.py inlines this into the game (the
+     overlay behind Settings -> PRIVACY) and also wraps it into
+     ../public/privacy.html for Firebase Hosting, which is the URL the
+     CrazyGames submission form asks for. Editing either output by hand puts the
+     two out of step, and the form's copy is the one a reviewer reads.
+
+     ⚠ It must match what the game actually collects. Add a field to
+     telemetry.js and this page is wrong the same day. The field list below is
+     the row written by teleEnd(). -->
+
+<h1>Privacy Policy</h1>
+<p class="upd">Seat Away &middot; last updated <span>2026-09-08</span></p>
+
+<p>This game is free, has no accounts, and never asks for your name, e-mail
+address or any other personal detail. What follows is the whole of what it
+stores and sends.</p>
+
+<h2>Saved on your own device</h2>
+<p>Your progress is kept in your browser's local storage under the key
+<code>seatawayo.save.v1</code>: the level you have reached, your stars, your
+gold, your lives, your boosters, and the sound and vibration switches. It never
+leaves your device except as described under <em>Cloud save</em> below, and
+clearing your browser's site data deletes it.</p>
+
+<h2>Cloud save</h2>
+<p>When the game is played on CrazyGames, that same saved progress is also
+handed to the CrazyGames SDK so your levels follow you between devices. It is
+governed by <span class="host">CrazyGames' own privacy policy</span>. On any
+other site this does not happen.</p>
+
+<h2>Google Analytics</h2>
+<p>The game loads Google Analytics 4 (measurement id <code>G-TZ865K21Z4</code>)
+the first time you open a level &mdash; not when the page loads. It records that
+a visit happened, roughly how long it lasted, and two events of ours:</p>
+<ul>
+  <li><code>level_start</code> &mdash; the level number and its difficulty</li>
+  <li><code>level_end</code> &mdash; the level number, win or lose, how many
+      seconds it took, and how many stars</li>
+</ul>
+<p>Google derives an approximate country from your IP address. We are not given
+your IP address itself, and we set no advertising or cross-site identifiers.
+Analytics is handled under
+<span class="host">Google's privacy policy</span>, and any browser setting or
+extension that blocks it will simply stop it working &mdash; the game plays
+exactly the same either way.</p>
+
+<h2>Gameplay statistics</h2>
+<p>When a level ends &mdash; and only then &mdash; one row is written to our
+Firebase Realtime Database so we can see which levels are too hard or too easy.
+The row is exactly this and nothing else:</p>
+<ul>
+  <li>the level number, its difficulty, and a fingerprint of the board's layout</li>
+  <li>whether it was won or lost, how many milliseconds it took, how many moves
+      were made, and how many stars were scored</li>
+  <li>which boosters or revives were used, if any</li>
+  <li>which build of the game was played, which site it was played on, and
+      whether Google Analytics loaded</li>
+  <li>the time the level ended</li>
+</ul>
+<p>There is no identifier of any kind in that row &mdash; no account, no device
+id, no cookie, nothing that links one row to another or to you. The rows cannot
+be read back by anyone visiting the game; the database accepts new rows and
+serves none.</p>
+
+<h2>What the game does not do</h2>
+<ul>
+  <li>No advertising sold by us, and no third-party ad network in the build.</li>
+  <li>No cookies of our own, and no cross-site tracking.</li>
+  <li>Nothing is sold or shared with anyone beyond the two services named above.</li>
+  <li>The game is not aimed at children under 13 and collects nothing that could
+      identify one.</li>
+</ul>
+
+<h2>Your choices</h2>
+<p>Clearing your browser's site data for this page erases your saved progress.
+Blocking <code>googletagmanager.com</code> stops the analytics. Because the
+gameplay rows carry no identifier, there is no way to single out or delete an
+individual player's rows &mdash; there is nothing in them to search on.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy: <code>PASTE_A_CONTACT_EMAIL</code></p>
+</div>
+    </div>
+  </div>
+
+  <div id="revive">
+    <div class="dim"></div>
+    <div class="design">
+      <div class="rv-plate"><i></i><u></u></div>
+      <div class="rv-banner">Time Out!</div>
+      <button class="rv-x" id="rv-x" aria-label="No thanks">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+      <div class="rv-art">
+        <div class="burst"></div>
+        <!-- drawn, not an image: the file would be the one asset in the build
+             that is not either the board's atlas or a stroked icon -->
+        <svg class="clock" viewBox="0 0 140 140" aria-hidden="true">
+          <g stroke="#a8281c" stroke-width="5" stroke-linejoin="round">
+            <path d="M34 116 24 133M106 116l10 17" stroke-width="13" stroke-linecap="round" fill="none"></path>
+            <ellipse cx="30" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(-32 30 33)"></ellipse>
+            <ellipse cx="110" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(32 110 33)"></ellipse>
+            <rect x="63" y="16" width="14" height="16" rx="5" fill="#ffc63a"></rect>
+            <circle cx="70" cy="82" r="47" fill="#e23b30"></circle>
+            <circle cx="70" cy="82" r="35" fill="#fff8ec" stroke-width="4"></circle>
+          </g>
+          <g fill="#d8cfc0">
+            <circle cx="70" cy="55" r="3"></circle><circle cx="97" cy="82" r="3"></circle>
+            <circle cx="70" cy="109" r="3"></circle><circle cx="43" cy="82" r="3"></circle>
+          </g>
+          <path d="M70 82 62 60M70 82l19 11" stroke="#f5a01e" stroke-width="8"
+            stroke-linecap="round" fill="none"></path>
+          <circle cx="70" cy="82" r="6" fill="#e23b30"></circle>
+        </svg>
+        <div class="plus" id="rv-plus">+60</div>
+      </div>
+      <div class="rv-say">Add <b id="rv-secs">60</b> seconds to keep playing!</div>
+      <button id="rv-go"><span class="lab">Continue</span><span class="cost">500</span></button>
     </div>
   </div>
 
@@ -1041,10 +1279,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
       </div>
       <div class="coins" id="c-coins"><i class="coin"></i><span>+0</span></div>
       <div class="streak" id="c-streak" hidden></div>
-      <!-- the stopwatch is the boosters' own, drawn twice: the dark pass is the
-           button label's 6px ink stroke, which SVG has no text-stroke for -->
-      <button class="wide-btn gold" id="c-revive" hidden>REVIVE<svg class="clk" viewBox="0 0 24 24"
-        aria-hidden="true"><g class="ink"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g><g class="lit"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path></g></svg><b>1:00</b><span class="cost">500</span></button>
       <button class="wide-btn" id="c-next">NEXT LEVEL</button>
       <button class="wide-btn blue" id="c-home">HOME</button>
     </div>
@@ -3881,6 +4115,235 @@ const PLATFORM = {
   onHostMuteChange() {},
 };
 
+/* ---------------- Google Analytics 4 ----------------
+   Ported from Marble Sort's `src/game/analytics.ts`. Two events, and the loader
+   that fetches gtag.js the first time a board is reached.
+
+   ⚠ Loaded on reaching a LEVEL, never at boot. "Time to gameplay" is a number
+   CrazyGames grades on and it is measured to the `gameplayStart` call, so a
+   145 KB cross-origin request on the boot path costs a metric that decides
+   whether the game gets traffic. Nothing here may move earlier.
+
+   ⚠ This file is concatenated between the platform door and game_shell.js, so
+   every name in it shares one scope with the shell and the engine. A duplicate
+   `function` declaration in the shell silently wins the hoist and this file
+   goes quiet with no error. Checked against both at the time of writing; check
+   again before adding a name.
+
+   What GA is for, and what it is not: see ANALYTICS.md §0. Short version -
+   GA answers "how many people, from where, coming back how often". It must
+   never be asked for a winrate, because it records the level NUMBER and this
+   campaign's boards get retuned underneath that number. The Realtime Database
+   in telemetry.js carries the board fingerprint and is the only honest source
+   for anything per-level. */
+
+/** The web app's GA4 stream, read out of the Firebase project rather than
+    retyped: `firebase apps:sdkconfig WEB <appId>` -> measurementId. */
+const GA_ID = "G-TZ865K21Z4";
+
+let gaLoaded = false;    // the script tag has been appended
+let gaOk = 0;            // 1 once gtag.js actually ran - telemetry ships this
+
+/** ⚠ A plain `function`, and it must stay one. gtag.js only processes dataLayer
+    entries that are `arguments` objects; pushing a real array is read as a
+    GTM-style push and dropped WITHOUT AN ERROR. An arrow function has no
+    `arguments` at all, so rewriting this as one sends nothing and looks fine.
+    This is the mistake that made Marble Sort's first analytics build a no-op. */
+function gtag() {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push(arguments);
+}
+
+/** Bring GA up. Safe to call on every level; only the first does anything. */
+function startAnalytics() {
+  if (gaLoaded) return;
+  gaLoaded = true;
+  try {
+    const el = document.createElement("script");
+    el.async = true;
+    el.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    // An adblocker or the host page's CSP can refuse this. That is a normal
+    // outcome, not a fault: `gaOk` stays 0, every row in the database says so,
+    // and the database is what the numbers come from anyway.
+    el.onload = () => { gaOk = 1; };
+    document.head.appendChild(el);
+    gtag("js", new Date());
+    // ⚠ send_page_view stays on. It is what `first_visit` and `session_start`
+    // hang off, and those are the only record of a player who opens the game
+    // and leaves without finishing a level - see ANALYTICS.md §8.
+    gtag("config", GA_ID, { game: "seataway" });
+  } catch (e) { /* no GA this session; the database still gets its row */ }
+}
+
+/** One event. Never throws - a dead analytics call must not take a level down. */
+function track(name, params) {
+  try { gtag("event", name, params || {}); } catch (e) { /* as above */ }
+}
+
+/** ⚠ `level` and `result` show up in GA reports only after they are declared as
+    custom dimensions, and the declaration is NOT retroactive. See ANALYTICS.md
+    §3 - without that step the events are counted but cannot be split, which
+    reads exactly like the parameters never being sent. */
+function gaLevelStart(lvl, diff) {
+  startAnalytics();
+  track("level_start", { level: lvl, diff: diff });
+}
+
+function gaLevelEnd(lvl, won, seconds, stars) {
+  track("level_end", {
+    level: lvl,
+    result: won ? "win" : "lose",
+    seconds: seconds,
+    stars: stars,
+  });
+}
+
+/* ---------------- the game's own telemetry ----------------
+   Ported from Marble Sort's `src/game/telemetry.ts`. One row per finished
+   level, written straight into the Firebase Realtime Database.
+
+   Why this exists next to GA at all (ANALYTICS.md §0): GA records the level
+   NUMBER, and a number is not a board. The clock, the grading and the campaign
+   file itself all get retuned here, so games played on a board that no longer
+   exists sit under the same number as games played on the one that replaced it,
+   and GA will average them into one convincing, wrong figure. Every row below
+   carries `sig`, the board's fingerprint, so a retune is visible instead of
+   silently folded in. This is the exact mistake that wrecked a calibration pass
+   on the sibling project - do not measure a winrate in GA.
+
+   ⚠ Concatenated between the platform door and game_shell.js, sharing one scope
+   with the shell and the engine. A duplicate `function` name in the shell wins
+   the hoist and this file goes quiet with no error. Checked against both;
+   check again before adding a name.
+
+   ⚠ Nothing here may throw, block, or hold up a card. A player whose network
+   refuses the write must not be able to tell. */
+
+/** ⚠ This URL exists TWICE - here and, minus `/runs.json`, in
+    scripts/pull_runs.py. They cannot share a constant: this one ships to
+    browsers and the other must never. Change one, change both.
+
+    The region is in the hostname, so it is not cosmetic: a database created in
+    us-central1 is `...-default-rtdb.firebaseio.com` with no region segment and
+    this URL would 404 forever. See ANALYTICS.md §1. */
+const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app/runs.json";
+
+/** Stamped by build.py from the git short hash, so a row says which build
+    played it. ⚠ It is the working tree's HEAD - building on a dirty tree
+    stamps every row with the PREVIOUS commit. Commit before building. */
+const BUILD = "a3fc8f9+";
+
+/** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
+    write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
+    still there when the question changes. */
+function isDevHost(h) {
+  return h === "localhost" || h === "127.0.0.1" || h === "" ||
+         /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+}
+
+/** FNV-1a, 32 bit, over the fields that decide what a board actually is.
+
+    Not over the whole record: `name`, `sourceId` and `track` are bookkeeping,
+    and folding them in would make a fingerprint that changes when nothing a
+    player could feel has changed. `time` and `diff` ARE in, because both are
+    set by build.py's tuning and a board whose clock moved is a different board
+    to win or lose on. */
+function runSig(b) {
+  if (!b) return "0";
+  const s = JSON.stringify([b.w, b.h, b.time, b.diff | 0, b.door, b.door2,
+                            b.panel, b.holes, b.seats, b.queue, b.queue2,
+                            b.secondDoor, b.obstacles, b.holeObstacles,
+                            b.colouredGrid, b.mods]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/* What the run in progress has done so far. Reset by teleStart. */
+let teleAt = 0;          // performance.now() when the board opened
+let teleLvl = 0;
+let teleSig = "0";
+let teleDiff = 0;
+let teleUsed = [];       // booster ids spent on this run, in order
+
+/** Called as a board opens. ⚠ Also on a retry, which is what makes a retry its
+    own row rather than a continuation - the level was played twice and the
+    database should say so. */
+function teleStart(lvl, board) {
+  teleAt = performance.now();
+  teleLvl = lvl;
+  teleSig = runSig(board);
+  teleDiff = board ? (board.diff | 0) : 0;
+  teleUsed = [];
+}
+
+/** A booster or a revive was spent on the run in progress. Kept out of GA on
+    purpose (ANALYTICS.md §5) - it is sliceable here without a custom dimension
+    per field and without GA's day-long lag. */
+function teleBooster(id) {
+  if (teleUsed.length < 40) teleUsed.push(id);   // a cap, so a stuck button cannot post a novel
+}
+
+/** The player bought their way past a loss and is still on the same board.
+
+    ⚠ Needed because onFinish() has already fired and posted the losing row by
+    the time revive() runs. Without re-arming the clock the continued game would
+    post nothing at all and a bought win would vanish from the data. Two rows is
+    the honest account of what happened: a loss, then a second game carrying
+    `revive` in `used` - which is exactly what PURE-style filtering keys on. */
+function teleResume(id) {
+  teleBooster(id);
+  teleAt = performance.now();
+}
+
+/** One finished level. Fire and forget. Returns the run's length in ms so the
+    GA event and the database row cannot disagree about it. */
+function teleEnd(won, stars) {
+  if (!teleAt) return 0;               // ended without ever having started - nothing honest to say
+  const ms = Math.round(performance.now() - teleAt);
+  teleAt = 0;                          // ⚠ so a second card on the same run cannot post twice
+  let host = "";
+  try { host = location.hostname; } catch (e) { /* no location in some frames */ }
+  const row = {
+    lvl: teleLvl,
+    sig: teleSig,
+    diff: teleDiff,
+    result: won ? "win" : "lose",
+    ms: ms,
+    moves: (typeof S === "object" && S && S.moves) | 0,
+    stars: stars | 0,
+    build: BUILD,
+    dev: isDevHost(host) ? 1 : 0,
+    host: host,
+    from: (typeof PLATFORM === "object" && PLATFORM && PLATFORM.name) || "web",
+    // ⚠ 1 = gtag.js ran, 0 = it was blocked. When `npm`-side tallies show this
+    // at all zeros the GA property is empty because the script never arrived,
+    // not because the tracking code is wrong. First thing to check - §6.
+    ga: gaOk,
+    t: Date.now(),
+  };
+  // ⚠ Absent, not empty. The database drops empty arrays, so an `used` that is
+  // missing means no booster was spent - sending [] would store nothing anyway
+  // and only makes the rules' shape check harder to write.
+  if (teleUsed.length) row.used = teleUsed.slice();
+  try {
+    // keepalive so the write survives the player pressing NEXT LEVEL straight
+    // away. No `await`, no `.then` that touches the game: a refusal here is a
+    // lost row, never a lost card.
+    fetch(RUNS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(row),
+      keepalive: true,
+      mode: "cors",
+    }).catch(() => { /* offline, blocked, or the rules said no */ });
+  } catch (e) { /* fetch missing entirely - nothing to do and nothing to report */ }
+  return ms;
+}
+
 /* ---------------- the game shell ----------------
    Everything the editor page does not need: saved progress, a home screen, a
    level picker, and a result card. The rules all live in the engine above; this
@@ -4343,6 +4806,17 @@ function startLevel(n) {
   closeSettings();
   CUR = Math.max(1, Math.min(CAMPAIGN.length, n));
   openBoard();
+  /* ⚠ After openBoard(), so the board being fingerprinted is the one that has
+     actually loaded, and before the warning card, so the clock covers the whole
+     time the level was on screen.
+
+     Fires again on a retry, which is deliberate: a retry is a second game of
+     the same level and the data should say so rather than folding two attempts
+     into one. gaLevelStart also brings gtag.js up - the first level is the
+     earliest it may load, see ANALYTICS.md §7. */
+  const tb = boardOf(CUR);
+  teleStart(CUR, tb);
+  gaLevelStart(CUR, tb ? tb.diff | 0 : 0);
   // The warning first, then anything new on the board. Chained rather than run
   // side by side: both stop the clock and hold the queue, and two overlays that
   // each let go on their own way out leave the board running under the second.
@@ -4575,6 +5049,10 @@ $("b-time").onclick = () => {
   const freeT = save.freeTime > 0;
   if (!freeT && save.coins < CF.boosterTime.price) return say("Not enough gold for more time.");
   if (freeT) save.freeTime--; else save.coins -= CF.boosterTime.price;
+  // A free go and a bought one are told apart: the free ones come from the
+  // walkthrough, so counting them as spending would make the tutorial look like
+  // a board people had to pay to get past.
+  teleBooster(freeT ? "time-free" : "time");
   SFX.buy(); buzz(14);
   S.left += CF.boosterTime.value;
   S.time = Math.max(S.time, S.left);          // keep the bar honest
@@ -4625,6 +5103,7 @@ $("b-area").onclick = () => {
     save.coins -= CF.boosterArea.price;
     if (CF.boosterArea.uses > 1) save.lines = CF.boosterArea.uses - 1;
   }
+  teleBooster("area");
   SFX.buy(); buzz(14);
   persist(); say("A lane opens down the left."); onHud(); draw();
   autoBoard();
@@ -4648,6 +5127,10 @@ onSeatPick = seat => {
   }
   JUMP = false;
   save.jumps = Math.max(0, save.jumps - 1);
+  // ⚠ Where the charge is actually spent, not where the button was pressed.
+  // Arming and then changing your mind is free, and a row saying otherwise
+  // would put jumps on boards nobody jumped on.
+  teleBooster("jump");
   persist(); buzz(16); onHud(); draw();
   introSaw("jumped");
   return true;
@@ -5242,6 +5725,12 @@ $("set-home").onclick = () => { closeSettings(); hideCard(); show("home"); };
    close disc in the corner, the one obvious thing to press was HOME, so
    opening the settings meant leaving the level. */
 $("set-resume").onclick = closeSettings;
+/* ⚠ Settings stays open behind it, so closing the policy lands back where it
+   was opened from rather than dropping the player onto a running board. The
+   panel is a div in this same page, never a link out - see CRAZYGAMES.md. */
+$("set-privacy").onclick = () => $("privacy").classList.add("on");
+$("pv-close").onclick = () => $("privacy").classList.remove("on");
+$("pv-dim").onclick = () => $("privacy").classList.remove("on");
 
 /* ---- the result card ---------------------------------------------------
    Marble Sort's `GameScene.overlay`, ported: the sunburst, the three-plate
@@ -5253,7 +5742,12 @@ const cardEl = document.getElementById("card");
    be left inside it - by a retry, or by anything that starts a level. Without
    this the card would arrive over whatever came next. */
 let cardGen = 0;
-function hideCard() { cardGen++; cardEl.classList.remove("on", "cheer"); }
+function hideCard() {
+  cardGen++; cardEl.classList.remove("on", "cheer");
+  // Everything that tears the card down - a retry, HOME, the next level - is
+  // also leaving the board the offer was about, so the offer goes with it.
+  $("revive").classList.remove("on"); REVIVE_THEN = null;
+}
 onNewLevel = hideCard;
 
 /* The star is Marble Sort's: a flat gold ten-point path with one darker outline,
@@ -5398,29 +5892,41 @@ function featureBar(feat, cleared) {
    still lost, which is not true of a penalty that is only written on TRY AGAIN. */
 let LOST = null;                     // what the last loss cost, until it is spent
 
-/** Show it, price it, and say whether the gold is there. */
-function reviveBtn(losing) {
-  const el = $("c-revive");
-  el.hidden = !losing;
-  // ⚠ Both ways. The variable is written inline on the design, so a card left
-  // holding the losing card's 82px hands the next win a plate with a button's
-  // worth of empty floor under HOME.
-  $("c-card").style.setProperty("--dr", losing ? "82px" : "0px");
-  if (!losing) return;
-  el.querySelector("b").textContent = fmt(CF.keepPlaying.secs);
-  el.querySelector(".cost").firstChild.textContent = CF.keepPlaying.price;
-  el.classList.toggle("broke", save.coins < CF.keepPlaying.price);
-  el.classList.remove("shake");
+/* The results card, held back until the offer has been answered. The X is the
+   only way to it, which is the whole point of the order: a player who has just
+   run out of time is asked whether they want to keep this board before being
+   shown the two ways of leaving it. */
+let REVIVE_THEN = null;
+
+/** Put the offer up, priced, ahead of `then`. */
+function offerRevive(then) {
+  REVIVE_THEN = then;
+  const go = $("rv-go"), secs = CF.keepPlaying.secs;
+  $("rv-plus").textContent = "+" + secs;
+  $("rv-secs").textContent = secs;
+  go.querySelector(".cost").textContent = CF.keepPlaying.price;
+  go.classList.toggle("broke", save.coins < CF.keepPlaying.price);
+  go.classList.remove("shake");
+  $("revive").classList.add("on");
+}
+
+/** Turned down: on to the card that was waiting behind it. */
+function declineRevive() {
+  $("revive").classList.remove("on");
+  const then = REVIVE_THEN; REVIVE_THEN = null;
+  if (then) then();
 }
 
 function revive() {
-  const el = $("c-revive"), price = CF.keepPlaying.price;
+  const go = $("rv-go"), price = CF.keepPlaying.price;
   if (save.coins < price) {
-    // The toast lives under the card, so the button has to carry the refusal.
-    el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+    // The toast lives under this, so the button has to carry the refusal.
+    go.classList.remove("shake"); void go.offsetWidth; go.classList.add("shake");
     SFX.no(); buzz(50);
     return;
   }
+  REVIVE_THEN = null;                  // the card behind this is not wanted now
+  $("revive").classList.remove("on");
   save.coins -= price;
   if (LOST) { save.streak = LOST.streak; save.hearts = LOST.hearts; save.heartAt = LOST.heartAt; }
   LOST = null;
@@ -5430,6 +5936,11 @@ function revive() {
   S.left += CF.keepPlaying.secs;
   S.time = Math.max(S.time, S.left);   // the star bar reads left/time - keep it honest
   RUNNING = true;                      // it was running a moment ago; do not wait to be asked again
+  /* ⚠ onFinish has already posted the losing row by the time this runs, so the
+     run's clock has to be re-armed or the bought game would report nothing at
+     all. Two rows is the honest account: a loss, then a second game carrying
+     `revive` in `used`. See telemetry.js. */
+  teleResume("revive");
   PLATFORM.gameplayStart();
   SFX.buy();
   onHud(); boosterUi(); draw();      // onHud repaints the purse; 500 gone can price a booster out
@@ -5442,7 +5953,6 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   design.style.setProperty("--dy", (feat ? 66 : 0) + "px");
   design.style.setProperty("--dz", (stars && streak ? 34 : 0) + "px");
   design.classList.toggle("lose", !stars);
-  reviveBtn(!stars);
   $("c-title").textContent = title;
   $("c-rays").hidden = !stars;
   $("c-coins").hidden = !stars;
@@ -5486,6 +5996,11 @@ onFinish = function (won) {
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;
   const pay = purse();
+  /* ⚠ Here, while `S` is still the board that was just played - teleEnd reads
+     `S.moves` off it, and the next startLevel replaces it. The row goes out
+     before the card so a player who closes the tab on the win still counts.
+     teleEnd hands back the run's length so GA and the database agree. */
+  gaLevelEnd(lvl, won, Math.round(teleEnd(won, stars) / 1000), stars);
   if (won) {
     if (stars > (save.stars[lvl] || 0)) save.stars[lvl] = stars;   // only ever raises
     if (lvl + 1 > save.unlocked) save.unlocked = Math.min(CAMPAIGN.length, lvl + 1);
@@ -5507,7 +6022,7 @@ onFinish = function (won) {
     has("booster_time") ? "There is more time on the booster row, if the gold is there."
                         : "Clear the doorway first - the queue does the rest.",
     featureProgress(lvl), lvl);
-  if (won) { cheer(); setTimeout(card, CHEER_MS); } else card();
+  if (won) { cheer(); setTimeout(card, CHEER_MS); } else offerRevive(card);
 };
 
 /* ---- wiring ------------------------------------------------------------ */
@@ -5529,7 +6044,8 @@ $("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null
    wired straight to `show("home")`, so the one control on the HUD that was
    not the clock took the player off the board in a single tap. */
 $("g-menu").onclick = openSettings;
-document.getElementById("c-revive").onclick = revive;
+document.getElementById("rv-go").onclick = revive;
+document.getElementById("rv-x").onclick = declineRevive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
 document.getElementById("c-next").onclick = () =>
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
