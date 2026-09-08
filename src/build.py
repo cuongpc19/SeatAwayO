@@ -94,8 +94,8 @@ FIRST_HARD = 15           # nothing before this is graded
 # people board. Two boards of capacity 26 and 13 both read 2:00 on the HUD. So
 # rather than keep a fitted curve that is wrong everywhere, every board gets one
 # of two numbers until the real ones turn up.
-PLAIN_SECONDS = 300       # 5:00
-HARD_SECONDS = 240        # 4:00, for both grades
+PLAIN_SECONDS = 240       # 4:00
+HARD_SECONDS = 180        # 3:00, for both grades
 
 # ⚠ Ours. Lives are switched off. The APK gates every board on a heart, refills
 # one every fifteen minutes and sells refills - a meter that decides when the
