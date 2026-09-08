@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seat Match - stats</title>
+<!--
+  The dashboard. Deployed to Firebase Hosting, NEVER into the game bundle.
+
+  ⚠ It reads /runs from a BROWSER, and a browser gets no owner privilege. That
+  is why database.rules.json has to name a uid: scripts/pull_runs.py works
+  without one only because the Firebase CLI authenticates as project owner and
+  never consults the rules at all.
+
+  The rule names one uid, and it is filled in. Anyone else signing in gets
+  "Permission denied" - that is the rule working, not a fault. To add a second
+  reader: sign in as them, copy the uid this page prints, add it to
+  database.rules.json and redeploy.
+
+  ⚠ Do NOT widen the rule to `auth != null` - that reads as "signed-in users
+  only" and actually means any Google account on earth, and /runs is the whole
+  dataset.
+
+  On what these numbers mean, and which question belongs to GA instead, see
+  ANALYTICS.md §0.
+-->
+<style>
+  :root { color-scheme: light; --line: #dfe3ee; --ink: #22283a; --dim: #6b7288; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 18px 80px; background: #f6f7fb; color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 78rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .15em; }
+  h2 { font-size: 1.05rem; margin: 2.2em 0 .6em; }
+  .sub { color: var(--dim); margin: 0 0 1.6em; }
+  button { font: inherit; padding: .45em 1em; border: 1px solid var(--line); border-radius: 8px;
+           background: #fff; cursor: pointer; }
+  button.p { background: #3b6fd4; border-color: #3b6fd4; color: #fff; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1.4em; }
+  .bar label { display: flex; gap: .4em; align-items: center; color: var(--dim); }
+  select { font: inherit; padding: .4em; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+          padding: 14px 18px; min-width: 8.5rem; }
+  .card b { display: block; font-size: 1.7rem; font-weight: 600; letter-spacing: -.02em; }
+  .card span { color: var(--dim); font-size: .86rem; }
+  .wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { position: sticky; top: 0; background: #f0f2f8; font-weight: 600; z-index: 1; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .warn { color: #b3341f; font-weight: 600; }
+  .ok { color: #1d7a44; }
+  .note { background: #fff6e0; border: 1px solid #f0d79a; border-radius: 10px;
+          padding: 12px 16px; margin: 1em 0; }
+  code { background: #e7eaf3; border-radius: 5px; padding: .1em .38em; overflow-wrap: anywhere; }
+  #msg { margin: 1em 0; }
+  .mini { color: var(--dim); font-size: .86rem; }
+</style>
+</head>
+<body><main>
+
+<h1>Seat Match &mdash; gameplay stats</h1>
+<p class="sub">One row per finished level, straight from the Realtime Database.
+Player counts and countries are <em>not</em> here &mdash; those are Firebase Analytics' job.</p>
+
+<div class="bar">
+  <button class="p" id="go">Sign in with Google</button>
+  <button id="reload" hidden>Reload</button>
+  <label hidden id="devwrap"><input type="checkbox" id="dev"> count test games</label>
+  <label hidden id="buildwrap">build <select id="build"><option value="">all</option></select></label>
+  <span class="mini" id="who"></span>
+</div>
+
+<div id="msg"></div>
+<div id="out" hidden>
+  <div class="cards" id="tot"></div>
+  <h2>By level</h2>
+  <p class="mini">Sorted by level. <b class="warn">A level showing more than one
+  fingerprint has been retuned</b> &mdash; its rows are two different boards and
+  must not be averaged together. That is the mistake this column exists to stop.</p>
+  <div class="wrap"><table id="lv"></table></div>
+  <h2>By day</h2>
+  <div class="wrap"><table id="day"></table></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* ⚠ This config is public by design - it identifies the project, it does not
+   authorise anything. What keeps the data safe is database.rules.json. */
+firebase.initializeApp({
+  apiKey: "AIzaSyCrMjU8gWwKs6R7AgIhqI8u_odakFD-hUU",
+  authDomain: "seatmatch-292b3.firebaseapp.com",
+  databaseURL: "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "seatmatch-292b3",
+  appId: "1:104118195139:web:17b23adff60ede8caa2376",
+});
+
+const $ = id => document.getElementById(id);
+const msg = h => { $("msg").innerHTML = h; };
+let ROWS = [];
+
+$("go").onclick = () => {
+  firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(e => msg('<div class="note">Sign-in failed: ' + e.message + "</div>"));
+};
+$("reload").onclick = () => pull();
+$("dev").onchange = render;
+$("build").onchange = render;
+
+firebase.auth().onAuthStateChanged(u => {
+  if (!u) return;
+  $("go").hidden = true;
+  $("reload").hidden = false;
+  $("who").textContent = u.email + "  ·  uid " + u.uid;
+  pull(u.uid);
+});
+
+function pull(uid) {
+  msg("Reading…");
+  // limitToLast on the push keys, which are chronological, so this needs no
+  // index. 40k rows is far more than the dashboard needs and far less than a
+  // runaway read.
+  firebase.database().ref("runs").limitToLast(40000).once("value")
+    .then(s => {
+      ROWS = [];
+      s.forEach(c => { const v = c.val(); if (v && v.lvl) ROWS.push(v); });
+      msg("");
+      $("out").hidden = false;
+      $("devwrap").hidden = $("buildwrap").hidden = false;
+      const builds = Array.from(new Set(ROWS.map(r => r.build))).sort();
+      $("build").innerHTML = '<option value="">all</option>' +
+        builds.map(b => '<option>' + esc(b) + "</option>").join("");
+      render();
+    })
+    .catch(e => {
+      // ⚠ The uid is printed even on success elsewhere, but here especially:
+      // the overwhelmingly likely cause of a denial is signing in with a
+      // different Google account from the one the rule names, and without the
+      // uid on screen there is nothing to compare against.
+      msg('<div class="note"><b>' + esc(e.message) + "</b><br><br>" +
+          "If that says <em>Permission denied</em>, the read rule does not name you yet. " +
+          "Put this uid into <code>database.rules.json</code> &rarr; " +
+          "<code>rules.runs.\".read\"</code>, then run " +
+          "<code>npx firebase-tools deploy --only database</code>:<br><br>" +
+          "<code>" + esc(uid || "(sign in first)") + "</code></div>");
+    });
+}
+
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (a, b) => b ? (100 * a / b).toFixed(0) + "%" : "–";
+
+function render() {
+  const wantDev = $("dev").checked, wantBuild = $("build").value;
+  const rows = ROWS.filter(r => (wantDev || !r.dev) && (!wantBuild || r.build === wantBuild));
+  const wins = rows.filter(r => r.result === "win").length;
+  const lvls = new Set(rows.map(r => r.lvl));
+  $("tot").innerHTML = [
+    ["games", rows.length],
+    ["wins", wins],
+    ["winrate", pct(wins, rows.length)],
+    ["levels seen", lvls.size],
+    ["furthest", rows.length ? Math.max.apply(null, rows.map(r => r.lvl)) : 0],
+    ["with a booster", rows.filter(r => r.used).length],
+  ].map(([k, v]) => '<div class="card"><b>' + esc(v) + "</b><span>" + k + "</span></div>").join("");
+
+  // ---- by level
+  const by = new Map();
+  for (const r of rows) {
+    let e = by.get(r.lvl);
+    if (!e) by.set(r.lvl, e = { n: 0, w: 0, ms: 0, mv: 0, sigs: new Set(), boost: 0 });
+    e.n++; e.w += r.result === "win" ? 1 : 0;
+    e.ms += r.ms || 0; e.mv += r.moves || 0;
+    e.sigs.add(r.sig); if (r.used) e.boost++;
+  }
+  $("lv").innerHTML =
+    "<thead><tr><th>level</th><th>games</th><th>wins</th><th>winrate</th>" +
+    "<th>avg time</th><th>avg moves</th><th>boosted</th><th>boards</th></tr></thead><tbody>" +
+    Array.from(by.keys()).sort((a, b) => a - b).map(l => {
+      const e = by.get(l), many = e.sigs.size > 1;
+      return "<tr><td>" + l + "</td><td>" + e.n + "</td><td>" + e.w + "</td><td>" +
+        pct(e.w, e.n) + "</td><td>" + (e.ms / e.n / 1000).toFixed(0) + "s</td><td>" +
+        (e.mv / e.n).toFixed(1) + "</td><td>" + e.boost + "</td>" +
+        '<td class="' + (many ? "warn" : "ok") + '">' + e.sigs.size + "</td></tr>";
+    }).join("") + "</tbody>";
+
+  // ---- by day
+  const dd = new Map();
+  for (const r of rows) {
+    const k = new Date(r.t || 0).toISOString().slice(0, 10);
+    let e = dd.get(k);
+    if (!e) dd.set(k, e = { n: 0, w: 0, lv: new Set() });
+    e.n++; e.w += r.result === "win" ? 1 : 0; e.lv.add(r.lvl);
+  }
+  $("day").innerHTML =
+    "<thead><tr><th>day</th><th>games</th><th>wins</th><th>winrate</th><th>levels</th></tr></thead><tbody>" +
+    Array.from(dd.keys()).sort().reverse().map(k => {
+      const e = dd.get(k);
+      return "<tr><td>" + k + "</td><td>" + e.n + "</td><td>" + e.w + "</td><td>" +
+        pct(e.w, e.n) + "</td><td>" + e.lv.size + "</td></tr>";
+    }).join("") + "</tbody>";
+}
+</script>
+</main></body>
+</html>

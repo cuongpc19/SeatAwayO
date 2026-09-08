@@ -1,0 +1,87 @@
+<!-- The privacy policy, as a body fragment.
+
+     ⚠ ONE source, two destinations. build.py inlines this into the game (the
+     overlay behind Settings -> PRIVACY) and also wraps it into
+     ../public/privacy.html for Firebase Hosting, which is the URL the
+     CrazyGames submission form asks for. Editing either output by hand puts the
+     two out of step, and the form's copy is the one a reviewer reads.
+
+     ⚠ It must match what the game actually collects. Add a field to
+     telemetry.js and this page is wrong the same day. The field list below is
+     the row written by teleEnd(). -->
+
+<h1>Privacy Policy</h1>
+<p class="upd">Seat Match &middot; last updated <span>/*__BUILT__*/</span></p>
+
+<p>This game is free, has no accounts, and never asks for your name, e-mail
+address or any other personal detail. What follows is the whole of what it
+stores and sends.</p>
+
+<h2>Saved on your own device</h2>
+<p>Your progress is kept in your browser's local storage under the key
+<code>seatmatch.save.v2</code>: the level you have reached, your stars, your gold,
+your boosters, and the sound and vibration switches. It never leaves your device
+except as described under <em>Cloud save</em> below, and clearing your browser's
+site data deletes it.</p>
+<!-- ⚠ Do not list features by name here beyond what the player can see. An
+     earlier draft named lives, which build.py had switched off (LIVES = False),
+     so the policy described a counter the game no longer shows. -->
+
+
+<h2>Cloud save</h2>
+<p>When the game is played on CrazyGames, that same saved progress is also
+handed to the CrazyGames SDK so your levels follow you between devices. It is
+governed by <span class="host">CrazyGames' own privacy policy</span>. On any
+other site this does not happen.</p>
+
+<h2>Google Analytics</h2>
+<p>The game loads Google Analytics 4 (measurement id <code>G-TZ865K21Z4</code>)
+the first time you open a level &mdash; not when the page loads. It records that
+a visit happened, roughly how long it lasted, and two events of ours:</p>
+<ul>
+  <li><code>level_start</code> &mdash; the level number and its difficulty</li>
+  <li><code>level_end</code> &mdash; the level number, win or lose, how many
+      seconds it took, and how many stars</li>
+</ul>
+<p>Google derives an approximate country from your IP address. We are not given
+your IP address itself, and we set no advertising or cross-site identifiers.
+Analytics is handled under
+<span class="host">Google's privacy policy</span>, and any browser setting or
+extension that blocks it will simply stop it working &mdash; the game plays
+exactly the same either way.</p>
+
+<h2>Gameplay statistics</h2>
+<p>When a level ends &mdash; and only then &mdash; one row is written to our
+Firebase Realtime Database so we can see which levels are too hard or too easy.
+The row is exactly this and nothing else:</p>
+<ul>
+  <li>the level number, its difficulty, and a fingerprint of the board's layout</li>
+  <li>whether it was won or lost, how many milliseconds it took, how many moves
+      were made, and how many stars were scored</li>
+  <li>which boosters or revives were used, if any</li>
+  <li>which build of the game was played, which site it was played on, and
+      whether Google Analytics loaded</li>
+  <li>the time the level ended</li>
+</ul>
+<p>There is no identifier of any kind in that row &mdash; no account, no device
+id, no cookie, nothing that links one row to another or to you. The rows cannot
+be read back by anyone visiting the game; the database accepts new rows and
+serves none.</p>
+
+<h2>What the game does not do</h2>
+<ul>
+  <li>No advertising sold by us, and no third-party ad network in the build.</li>
+  <li>No cookies of our own, and no cross-site tracking.</li>
+  <li>Nothing is sold or shared with anyone beyond the two services named above.</li>
+  <li>The game is not aimed at children under 13 and collects nothing that could
+      identify one.</li>
+</ul>
+
+<h2>Your choices</h2>
+<p>Clearing your browser's site data for this page erases your saved progress.
+Blocking <code>googletagmanager.com</code> stops the analytics. Because the
+gameplay rows carry no identifier, there is no way to single out or delete an
+individual player's rows &mdash; there is nothing in them to search on.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy: <code>binhp8973@gmail.com</code></p>

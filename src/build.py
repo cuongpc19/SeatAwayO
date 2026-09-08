@@ -242,7 +242,11 @@ def build_stamp():
         except Exception:
             return ""
     h = git("rev-parse", "--short", "HEAD") or "nogit"
-    return h + ("+" if git("status", "--porcelain") else "")
+    # ⚠ `-uno`: modified TRACKED files make a build unreproducible, untracked
+    # ones do not - nothing untracked is read by this script. Without it, a
+    # scratch file left in the tree by another session marks every build dirty
+    # for days, and a warning that is always on is a warning nobody reads.
+    return h + ("+" if git("status", "--porcelain", "-uno") else "")
 
 
 BUILD = build_stamp()
@@ -259,7 +263,7 @@ def privacy_page():
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Seat Away - Privacy Policy</title>
+<title>Seat Match - Privacy Policy</title>
 <style>
   :root { color-scheme: light; }
   body { margin: 0; padding: 40px 22px 80px; background: #f6f7fb; color: #22283a;

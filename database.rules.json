@@ -1,0 +1,82 @@
+{
+  // Realtime Database rules for seatmatch-292b3.
+  //
+  // ⚠ Deploy these before the game is played by anyone:
+  //     npx firebase-tools deploy --only database
+  //
+  // A fresh database starts in TEST MODE - world-readable and world-writable -
+  // and then locks itself completely after 30 days. Neither state is the one we
+  // want, and the second one looks exactly like the telemetry code being broken.
+  //
+  // The shape here is the only workable one for browser-sent telemetry:
+  // WRITE-ONLY. Anyone may add a row, nobody may read one. The database URL
+  // ships inside the game bundle and there is no way around that - a browser
+  // cannot be given a secret. So the defence is not on who writes, it is on the
+  // fact that a write can only ever ADD, and only ever a row of the right shape.
+  //
+  // Reading is done two ways, neither of which consults these rules for write:
+  //   scripts/pull_runs.py  - shells out to the Firebase CLI, which authenticates
+  //                           as project OWNER and bypasses rules entirely.
+  //   public/stats.html     - a BROWSER, which gets no owner privilege, so it
+  //                           needs the uid allowance on /runs below.
+  "rules": {
+    // Everything not named here is closed. Stated rather than left implicit so
+    // that adding a second branch later is a deliberate act.
+    ".read": false,
+    ".write": false,
+
+    "runs": {
+      // ⚠ One uid, never `auth != null`. That reads as "signed-in users only"
+      // and actually means ANY Google account on earth; anyone can make one in
+      // a minute, and this is the whole read surface of the dataset.
+      //
+      // The uid is per-project, so ball-flow's does not work here. Sign in at
+      // stats.html once - it prints the uid it signed in as - then paste it
+      // below and redeploy. Until then the page will correctly say Permission
+      // denied, which is this rule working rather than a fault.
+      ".read": "auth != null && auth.uid === 'uXOeymlk16bxqP2Qi4rdlfi0BGi1'",
+      // No write at the collection level: a client may push a child, never
+      // replace or clear the collection.
+      ".write": false,
+
+      "$run": {
+        // Add only. `!data.exists()` forbids editing or deleting an existing
+        // row, `newData.exists()` forbids using a null write as a delete.
+        ".write": "!data.exists() && newData.exists()",
+
+        // ⚠ The shape check is what makes the open write safe. Without it the
+        // endpoint is a free key-value store for anyone who reads the bundle.
+        ".validate": "newData.hasChildren(['lvl','sig','result','ms','build','t'])",
+
+        "lvl":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5000" },
+        "sig":    { ".validate": "newData.isString() && newData.val().length <= 12" },
+        "diff":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2" },
+        "result": { ".validate": "newData.isString() && (newData.val() === 'win' || newData.val() === 'lose')" },
+        // 6 hours. Long enough for a board left open over lunch, short enough
+        // that a junk number is refused.
+        "ms":     { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 21600000" },
+        "moves":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "stars":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+        "build":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "dev":    { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1)" },
+        "host":   { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "from":   { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "ga":     { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1)" },
+        "t":      { ".validate": "newData.isNumber() && newData.val() > 1700000000000" },
+
+        // Boosters spent, in order. Absent when none were - the database drops
+        // empty arrays, so absent IS the "no booster" case and the reader must
+        // treat it that way rather than expecting [].
+        "used": {
+          ".validate": "newData.hasChildren()",
+          "$i": { ".validate": "newData.isString() && newData.val().length <= 16" }
+        },
+
+        // ⚠ Anything not listed above is refused. This is the line that keeps
+        // the open write from being a free store: a row of unknown fields
+        // cannot be written at all.
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

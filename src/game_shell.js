@@ -130,23 +130,29 @@ const has = f => Math.max(save.unlocked, CUR || 0) >= unlockedAt(f);
 /* ⚠ This name is fixed from launch on. CrazyGames' Progress Save backs up
    localStorage verbatim, so renaming the key later restores the old name into a
    game that reads the new one and every player loses everything. The window in
-   which a rename is free is before anyone has played, and this build spends it.
+   which a rename is free is before anyone has played, and this build spends it:
+   renamed from `seatawayo.save.v1` on 8 Sep 2026, deliberately, to carry the
+   game's real title instead of the repo's folder name.
 
-   The name carries the repo, not the game's title, because localStorage is
-   keyed by origin and pays no attention to path. Both builds are served from
-   https://cuongpc19.github.io - /SeatAway/ and /SeatAwayO/ - so they share one
-   storage area, and any name the two have in common is one save played by two
-   different games. `seatmatch.save.v1` was exactly that: the older deploy is
-   still reading and writing it.
+   ⚠ `.v2`, and NOT `seatmatch.save.v1`, which looks like the obvious name and
+   is already taken. localStorage is keyed by origin and pays no attention to
+   path, so everything under https://cuongpc19.github.io shares one storage
+   area, and the sibling port in ../../seataway writes `seatmatch.save.v1` from
+   its own source. Its deploy answers 404 today, which makes the collision look
+   theoretical - it is one redeploy away from being two different campaigns
+   writing one save. The suffix is what keeps them apart, so do not "tidy" it.
 
    OLD_KEYS is empty on purpose, and stays empty. Adopting a key is the same
-   mistake in slower motion - it would copy the older game's progress into this
-   one on first load, and levels do not mean the same thing across the two, so
-   an `unlocked` from over there is a number this campaign never earned.
+   mistake in slower motion - it would copy another campaign's progress into
+   this one on first load, and levels do not mean the same thing across the two,
+   so an `unlocked` from over there is a number this campaign never earned. That
+   applies to `seatawayo.save.v1` as well: the rename above is a fresh start,
+   not a migration, and any test progress under the old name is meant to be left
+   behind rather than carried over.
 
    Keeping it empty also settles the other direction: a reset here clears this
-   key alone, and cannot reach into a save that belongs to the other build. */
-const SAVE_KEY = "seatawayo.save.v1";
+   key alone, and cannot reach into a save that belongs to another build. */
+const SAVE_KEY = "seatmatch.save.v2";
 const OLD_KEYS = [];
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
