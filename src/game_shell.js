@@ -640,8 +640,21 @@ function lockChip(el, tagId, feat) {
   if (!open) {
     const n = unlockedAt(feat);
     $(tagId).textContent = n === Infinity ? "SOON" : "LV " + n;
+    $(tagId).classList.remove("own");
   }
   return open;
+}
+
+/** The chip across the bottom of a booster says one of two things, and they are
+    not the same kind of thing: what it COSTS, or how many goes are already in
+    hand. Only the first is money, so only the first carries the coin - beside a
+    count the coin read as a price of one, which is why the count used to need
+    an "x" after it to be told apart at all. Without the coin it does not: a
+    bare number on a green chip is a number of goes. */
+function costChip(id, own, price) {
+  const el = $(id);
+  el.textContent = own == null ? price : own;
+  el.classList.toggle("own", own != null);
 }
 
 function boosterUi() {
@@ -649,15 +662,14 @@ function boosterUi() {
   const tOpen = lockChip(t, "b-time-cost", "booster_time");
   const jOpen = lockChip(j, "b-jump-cost", "booster_jump");
   const aOpen = lockChip(a, "b-area-cost", "booster_area");
-  if (tOpen) $("b-time-cost").textContent = save.freeTime > 0 ? "FREE" : CF.boosterTime.price;
-  if (jOpen) $("b-jump-cost").textContent = save.jumps > 0 ? save.jumps + "x" : CF.boosterJump.price;
+  if (tOpen) costChip("b-time-cost", save.freeTime > 0 ? "FREE" : null, CF.boosterTime.price);
+  if (jOpen) costChip("b-jump-cost", save.jumps > 0 ? save.jumps : null, CF.boosterJump.price);
   // The chip is hidden once the lane is out - see .boost.spent in the head. A
   // button that quotes a price it will refuse to take is a lie, and a word in
   // its place is just a quieter one; the dimmed tile says it without either.
   const spent = !!(S && S.lines);
   a.classList.toggle("spent", aOpen && spent);
-  if (aOpen) $("b-area-cost").textContent =
-    save.lines > 0 ? save.lines + "x" : CF.boosterArea.price;
+  if (aOpen) costChip("b-area-cost", save.lines > 0 ? save.lines : null, CF.boosterArea.price);
   t.classList.toggle("broke", tOpen && !save.freeTime && save.coins < CF.boosterTime.price);
   j.classList.toggle("broke", jOpen && save.jumps === 0 && save.coins < CF.boosterJump.price);
   a.classList.toggle("broke", aOpen && !spent
@@ -799,8 +811,8 @@ const INTRO_RUNS = {
           + "is no use. Jump flies them straight in instead. Here is a free one - tap "
           + "the arrow button." },
     { spot: "seats", wait: "jumped", thru: true, dock: "high", slim: true,
-      text: "Now tap one of the lit seats. The passenger at the front of the queue flies "
-          + "straight to it, over everything in the way." },
+      text: "Now tap the lit seat. There is no way to walk to it - the passenger at the "
+          + "front of the queue flies straight there, over everything in between." },
   ],
   /* Two steps, like the clock. The first buys the press; the second is worth a
      card of its own because what just happened is easy to misread - the board
@@ -1001,9 +1013,21 @@ function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
   if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
   if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
-  // the seats the free jump can actually be spent on, lit the same way
-  if (INTRO.id === "jump" && S.queue.length)
-    return S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
+  // One seat, not every seat the jump could be spent on. Ringing all of them
+  // taught nothing except which seats are the front colour, and on a full board
+  // it covered the board. The jump is for a seat the queue cannot walk to, so
+  // the one worth pointing at is exactly that: unreachable first, then whichever
+  // is furthest from the door.
+  if (INTRO.id === "jump" && S.queue.length) {
+    const ok = S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
+    if (!ok.length) return [];
+    const reach = reachRegion(S, 0);
+    const [dc, dr] = (S.doors && S.doors[0]) || [S.W - 1, S.door];
+    const walk = b => (touches(S, b, reach) ? 0 : 1);          // 1 = no way in on foot
+    const far = b => Math.abs(b.c - dc) + Math.abs(b.r - dr);
+    ok.sort((a, b) => (walk(b) - walk(a)) || (far(b) - far(a)));
+    return [ok[0]];
+  }
   return [];
 }
 
@@ -1560,7 +1584,6 @@ document.getElementById("h-hearts").onclick = () => {
 };
 document.getElementById("h-levels").onclick = () => show("levels");
 document.getElementById("l-back").onclick = () => show("home");
-$("g-retry").onclick = () => { if (!INTRO) startLevel(CUR); };
 // the chip is a real control: it plays the stamp again mid-board
 $("g-grade").onclick = () => { const d = diffOf(CUR); if (d) showWarning(d, null); };
 // the menu button opens Settings; Home lives inside it, beside the switches
