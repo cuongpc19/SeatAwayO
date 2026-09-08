@@ -4647,8 +4647,8 @@ const INTRO_RUNS = {
           + "is no use. Jump flies them straight in instead. Here is a free one - tap "
           + "the arrow button." },
     { spot: "seats", wait: "jumped", thru: true, dock: "high", slim: true,
-      text: "Now tap one of the lit seats. The passenger at the front of the queue flies "
-          + "straight to it, over everything in the way." },
+      text: "Now tap the lit seat. There is no way to walk to it - the passenger at the "
+          + "front of the queue flies straight there, over everything in between." },
   ],
   /* Two steps, like the clock. The first buys the press; the second is worth a
      card of its own because what just happened is easy to misread - the board
@@ -4849,9 +4849,21 @@ function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
   if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
   if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
-  // the seats the free jump can actually be spent on, lit the same way
-  if (INTRO.id === "jump" && S.queue.length)
-    return S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
+  // One seat, not every seat the jump could be spent on. Ringing all of them
+  // taught nothing except which seats are the front colour, and on a full board
+  // it covered the board. The jump is for a seat the queue cannot walk to, so
+  // the one worth pointing at is exactly that: unreachable first, then whichever
+  // is furthest from the door.
+  if (INTRO.id === "jump" && S.queue.length) {
+    const ok = S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
+    if (!ok.length) return [];
+    const reach = reachRegion(S, 0);
+    const [dc, dr] = (S.doors && S.doors[0]) || [S.W - 1, S.door];
+    const walk = b => (touches(S, b, reach) ? 0 : 1);          // 1 = no way in on foot
+    const far = b => Math.abs(b.c - dc) + Math.abs(b.r - dr);
+    ok.sort((a, b) => (walk(b) - walk(a)) || (far(b) - far(a)));
+    return [ok[0]];
+  }
   return [];
 }
 
