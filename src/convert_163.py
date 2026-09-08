@@ -98,6 +98,21 @@ GREY = 0           # the engine's fixture colour, and GREY_TAKES is 2 - sky
 # SeatDirect: 0 and 2 run along x, 1 and 3 along z. turnNumber is this, not a
 # count of turns - see the module docstring.
 STEP = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+
+# The Train panel is two carriages, not one room. Its middle column is the gap
+# between them - outside, not floor - and the only way across is the coupling at
+# each end. The bundle marks none of this: no holeObstacles, no obstacles, no
+# secondDoor on any of the 97 train boards. What says it is where the seats go.
+# Column 3 holds a seat on 13 boards at row 0 and 13 at row 10, and almost
+# nowhere else, against 647-823 seat-cells in each neighbouring column. So the
+# column is wall except at its two ends, which is exactly the two open squares
+# you can see between the carriages in the game.
+#
+# It has to be both. Wall the whole column and half the riders are stranded:
+# the door is at column 6, so board 390 loses 9 of its 19 and board 1029 loses
+# 21 of 43, and secondDoor is false everywhere, so nothing lets them in.
+GAP_PANEL = 10
+GAP_COL = 3
 # The two rare markers, 8 and 12 in the old format. They appear on 16 boards
 # between them, all of which already use green, so 501 cannot have lime.
 SPECIAL = {500: 7, 501: 6}
@@ -163,6 +178,10 @@ def convert():
             continue
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
+        # the carriage gap, as cell indices the engine reads as not-floor
+        holes = []
+        if r["panel"] == GAP_PANEL:
+            holes = [row * W + GAP_COL for row in range(1, H - 1)]
         laid, ok = set(), True
         for i, s in enumerate(r["seats"]):
             if s["slot"] not in cells:      # the switched-off column; nothing uses it
@@ -175,6 +194,9 @@ def convert():
             if any(not (0 <= c < W and 0 <= rr < H) for c, rr in covered) or laid & set(covered):
                 ok = False
                 break
+            if any(rr * W + c in holes for c, rr in covered):
+                # a seat sitting in the gap means this board is not two carriages
+                holes = []
             laid |= set(covered)
             # c, r, size, colour, SeatDirect. The engine lays a seat out from its
             # anchor in the positive direction whichever way it faces, so one
@@ -220,7 +242,7 @@ def convert():
             "panel": r["panel"], "w": W, "h": H,
             "time": clock(len(r["queue"]) + len(r["queue2"])),
             "moves": r["moveCount"],
-            "holes": [],                     # every cell is floor; benches sit on it
+            "holes": holes,                  # the carriage gap, empty otherwise
             "seats": seats,                  # c, r, capacity, colour, dir
             "queue": [recolour(c) for c in r["queue"]],
             "queue2": [recolour(c) for c in r["queue2"]],
