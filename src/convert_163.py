@@ -173,28 +173,23 @@ def grids():
 
 
 def second_row(doors, panel, H):
-    """The row the far door stands in: the front, the same row as the near one.
+    """The row the far door stands in: the panel's own if it carries one, else
+    two rows off the back, which is where the only one in the bundle sits.
 
-    Nothing in the bundle says outright. Cadillac and Limo are the only panels
-    that use a second queue and neither carries a second door object; theirs is
-    in the vehicle mesh. Firecar does carry a BusDoor_2 - far wall, two rows off
-    the back - and it looked like the answer until the boards were asked.
+    Firecar is the single panel with a BusDoor_2 - far wall, row 8 of a 6x10 -
+    and a capture of the real game agrees with it. On level 55 the far line's
+    tail runs off the TOP of the board, which puts its head at the bottom, and a
+    passenger is already sitting in the bottom-left corner.
 
-    The boards answer it, because seats were laid out around wherever the door
-    really is. Trying every cell on both walls across all 78 of them, counting
-    where the second line can walk straight in with nothing moved:
-
-        col 0 row 0   37 boards        <- the front of the far wall
-        col 0 row 1   27
-        col 0 row 4   19
-        col 0 row 8    7               <- where Firecar puts its BusDoor_2
-        col 0 row 9    5
-
-    Five times the boards open at the front than at Firecar's row, so Firecar's
-    is not this door - a fire engine's rear hatch is not where passengers get
-    on. The front of the far wall it is, facing the near door across the floor.
+    An earlier reading put it at the front instead, on the grounds that the front
+    is where most boards let the second line walk straight in (37 of 78, against
+    7 at Firecar's row). That test was backwards. A door the queue can stroll
+    through is not what these boards are built around - the near door starts
+    under a parked seat on 987 boards, and being blocked at the open is the
+    puzzle, not a fault in the reading.
     """
-    return 0
+    d = doors[str(panel)].get("second")
+    return d["row"] if d else max(0, H - 2)
 
 
 def clock(riders):

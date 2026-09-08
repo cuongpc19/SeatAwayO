@@ -170,10 +170,19 @@ function fits(g, b, c, r) {
 const doorCell = (g, k) => (g.doors && g.doors[k]) || [g.W - 1, g.door];
 const queueOf = (g, k) => (k ? (g.queue2 || []) : g.queue);
 /** Where the line for a door waits, in world units - outside the wall it is on. */
+/* How far off the wall each line stands. The far one is pulled in a little: it
+   is the difference between a board that keeps its size and one that shrinks to
+   make room, and nobody reads a queue by how much air is behind it. */
+const LANE_NEAR = 2.0, LANE_FAR = 1.55;
 function stopAt(g, k) {
   const [dc, dr] = doorCell(g, k);
-  return [cellW(dc) + (dc === 0 ? -SX * 2.0 : SX * 2.0), cellZ(dr)];
+  return [cellW(dc) + (dc === 0 ? -SX * LANE_FAR : SX * LANE_NEAR), cellZ(dr)];
 }
+/** Which way a line trails back from its door: away from the board, so a door at
+    the front has its queue running off the back and one at the back has it
+    running off the front. Both trailing the same way would lay the far line
+    across the board it is waiting to get into. */
+const queueDir = (g, k) => (doorCell(g, k)[1] * 2 < g.H ? 1 : -1);
 
 function reachRegion(g, k) {
   const seen = new Uint8Array(g.W * g.H);
@@ -291,7 +300,8 @@ function load(n) {
      boards - each carries a colour the other has none of - so a passenger at the
      wrong door cannot stand in for one at the right door. */
   g.queue2 = (raw.queue2 || []).slice();
-  const d2 = raw.door2 == null ? g.door : Math.max(0, Math.min(H - 1, raw.door2));
+  const d2 = raw.door2 == null ? Math.max(0, H - 2)
+                               : Math.max(0, Math.min(H - 1, raw.door2));
   g.doors = g.queue2.length ? [[W - 1, g.door], [0, d2]] : [[W - 1, g.door]];
   g.lastDoor = 1;                        // so the first launch comes from door 0
   g.total = g.queue.length + g.queue2.length;
@@ -458,9 +468,11 @@ function frame() {
   // Two lines want room on both sides, so the grid gives some back rather than
   // running to the edge. It costs the board a little width; a queue nobody can
   // see costs the player the level.
+  // A two-line board is a wider picture, so it gets the whole window rather than
+  // the usual margin - the board keeps its size and the extra goes to the lanes.
   const two = !!(S && S.doors && S.doors.length > 1);
-  if (two) return wide ? { left: .30, right: .74, top: head, bottom: .93 }
-                       : { left: .17, right: .83, top: head - .02, bottom: .94 };
+  if (two) return wide ? { left: .22, right: .82, top: head, bottom: .93 }
+                       : { left: .01, right: .99, top: head - .02, bottom: .94 };
   return wide ? { left: .26, right: .78, top: head, bottom: .93 }
               : { left: .04, right: .95, top: head - .02, bottom: .94 };
 }
@@ -477,7 +489,11 @@ function layout() {
     const gx = g.W * SX / 2 + WALL, gz = g.H * SZ / 2 + WALL;
     const qx = (g.W - 1) * SX / 2 + SX * 2.45;
     const rx = Math.max(gx, qx);
-    const c = [view(-gx, 0, -gz), view(rx, 0, -gz), view(-gx, 0, gz), view(rx, 0, gz)];
+    // and out to the far line as well, where there is one - it stands outside
+    // the far wall, so fitting to the wall leaves it off the canvas entirely
+    const lx = (g.doors && g.doors.length > 1)
+      ? Math.max(gx, (g.W - 1) * SX / 2 + SX * (LANE_FAR + .5)) : gx;
+    const c = [view(-lx, 0, -gz), view(rx, 0, -gz), view(-lx, 0, gz), view(rx, 0, gz)];
     const xs = c.map(p => p[0]), ys = c.map(p => -p[1]);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -1940,6 +1956,9 @@ function drawRoom(g) {
   // near doorway is mirrored across the room for it.
   const twoDoors = !!(g.doors && g.doors.length > 1);
   const OX2 = x0 - T;
+  // the far doorway has its own row, and it is not the near one's
+  const dr2 = twoDoors ? g.doors[1][1] : 0;
+  const ez0 = cellZ(dr2) - SZ * .42, ez1 = cellZ(dr2) + SZ * .42;
 
   // ---- outside the room ----
   const gx0 = x0 - T - SX * 9, gx1 = x1 + T + SX * 9;
@@ -1994,8 +2013,8 @@ function drawRoom(g) {
   slab(x0 - L, z0 - L, x1 + L, z0, .0, SKIN.lip);
   slab(x0 - L, z1, x1 + L, z1 + L, .0, SKIN.lip);
   if (twoDoors) {                                // the far lip parts for its own way in
-    slab(x0 - L, z0, x0, dz0, .0, SKIN.lip);
-    slab(x0 - L, dz1, x0, z1, .0, SKIN.lip);
+    slab(x0 - L, z0, x0, ez0, .0, SKIN.lip);
+    slab(x0 - L, ez1, x0, z1, .0, SKIN.lip);
   } else {
     slab(x0 - L, z0, x0, z1, .0, SKIN.lip);
   }
@@ -2007,7 +2026,7 @@ function drawRoom(g) {
   // drawn at floor level, so under this camera they landed BELOW the cut and the
   // three of them stacked up into bars across the way in.
   slab(x1 - .02, dz0, OX + .02, dz1, H + .004, SKIN.door);
-  if (twoDoors) slab(OX2 - .02, dz0, x0 + .02, dz1, H + .004, SKIN.door);
+  if (twoDoors) slab(OX2 - .02, ez0, x0 + .02, ez1, H + .004, SKIN.door);
 
   if (TH.dressWalls) TH.dressWalls(E);
   if (f != null && TH.finale) TH.finale(E, f, "room");
@@ -2123,7 +2142,7 @@ function draw() {
       // whole place and standing still, and drawing that as a walk frame turns the
       // back half of the line to face away for as long as anyone is boarding.
       const walking = back > 1e-3 && qnow >= st.t0;
-      const pos = i + back, wz = laneZ + pos * QUEUE_PITCH;
+      const pos = i + back, wz = laneZ + pos * QUEUE_PITCH * queueDir(g, dk);
       const nm = SPRITE[colName(q[i])] || "grey";
       // Faded by where they stand rather than by which place they hold, so someone
       // coming forward brightens as they arrive instead of on the frame they shift.
