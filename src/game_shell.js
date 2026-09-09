@@ -1495,31 +1495,6 @@ function ambRoar() { ambCheer(2.8, .200, 620, 1500); }
     church bell and a smooth tone is a doorbell; what says "school" is the ratio
     between the partials being nothing musical, and the hammer buzzing against
     the dome twenty times a second. */
-function ambBell() {
-  if (!AMB) return;
-  const t = AC.currentTime, dur = 1.9, peak = .036;
-  const env = AC.createGain();
-  env.gain.setValueAtTime(.0001, t);
-  env.gain.exponentialRampToValueAtTime(peak, t + .03);
-  env.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  env.connect(AMB.master);
-  const trem = AC.createGain();
-  trem.gain.value = .55;
-  const lfo = AC.createOscillator(), lg = AC.createGain();
-  lfo.type = "square"; lfo.frequency.value = 19; lg.gain.value = .45;
-  lfo.connect(lg); lg.connect(trem.gain);
-  lfo.start(t); lfo.stop(t + dur + .05);
-  trem.connect(env);
-  for (const r of [1, 2.76, 5.40]) {                 // nothing musical about these
-    const o = AC.createOscillator();
-    o.type = "triangle"; o.frequency.setValueAtTime(620 * r, t);
-    o.connect(trem);
-    o.start(t); o.stop(t + dur + .05);
-  }
-}
-
-/** One muffled beat from beyond the wall: a sine dropped through its own pitch,
-    with everything above the bottom taken off. */
 function ambThump(hz, dur, peak, delay) {
   if (!AMB) return;
   const t = AC.currentTime + (delay || 0);
@@ -1556,10 +1531,13 @@ function ambBars() {
    defining sound is that it has none, and the honest alternatives were a
    projector nobody would place or a rumble from the film next door. A theme
    missing from this table is silent - see ambCue(). */
+/* ⚠ No `classroom` either. It had a hand bell, which reads as the sound that
+   ENDS a lesson rather than one that celebrates finishing it - and a classroom
+   is quiet for the same reason a cinema is. The bell went with it rather than
+   sitting here unreachable. */
 const AMBIENCE = {
   station: ambHorn,
   stadium: ambRoar,
-  classroom: ambBell,
   concert: ambBars,
 };
 
