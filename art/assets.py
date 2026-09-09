@@ -172,25 +172,32 @@ def table_parts():
     ⚠ Modelled here, with the same primitives and the same lit bake as the
     seats, rather than drawn on the canvas at run time. Two canvas versions came
     before this - a stone bench and a flat two-tone box - and both looked like a
-    different game sitting next to a seat, because the seats are lit 3D renders
-    and a vector shape has no way to match that. Built as parts, it matches by
-    construction: same camera, same light, same specular.
+    different game sitting beside a seat, because the seats are lit 3D renders
+    and vector fills have no way to match a specular.
+
+    ⚠ Wide and low, not a stool. The first modelled one was taller than it was
+    wide and still did not belong: what the eye matches on is the SILHOUETTE,
+    and every seat on this board is a wide flat slab. A tall box beside them
+    reads as furniture from another game however well it is lit. Its width is
+    close to a seat's, its depth about half that, and it sits low on four stubby
+    legs.
 
     Fixed wood colours rather than a `k` multiplier: the seats take a palette
-    colour per frame and this must not, or it would read as a seat of that
-    colour rather than as furniture."""
-    W = CELL - 0.72                  # clearly smaller than a seat
-    D = W * 0.74
-    TOP = 0.66
-    P = []
-    P.append(dict(geo=rbox((0, TOP, 0), (W, 0.18, D), 0.07),
-                  fixed=WOOD, spec=0.44, shin=20))
-    P.append(dict(geo=rbox((0, TOP - 0.15, 0), (W - 0.14, 0.11, D - 0.14), 0.04),
-                  fixed=WOOD_DARK, spec=0.30))
+    colour per frame and this must not, or nine tinted copies of one table would
+    read as seats of nine colours."""
+    W = CELL - 0.22
+    D = W * 0.52
+    TOP, THICK, APRON, LEG = 0.74, 0.34, 0.18, 0.16
+    P = [dict(geo=rbox((0, TOP, 0), (W, THICK, D), 0.19),
+              fixed=WOOD, spec=0.50, shin=20),
+         dict(geo=rbox((0, TOP - THICK / 2 - APRON * .75, 0),
+                       (W - 0.22, APRON, D - 0.18), 0.085),
+              fixed=WOOD_DARK, spec=0.34)]
+    base = TOP - THICK / 2 - APRON
     for sx in (-1, 1):
         for sz in (-1, 1):
-            P.append(dict(geo=rbox((sx * (W / 2 - 0.13), (TOP - 0.22) / 2, sz * (D / 2 - 0.12)),
-                                   (0.13, TOP - 0.22, 0.13), 0.045),
+            P.append(dict(geo=rbox((sx * (W / 2 - LEG), base / 2, sz * (D / 2 - LEG * .7)),
+                                   (LEG * 1.7, base, LEG * 1.7), LEG * .5),
                           fixed=WOOD_DARK, spec=0.26))
     return P
 
