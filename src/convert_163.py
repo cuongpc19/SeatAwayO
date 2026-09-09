@@ -324,6 +324,15 @@ def convert():
         ordered = ([r for r in src if r["id"] == TUTORIAL_ID]
                    + [r for r in src if FIRST_ID <= r["id"] <= LAST_ID])
     for pos, r in enumerate(ordered, 1):
+        # ⚠ A second line with no second door has nowhere to walk in. Board 2488
+        # is the only one of 2676 that carries one - its `customerSiralistesi2`
+        # is a byte-for-byte copy of the first line, on a board whose
+        # `secondDoor` is unset - so 31 places were being asked to seat 62
+        # people and the level could not be finished at all. It is the APK's own
+        # authoring slip, not a decoding one: every other board with a second
+        # line has the door to go with it, and a different line behind it.
+        if not r["secondDoor"]:
+            r = dict(r, queue2=[])
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
         # the carriage gap, as cell indices the engine reads as not-floor
