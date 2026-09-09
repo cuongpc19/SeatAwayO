@@ -166,6 +166,35 @@ def seat_parts(cells=1):
     return P
 
 
+def table_parts():
+    """The small table that stands on a blocked floor cell.
+
+    ⚠ Modelled here, with the same primitives and the same lit bake as the
+    seats, rather than drawn on the canvas at run time. Two canvas versions came
+    before this - a stone bench and a flat two-tone box - and both looked like a
+    different game sitting next to a seat, because the seats are lit 3D renders
+    and a vector shape has no way to match that. Built as parts, it matches by
+    construction: same camera, same light, same specular.
+
+    Fixed wood colours rather than a `k` multiplier: the seats take a palette
+    colour per frame and this must not, or it would read as a seat of that
+    colour rather than as furniture."""
+    W = CELL - 0.72                  # clearly smaller than a seat
+    D = W * 0.74
+    TOP = 0.66
+    P = []
+    P.append(dict(geo=rbox((0, TOP, 0), (W, 0.18, D), 0.07),
+                  fixed=WOOD, spec=0.44, shin=20))
+    P.append(dict(geo=rbox((0, TOP - 0.15, 0), (W - 0.14, 0.11, D - 0.14), 0.04),
+                  fixed=WOOD_DARK, spec=0.30))
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            P.append(dict(geo=rbox((sx * (W / 2 - 0.13), (TOP - 0.22) / 2, sz * (D / 2 - 0.12)),
+                                   (0.13, TOP - 0.22, 0.13), 0.045),
+                          fixed=WOOD_DARK, spec=0.26))
+    return P
+
+
 # ============================== FENCE ==============================
 def fence_post_parts():
     P = [dict(geo=rbox((0, 0.34, 0), (0.34, 0.68, 0.34), 0.10), fixed=WOOD, spec=0.35),

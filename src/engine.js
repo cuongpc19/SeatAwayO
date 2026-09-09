@@ -782,53 +782,13 @@ function drawBlock(wx, wz, alpha) {
    `kind` only picks the ornament. Nothing in the data says what prop 4 is as
    opposed to prop 5, so the shapes are ours; what is read from the data is
    where they stand and that they block the cell. */
-/* ⚠ Screen space, against the seat sprite's own rectangle - not geometry. The
-   first two tries built a bench out of projected boxes and both came out as a
-   rug, because this projection gives a unit of x 28.7px and a unit of z 27.9
-   but a unit of HEIGHT only 6.9. The seats do not have that problem: they are
-   pre-rendered sprites. So the table is drawn the way they LOOK rather than the
-   way they would be built - a lit top plate over a darker body, rounded, with an
-   ink outline - and sized off the seat frame so it stays in proportion at every
-   board scale.
-
-   No theme in it. It is a small table and it is the same table in every room. */
-const TABLE = { top: "#e6dcc6", face: "#c2b294", edge: "#a2957c", ink: "#4b4536" };
-let TABLE_W = .68, TABLE_H = .60, TABLE_LID = .46;
-
+/* The table that stands on a blocked floor cell. One frame, baked by the same
+   renderer that makes the seats - see table_parts() in art/assets.py - so it
+   carries the same light and the same specular instead of trying to imitate
+   them with canvas fills. Two hand-drawn versions came before it and both read
+   as a different game beside a seat. */
 function drawFixture(wx, wz, kind) {
-  const f = META.frames["s1_0_grey"];
-  if (!f) return;
-  const [px, py] = P(wx, 0, wz);
-  const k = LAY.s / META.scale;
-  const x0 = px - f[4] * k, y0 = py - f[5] * k, sw = f[2] * k, sh = f[3] * k;
-  const w = sw * TABLE_W, h = sh * TABLE_H;
-  const x = x0 + (sw - w) / 2, y = y0 + sh - h;   // stands on the same line a seat does
-  const r = w * .17;
-
-  ctx.save();
-  ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.lineWidth = Math.max(1, LAY.s * .019);
-  ctx.strokeStyle = TABLE.ink;
-  /* ⚠ A gradient down each face, not a flat fill. The seats are lit renders and
-     what makes them read as moulded is the fall-off from top to bottom; a table
-     in two flat tones beside them reads as a sticker. */
-  const box = (yy, hh, a1, a2) => {
-    const g = ctx.createLinearGradient(0, yy, 0, yy + hh);
-    g.addColorStop(0, a1); g.addColorStop(1, a2);
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, yy, w, hh, r);
-    else ctx.rect(x, yy, w, hh);
-    ctx.fillStyle = g; ctx.fill(); ctx.stroke();
-  };
-  box(y + h * TABLE_LID * .62, h * (1 - TABLE_LID * .62), TABLE.face, TABLE.edge);
-  box(y, h * TABLE_LID, "#f4ecdb", TABLE.top);
-  // the sheen the seats carry along their top edge, which is most of what makes
-  // them read as moulded rather than as flat shapes
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x + w * .12, y + h * .10, w * .76, h * TABLE_LID * .34, r * .5);
-  else ctx.rect(x + w * .12, y + h * .10, w * .76, h * TABLE_LID * .34);
-  ctx.fillStyle = "rgba(255,255,255,.34)"; ctx.fill();
-  ctx.restore();
+  blit("table", wx, 0, wz, 1);
 }
 
 /* ---- the padlock on a locked seat --------------------------------------

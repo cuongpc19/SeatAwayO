@@ -21,7 +21,7 @@ import json, base64, math, os, time
 from PIL import Image
 from toy3d import Cam, bake, colorize, scale_parts, rotate_parts, xform, _bounds
 from assets import guest_parts, PALETTE, EYE, WOOD, WOOD_DARK, fence_post_parts
-from assets import rbox, capsule, seat_parts, CELL
+from assets import rbox, capsule, seat_parts, table_parts, CELL
 
 SCALE = 74
 PITCH = 1.33
@@ -71,6 +71,10 @@ for name, pose in (("idle", "idle"), ("cheer", "cheer")):
     parts = rotate_parts(scale_parts(guest_parts(pose, face=False), 0.88), math.pi)
     shapes[name] = fit(parts)
 shapes["post"] = fit(fence_post_parts())
+# ⚠ Not "s..." and not "r...", so the packer leaves it untinted - see `tint`
+# below. It is furniture, not a seat, and a tinted copy per colour would be nine
+# frames of the same table.
+shapes["table"] = fit(table_parts())
 print("  queue, cheer, post         %.1fs" % (time.time() - t0))
 
 # ---- pack ----
