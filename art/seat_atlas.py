@@ -36,7 +36,16 @@ ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "g
 
 # SeatDirect -> how far to spin the model. 0 faces up the screen; the cells of a
 # 1/3 seat run down the screen, so those must face left or right.
-DIRECT_SPIN = {0: math.pi, 1: -math.pi / 2, 2: 0.0, 3: math.pi / 2}
+#
+# ⚠ 1 and 3 were the wrong way round, and had been since the side-on seats were
+# first baked. FACING in engine.js reads 1 as facing right and 3 as facing left,
+# and the data agrees with FACING rather than with the art: on every board that
+# runs benches down the walls, the seats against the LEFT wall carry turn 1 and
+# those against the RIGHT wall carry turn 3 - a bench faces the aisle, not the
+# wall it is bolted to. The model was spun the other way, so a passenger walked
+# in over the backrest and the one cell that should have been barred was the one
+# in front of the cushion.
+DIRECT_SPIN = {0: math.pi, 1: math.pi / 2, 2: 0.0, 3: -math.pi / 2}
 VARIANTS = [(1, 0), (2, 0), (1, 2), (2, 2), (2, 1), (2, 3), (3, 3),
             (3, 0), (3, 1), (3, 2), (4, 0), (1, 1), (1, 3)]
 
