@@ -755,64 +755,71 @@ function drawBlock(wx, wz, alpha) {
   ctx.restore();
 }
 
-/* ⚠ How high the padlock hangs and how far back it sits. `let`, because these
-   are the two numbers that decide whether it reads as hanging off the seat or
-   floating over it, and that is a thing to look at rather than reason about.
-   The seat is painted after it, so the lower it hangs the more the cushion
-   covers. */
-let LOCK_Y = .70, LOCK_BACK = .26, LOCK_K = .115;
+/* ---- the padlock on a locked seat --------------------------------------
+   In FRONT of the cushion, hanging off it, rather than parked behind the seat
+   back. Behind, the seat covered everything but the shackle and it read as a
+   scratch; the original hangs its lock on the front of the seat, where it reads
+   as something holding the seat down.
 
-/* The padlock on the back of a chained seat. Drawn rather than an atlas frame:
-   it has to sit on nine seat colours at four rotations and three footprints, and
-   a sprite for each is 108 frames for one small piece of metal. Sat behind the
-   seat and a little above it, so it reads as hanging off the back rather than
-   as something a passenger is holding. */
-function drawPadlock(b, wx, wz, alpha) {
-  const k = LAY.s * LOCK_K;
-  const back = b.dir & 1 ? [0, -SZ * LOCK_BACK] : [0, -SZ * (LOCK_BACK + .04)];
-  const [px, py] = P(wx + back[0], LOCK_Y, wz + back[1]);
+   Laid out against the seat's own sprite rectangle rather than in world units,
+   so it lands in the same place on the cushion at any board scale and follows
+   the two facings a one-cell seat is drawn with. Every locked seat in the
+   bundle is one cell and one place - all 2126 of them.
+
+   The numbers are `let` and named: where it hangs and how big it is are things
+   to look at, not to reason about. */
+let LOCK_X = .50;      // across the seat, 0 left edge, 1 right
+let LOCK_DOWN = .86;   // down the seat, 1 = its bottom edge
+let LOCK_K = .19;      // the padlock, as a fraction of a cell
+
+const LOCK_INK = "#2b3550", LOCK_LIT = "#eef1fa";
+
+function drawLock(b, wx, wz, alpha) {
+  const f = META.frames[seatFrame(b)];
+  if (!f) return;
+  const [px, py] = P(wx, 0, wz);
+  const k = LAY.s / META.scale;
+  const x0 = px - f[4] * k, y0 = py - f[5] * k, w = f[2] * k, h = f[3] * k;
+  const mx = x0 + w * LOCK_X, my = y0 + h * LOCK_DOWN;
+  const q = LAY.s * LOCK_K;
+
   ctx.save();
   ctx.globalAlpha = alpha == null ? 1 : alpha;
   ctx.lineCap = "round"; ctx.lineJoin = "round";
-  // the shackle
-  ctx.beginPath();
-  ctx.arc(px, py - k * 1.55, k * .82, Math.PI, 0);
-  ctx.lineWidth = k * .58;
-  ctx.strokeStyle = "#232c44"; ctx.stroke();
-  ctx.lineWidth = k * .30;
-  ctx.strokeStyle = "#cdd5ea"; ctx.stroke();
-  // the body, with its ink outline the way every other piece on the board carries one
-  const w = k * 2.5, h = k * 2.0, x = px - w / 2, y = py - k * .95;
+
+  // The shackle: an ink pass, then a lighter one inside it, the way every other
+  // piece on this board carries an outline.
+  const arc = () => { ctx.beginPath(); ctx.arc(mx, my - q * .58, q * .50, Math.PI, 0); };
+  ctx.strokeStyle = LOCK_INK; ctx.lineWidth = q * .46; arc(); ctx.stroke();
+  ctx.strokeStyle = LOCK_LIT; ctx.lineWidth = q * .22; arc(); ctx.stroke();
+
+  const bw = q * 1.50, bh = q * 1.20, bx = mx - bw / 2, by = my - q * .62;
   const body = (fill, inset) => {
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x + inset, y + inset, w - inset * 2, h - inset * 2, k * .48);
-    else ctx.rect(x + inset, y + inset, w - inset * 2, h - inset * 2);
+    if (ctx.roundRect) ctx.roundRect(bx + inset, by + inset, bw - inset * 2, bh - inset * 2, q * .30);
+    else ctx.rect(bx + inset, by + inset, bw - inset * 2, bh - inset * 2);
     ctx.fillStyle = fill; ctx.fill();
   };
-  /* ⚠ Steel, not gold. A gold padlock disappears on a yellow seat, and the seat
-     under it is one of nine colours - so the body is a neutral the palette does
-     not contain, inside an ink outline as thick as everything else on the board
-     carries. */
-  body("#232c44", 0);
-  body("#e4e9f6", k * .26);
-  // the keyhole
+  body(LOCK_INK, 0);
+  body(LOCK_LIT, q * .18);
+
+  ctx.beginPath();                                   // keyhole
+  ctx.arc(mx, by + bh * .42, q * .18, 0, Math.PI * 2);
+  ctx.fillStyle = LOCK_INK; ctx.fill();
   ctx.beginPath();
-  ctx.arc(px, y + h * .46, k * .28, 0, Math.PI * 2);
-  ctx.fillStyle = "#232c44"; ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(px, y + h * .46); ctx.lineTo(px, y + h * .78);
-  ctx.lineWidth = k * .22; ctx.strokeStyle = "#232c44"; ctx.stroke();
+  ctx.moveTo(mx, by + bh * .42); ctx.lineTo(mx, by + bh * .74);
+  ctx.lineWidth = q * .14; ctx.strokeStyle = LOCK_INK; ctx.stroke();
   ctx.restore();
 }
 
 /** A seat, or a crate where the board carries one instead. */
 function paintPiece(b, wx, wz, alpha) {
   if (isBlock(b)) return drawBlock(wx, wz, alpha);
-  if (b.chain) drawPadlock(b, wx, wz, alpha);        // behind the seat, so first
   if (HARD && RICH) seatSheen(b, wx, wz, alpha);
   const per = packing(b);
   if (per <= 1) {
     blit(seatFrame(b), wx, 0, wz, alpha);
+    if (b.chain) drawLock(b, wx, wz, alpha);         // over the cushion, so last
     return;
   }
   // A bench that covers one cell is drawn as its own places, side by side and
@@ -823,6 +830,7 @@ function paintPiece(b, wx, wz, alpha) {
     blit(seatFrame(b), wx + (b.dir & 1 ? 0 : off * SX), 0,
          wz + (b.dir & 1 ? off * SZ : 0), alpha, 1 / per);
   }
+  if (b.chain) drawLock(b, wx, wz, alpha);
 }
 
 /* ---------------- the room ----------------
