@@ -200,6 +200,26 @@ body {
   background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
   box-shadow: inset 0 -4px 0 rgba(0,0,0,.18);
 }
+/* Sits under the purse, on the same centre line. ⚠ Its top follows --wallet-y
+   rather than being a number of its own: the wallet moves with the frame, and a
+   fixed offset put this through the middle of it on a wide window. */
+.nexthard {
+  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 42) * 1px);
+  transform: translate(-50%, -50%);
+  font-family: var(--ms); font-size: 21px; color: #fff; white-space: nowrap;
+  -webkit-text-stroke: 5px var(--ms-ink); paint-order: stroke fill;
+}
+.nexthard b { color: var(--ms-gold); }
+.nexthard[hidden] { display: none; }
+/* The size of what is ahead. Quieter than the line above it: one is a thing to
+   plan for, the other is a horizon. */
+.waiting {
+  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 72) * 1px);
+  transform: translate(-50%, -50%);
+  font-family: var(--ms); font-size: 17px; color: rgba(255,255,255,.86);
+  white-space: nowrap; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
+}
+.waiting[hidden] { display: none; }
 .ver {
   left: calc(var(--ui-cx) * 1px); top: 1120px; transform: translateX(-50%);
   font-size: 16px; color: #fff; opacity: .55; white-space: nowrap;
@@ -357,15 +377,72 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 
 
 /* ---------- level grid ---------- */
-#levels { overflow-y: auto; -webkit-overflow-scrolling: touch;
+/* ⚠ Capped, or it does not scroll - it grows. #app is min-height:100dvh with no
+   ceiling, so a screen taller than the viewport pushes the whole page and the
+   WINDOW scrolls while this element sits still. `overflow-y: auto` then makes it
+   the scrollport for its own sticky children without ever scrolling, which
+   silently disables them. Every other screen fits the viewport; this is the one
+   that does not. */
+#levels { overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0;
+  max-height: 100vh; max-height: 100dvh;
   padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l)); }
+/* ⚠ Pinned. The screen scrolls itself, and buildGrid() centres the cell the
+   player is on - which by level 60 is a long way down, taking the heading and
+   the count off the top with it. The one line that says how far along they are
+   was the first thing to disappear on the screen that exists to say it. */
+#levels .topbar, #levels .l-sum {
+  position: sticky; z-index: 2;
+  /* ⚠ The app's own top colour, not a tint. At the top of the list the bar has
+     to be invisible - it is the background - and once the list moves under it,
+     the same colour reads as a bar rather than as a smudge. */
+  background: var(--sky-hi); box-shadow: 0 8px 12px -8px rgba(0,0,0,.5);
+}
+#levels .topbar { top: 0; padding-bottom: .5rem; }
+#levels .l-sum { top: 3.1rem; margin: 0; padding: .35rem 0 .7rem; box-shadow: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .5rem; }
+/* ⚠ Not a button any more, whatever the class is called. This screen says how
+   far along the player is and no longer starts a level, so the cells take no
+   pointer: a cursor that promises a click the cell will not honour is worse than
+   no cursor. The name stays because the CSS, the markup and buildGrid() all
+   share it, and renaming three things to say the same one is churn. */
 .cellbtn {
-  aspect-ratio: 1; border: 0; border-radius: 14px; cursor: pointer; font-family: var(--disp);
+  aspect-ratio: 1; border: 0; border-radius: 14px; cursor: default; font-family: var(--disp);
   font-weight: 800; font-size: 1rem; color: #fff; position: relative;
   background: linear-gradient(180deg, #6d84a8, #4c5f7d); box-shadow: 0 3px 0 rgba(0,0,0,.28);
+  /* ⚠ Centred here rather than inherited. These were <button> until this screen
+     stopped starting levels, and a button centres its own text - a div does not,
+     so every number slid into the top-left corner. */
+  display: grid; place-items: center; padding-top: .34rem;
 }
+/* Where the player is standing: gold, ringed and lifted off the grid. The one
+   cell on this screen that has to be findable without reading numbers. */
+.cellbtn.here {
+  background: linear-gradient(180deg, #ffd964, var(--gold-dk));
+  color: var(--ink); box-shadow: 0 0 0 3px #fff, 0 4px 0 rgba(0,0,0,.32);
+  transform: scale(1.06); z-index: 1;
+}
+.cellbtn.here .d, .cellbtn.here .s { color: var(--ink); text-shadow: none; }
+/* The gap between what is next and the far end. Flat and unlit: it is not a
+   level, and a cell that looks like the others invites a tap. */
+/* ⚠ Spans the row and stops one short, which puts the far end in the corner.
+   A grid item told to start at column 1 has to begin a fresh row, so the run of
+   dots always gets its own line and the level after it lands in the last
+   column - the corner being where a reader looks for "and it ends at". */
+.cellbtn.dots {
+  grid-column: 1 / -2; aspect-ratio: auto; min-height: 2.2rem;
+  background: none; box-shadow: none; color: rgba(255,255,255,.55);
+  font-size: 1.3rem; letter-spacing: .38em; place-items: center;
+}
+.l-sum {
+  margin: 0 0 .7rem; text-align: center; font-family: var(--disp); font-weight: 800;
+  font-size: .82rem; letter-spacing: .04em; color: rgba(255,255,255,.82);
+}
+.l-sum b { color: var(--gold); font-size: 1.05rem; }
 .cellbtn.done { background: linear-gradient(180deg, var(--go), var(--go-dk)); }
+/* Not reached yet. ⚠ Declared BEFORE the two difficulty rules so they win: on a
+   screen that only shows what is coming, every cell is unreached, and a grey
+   that beats the warning colours would leave nothing to see. */
+.cellbtn.ahead { background: rgba(20,28,44,.34); color: rgba(255,255,255,.7); }
 /* ---------- the hard levels ----------
    `difficultLevel` off the APK board: 0, 1 or 2. 118 of the 600 campaign levels
    carry one, and the game shows it in two places - the tile here, and the level
@@ -378,11 +455,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    be shouting. */
 .cellbtn.hard  { background: linear-gradient(180deg, #ef7d4d, #c1502a); }
 .cellbtn.shard { background: linear-gradient(180deg, #a95ce2, #7233ab); }
-.cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); cursor: not-allowed; }
+.cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); }
 .cellbtn .s { position: absolute; inset: auto 0 3px 0; font-size: .55rem; letter-spacing: .1em; color: var(--gold); }
+/* ⚠ A band across the top, and the number is padded down to clear it. They used
+   to be laid over each other - "HARD" and "75" in the same few pixels - which
+   read as neither. */
 .cellbtn .d {
-  position: absolute; inset: 4px 0 auto 0; font-size: .44rem; font-weight: 800;
-  letter-spacing: .07em; color: rgba(255,255,255,.95); text-shadow: 0 1px 0 rgba(0,0,0,.25);
+  position: absolute; inset: 3px 0 auto 0; font-size: .42rem; font-weight: 800;
+  letter-spacing: .06em; color: rgba(255,255,255,.95); text-shadow: 0 1px 0 rgba(0,0,0,.3);
 }
 .cellbtn.locked .d { color: rgba(255,255,255,.42); text-shadow: none; }
 /* The grade rides beside the level pill as its own control, so "Level 9" keeps
@@ -601,6 +681,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
 #c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
 #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+#c-home[hidden] { display: none; }
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -1006,6 +1087,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
         <span class="gap"></span>
         <i class="coin"></i><span id="h-coins">0</span>
       </div>
+      <div class="nexthard" id="h-nexthard"></div>
+      <div class="waiting" id="h-waiting"></div>
       <div class="ver" id="h-ver"></div>
     </div>
   </section>
@@ -1013,9 +1096,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   <section id="levels" class="screen">
     <div class="topbar">
       <button class="icon-btn" id="l-back" aria-label="Back">&larr;</button>
-      <div class="meter"><div class="meter-top"><span class="lvl">CHOOSE A LEVEL</span></div></div>
+      <div class="meter"><div class="meter-top"><span class="lvl" id="l-title">YOUR PROGRESS</span></div></div>
       <span></span>
     </div>
+    <p class="l-sum" id="l-sum"></p>
     <div class="grid" id="l-grid"></div>
   </section>
 

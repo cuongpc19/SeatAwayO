@@ -277,7 +277,11 @@ const DW = 540, DH = 1160;
    phone and shorter on a squat desktop frame, and a PLAY button written as
    "952" is drawn below the bottom edge of the one screen it exists for. */
 const PLAY_UP = 208;
-const WALLET_UP = 98;
+/* ⚠ 140, not 98. Two lines now sit under the purse and the build stamp is
+   pinned at 1120, so at 98 they landed on top of it. The ceiling is the PLAY
+   button: its foot is at 990, so the purse cannot rise past about 1011 without
+   touching it. */
+const WALLET_UP = 132;
 
 const WIDE_FROM = 1.2;             // where furniture becomes a landscape menu
 const WIDE_COL = .95;              // how much room the column beside the art may take
@@ -353,6 +357,25 @@ function refreshHome() {
   $("h-play").textContent = lvl > 1 ? "LEVEL " + lvl : "PLAY";
   $("h-stars").textContent = totalStars();
   $("h-coins").textContent = save.coins;
+  /* ⚠ Read off the boards, not off the 5-and-9 rule. The rule is what GRADES
+     them, but the ladder drops fifteen boards the APK carries, so our level 88
+     is its 89 and the marked ones do not land on a tidy rhythm of ours. Scanning
+     for the next graded board is the only reading that cannot drift. */
+  const nh = $("h-nexthard");
+  if (nh) {
+    const at = nextHardFrom(Math.min(save.unlocked, CAMPAIGN.length));
+    nh.hidden = !at;
+    if (at) nh.innerHTML = "Next hard level: <b>" + at + "</b>";
+  }
+  /* ⚠ Rounded down off CAMPAIGN.length, not written out. "2,000+" has to stay
+     true if the ladder moves, and it has moved twice; a number typed here is a
+     second copy of the campaign that goes stale without anything failing. */
+  const wt = $("h-waiting");
+  if (wt) {
+    const round = Math.floor(CAMPAIGN.length / 500) * 500;
+    wt.hidden = round < 500;
+    wt.textContent = round.toLocaleString("en-US") + "+ levels waiting for you";
+  }
   $("h-star-icon").innerHTML = STAR_ON;
   const left = hearts(), w = heartIn();
   const heart = $("h-hearts");
@@ -365,22 +388,74 @@ function refreshHome() {
   $("h-ver").textContent = BUILT ? "build " + BUILT : "";
 }
 
+/* ⚠ A progress board, not a picker. It used to start any cleared level, which
+   made the ladder optional - a player could hop back to an easy one, and the
+   number on the home button stopped meaning where they are. It answers one
+   question now: how far along am I. Nothing here starts a level; PLAY is the
+   only way onto a board, and the cells are divs rather than buttons so there is
+   nothing to press.
+
+   ⚠ Still a window, not all 2085. A wall of two thousand cells is not a
+   picture of progress, it is a scroll bar - so it shows the run up to where the
+   player is with a little of what is ahead, and the line above it carries the
+   total. */
+/* ⚠ What is AHEAD, not what is behind. The levels already cleared were most of
+   what this screen showed, and they are the part the player has no use for: they
+   cannot be replayed and the stars for them are already summed on the line
+   above. What is worth showing is the road - where they stand, what is coming,
+   and how much of it there is.
+
+   The tail is the point of the ellipsis. Two thousand cells is a scroll bar, not
+   a fact; a run of the next few, a gap, and the last level says "there are two
+   thousand of these" in one glance. */
+/* ⚠ Ours. Past this level a win ends at the home screen instead of on the next
+   board - see overlay(). The first levels run one into the next because that is
+   the stretch where stopping is what loses a player. */
+const HOME_AFTER = 10;
+
+/** The next level carrying a warning, from `n` on. Hard and super hard both
+    count: to a player they are the same thing arriving, and splitting them here
+    would be a distinction the home screen cannot afford the room to draw. */
+function nextHardFrom(n) {
+  for (let i = Math.max(1, n); i <= CAMPAIGN.length; i++) if (diffOf(i)) return i;
+  return 0;
+}
+
+const GRID_AHEAD = 29;          // the level they are on, plus this many to come
+
 function buildGrid() {
   const grid = document.getElementById("l-grid");
   grid.innerHTML = "";
-  // Far more boards than anyone will scroll: show what is reachable plus a
-  // little runway, so the picker stays a picker and not a 633-row wall.
-  const upto = Math.min(CAMPAIGN.length, save.unlocked + 24);
-  for (let n = 1; n <= upto; n++) {
-    const b = document.createElement("button");
-    const st = save.stars[n] || 0;
+  const last = CAMPAIGN.length;
+  const here = Math.min(save.unlocked, last);
+  const upto = Math.min(last, here + GRID_AHEAD);
+  const sum = $("l-sum");
+  if (sum) sum.innerHTML = "LEVEL <b>" + here + "</b> OF " + last
+      + " &middot; " + totalStars() + " STARS";
+
+  const cell = n => {
+    const b = document.createElement("div");
     const d = diffOf(n);
-    b.className = "cellbtn " + (n > save.unlocked ? "locked" : st ? "done" : "")
-                + (d ? " " + d.cls : "");
-    b.innerHTML = (d ? '<span class="d">' + d.tile + "</span>" : "")
-                + n + (st ? '<span class="s">' + "★".repeat(st) + "</span>" : "");
-    if (n <= save.unlocked) b.onclick = () => startLevel(n);
+    /* ⚠ `ahead`, not `locked`. Locked was styled to win over the difficulty
+       colours, which was right when a cleared board and an unreachable one sat
+       side by side. Every cell here is unreached, so that rule painted the whole
+       screen one grey and swallowed the one thing it is meant to show. */
+    b.className = "cellbtn " + (n === here ? "here" : "ahead") + (d ? " " + d.cls : "");
+    b.innerHTML = (d ? '<span class="d">' + d.tile + "</span>" : "") + n;
     grid.appendChild(b);
+  };
+
+  for (let n = here; n <= upto; n++) cell(n);
+  /* The gap, then the far end. Only when there is actually something between
+     them - on the last thirty levels there is nothing to elide. */
+  if (upto < last - 1) {
+    const dots = document.createElement("div");
+    dots.className = "cellbtn dots";
+    dots.textContent = "\u2026";
+    grid.appendChild(dots);
+    cell(last);
+  } else {
+    for (let n = upto + 1; n <= last; n++) cell(n);
   }
 }
 
@@ -1960,7 +2035,15 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   $("c-streak").textContent = streak;
   $("c-sum").hidden = !!stars;
   $("c-sum").innerHTML = sum;
-  $("c-next").textContent = stars ? "NEXT LEVEL" : "TRY AGAIN";
+  /* ⚠ From HOME_AFTER on, a win ends at the home screen rather than on the next
+     board. The first levels run one into the next because that is the stretch
+     where stopping is what loses a player; past it, going through Home is what
+     puts the progress board, the purse and the next hard level in front of them
+     between attempts. Only one button then - NEXT LEVEL and HOME both leading
+     home is the same button twice. */
+  const goHome = !!stars && cleared >= HOME_AFTER;
+  $("c-next").textContent = !stars ? "TRY AGAIN" : goHome ? "CONTINUE" : "NEXT LEVEL";
+  $("c-home").hidden = goHome;
 
   const box = $("c-stars");
   box.innerHTML = "";
@@ -2051,8 +2134,10 @@ $("g-menu").onclick = openSettings;
 document.getElementById("rv-go").onclick = revive;
 document.getElementById("rv-x").onclick = declineRevive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
-document.getElementById("c-next").onclick = () =>
+document.getElementById("c-next").onclick = () => {
+  if (S.phase === "win" && CUR >= HOME_AFTER) { hideCard(); show("home"); return; }
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
+};
 addEventListener("resize", () => { fitDesign(); draw(); });
 
 let last = performance.now();
