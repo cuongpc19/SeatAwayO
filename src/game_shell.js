@@ -276,12 +276,15 @@ const DW = 540, DH = 1160;
    the design box. Nothing here may be an absolute y: the box is 1160 tall on a
    phone and shorter on a squat desktop frame, and a PLAY button written as
    "952" is drawn below the bottom edge of the one screen it exists for. */
-const PLAY_UP = 208;
+/* ⚠ 228, not 208. Two lines now hang under the purse and the whole column -
+   button, purse, two lines, build stamp - has to fit between the art and the
+   foot of the box. The only slack left was above the button. */
+const PLAY_UP = 228;
 /* ⚠ 140, not 98. Two lines now sit under the purse and the build stamp is
    pinned at 1120, so at 98 they landed on top of it. The ceiling is the PLAY
    button: its foot is at 990, so the purse cannot rise past about 1011 without
    touching it. */
-const WALLET_UP = 132;
+const WALLET_UP = 140;
 
 const WIDE_FROM = 1.2;             // where furniture becomes a landscape menu
 const WIDE_COL = .95;              // how much room the column beside the art may take
@@ -327,7 +330,20 @@ function fitDesign() {
   const st = document.getElementById("home").style;
   const set = (n, v) => st.setProperty(n, v);
   set("--dw", W);
-  set("--art-l", artCx - artW / 2);  set("--art-t", (DH - artH) / 2);
+  /* ⚠ Portrait hangs the render from the TOP of the box rather than centring
+     it, and that is about where the empty part goes. The render is 2:3 with a
+     quarter of bare gradient above the title and better than a third below the
+     seats; a phone is nearer 1:2, so something has to be cropped. Centred, the
+     crop is split and half of it comes off the top - which pulls the title and
+     the seats UP, away from the button, and opens the gap this was meant to
+     close. Hung from the top, all of it comes off the bottom, which is the part
+     the button and the purse are drawn over anyway.
+
+     Zooming instead was tried and clipped the title: the crop is uniform, and
+     "Seat Match" runs nearly the full width of the render, so any zoom that
+     closes the vertical gap eats the S and the h on a narrow phone. */
+  set("--art-l", artCx - artW / 2);
+  set("--art-t", wide ? (DH - artH) / 2 : 0);
   set("--art-w", artW);              set("--art-h", artH);
   set("--art-cx", artCx);
   set("--ui-cx", uiCx);
@@ -886,7 +902,9 @@ $("b-area").onclick = () => {
 };
 
 /* One charge per seat actually moved, and the arming ends with it. */
-onSeatMoved = () => { SFX.move(); buzz(12); };
+// ⚠ The buzz stays. It is not the sound - it is the drag landing, felt rather
+// than heard, and it costs nothing on a page the player has silenced.
+onSeatMoved = () => { buzz(12); };
 
 /* Armed, a tap on a seat is the booster being used: the front of the queue
    flies into it. A tap on a seat they cannot sit in is not a wasted charge -
@@ -1432,17 +1450,18 @@ function blip(freq, dur, type, peak, delay) {
     o.start(t); o.stop(t + dur + .02);
   } catch (e) { /* no output device, or a browser that refuses one */ }
 }
-/* ⚠ `move` is the one that fires most - once per drag, dozens of times a
-   level - and it was at .09, which measured within a decibel of `seated`.
-   The reward for finding a passenger a seat was as loud as the act of
-   nudging a seat, and a sound that frequent at that level stops being
-   feedback and becomes a rattle. At .015 it is fifteen dB under `seated`: a
-   tick that says the drag landed and then gets out of the way. */
-const MOVE_PEAK = .015;
+/* ⚠ No `move`. Dragging a seat is the thing the player does most - dozens of
+   times a level - and any cue on it becomes a rattle rather than feedback. It
+   went from .09 to .015 and then out altogether; the drag has the seat moving
+   under the finger and a short buzz, which is feedback enough.
+
+   ⚠ `seated` is a fifth of what it was. It is the sound of the level going
+   right, so it stays - but it fires once per passenger and a board seats
+   thirty, which is a lot of chiming for something that is not an ending. */
+const SEATED_PEAK = .018;
 
 const SFX = {
-  move:   () => blip(300, .09, "triangle", MOVE_PEAK),
-  seated: () => { blip(560, .08, "sine", .09); blip(840, .11, "sine", .07, .06); },
+  seated: () => { blip(560, .08, "sine", SEATED_PEAK); blip(840, .11, "sine", SEATED_PEAK * .78, .06); },
   buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
   win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
   lose:   () => { blip(300, .22, "sawtooth", .06); blip(190, .34, "sawtooth", .06, .13); },

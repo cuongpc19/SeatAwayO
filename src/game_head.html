@@ -204,8 +204,12 @@ body {
    rather than being a number of its own: the wallet moves with the frame, and a
    fixed offset put this through the middle of it on a wide window. */
 .nexthard {
-  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 42) * 1px);
-  transform: translate(-50%, -50%);
+  left: calc(var(--ui-cx) * 1px);
+  /* ⚠ Offset AND scaled by --wallet-s. The purse grows on a wide frame and
+     these did not, so the gap that reads right on a phone closed up beside a
+     bigger row of icons. */
+  top: calc((var(--wallet-y) + 52 * var(--wallet-s)) * 1px);
+  transform: translate(-50%, -50%) scale(var(--wallet-s));
   font-family: var(--ms); font-size: 21px; color: #fff; white-space: nowrap;
   -webkit-text-stroke: 5px var(--ms-ink); paint-order: stroke fill;
 }
@@ -214,14 +218,18 @@ body {
 /* The size of what is ahead. Quieter than the line above it: one is a thing to
    plan for, the other is a horizon. */
 .waiting {
-  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 72) * 1px);
-  transform: translate(-50%, -50%);
+  left: calc(var(--ui-cx) * 1px);
+  top: calc((var(--wallet-y) + 88 * var(--wallet-s)) * 1px);
+  transform: translate(-50%, -50%) scale(var(--wallet-s));
   font-family: var(--ms); font-size: 17px; color: rgba(255,255,255,.86);
   white-space: nowrap; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
 }
 .waiting[hidden] { display: none; }
 .ver {
-  left: calc(var(--ui-cx) * 1px); top: 1120px; transform: translateX(-50%);
+  /* ⚠ Pinned to the foot of the design box, not to a y of its own. At 1120 the
+     two new lines ran into it; at 1142 it fell off the bottom of a short
+     landscape window. The box has a foot and this belongs on it. */
+  left: calc(var(--ui-cx) * 1px); bottom: 10px; transform: translateX(-50%);
   font-size: 16px; color: #fff; opacity: .55; white-space: nowrap;
 }
 
