@@ -480,9 +480,12 @@ if "plana" in targets:
     apk_levels = levels_json(test=False)          # ⚠ after CAMPAIGN moves, not before
     globals()["CAMPAIGN"] = keep
     page = build("game_head.html", "game_shell.js", "../a.html", levels=apk_levels)
-    swapped = page.replace('"seatmatch.save.v2"', '"seatmatch.apkladder.save.v1"')
-    if swapped == page:
-        sys.exit("a.html: the save key was not swapped - it would share progress with the main build")
+    # ⚠ Every occurrence, not just the declaration. The privacy page names the
+    # storage key in prose, and a policy that names the wrong key is wrong in
+    # the one place a reader would check it.
+    swapped = page.replace("seatmatch.save.v2", "seatmatch.apkladder.save.v1")
+    if "seatmatch.save.v2" in swapped or swapped == page:
+        sys.exit("a.html: the save key survived the swap - it would share progress with the main build")
     open("../a.html", "w", encoding="utf-8").write(swapped)
     print("  plana     ../a.html - APK ladder, own save key")
 
