@@ -412,6 +412,11 @@ const FEATURES = [
   { id: "area", label: "ADD LINE", from: () => unlockedAt("booster_area") },
   { id: "twin", label: "DOUBLE SEAT",
     from: () => firstBoard(b => b.seats.some(s => s[2] > 1)) },
+  /* ⚠ Read off the board like the others. The padlock arrives on its own level
+     rather than with a booster, and reading it off the data means the card
+     follows the seat if the ladder ever moves again - which it has, twice. */
+  { id: "lock", label: "LOCKED SEAT",
+    from: () => firstBoard(b => Object.values(b.mods || {}).some(m => m.isLocked)) },
   { id: "time", label: "TIME BOOSTER", from: () => unlockedAt("booster_time") },
 ];
 
@@ -857,6 +862,14 @@ const INTRO_RUNS = {
     { spot: "seats", btn: "GOT IT",
       text: "The ringed seat is bolted down. It does not move, whatever you drag." },
   ],
+  /* Two sentences because it is two facts, and the second is the one that makes
+     it a puzzle piece rather than an obstacle: the padlock is not permanent, and
+     what opens it is the thing the player is doing anyway. */
+  lock: [
+    { spot: "seats", btn: "GOT IT",
+      text: "The ringed seat is padlocked and will not budge. Seat a passenger in it and "
+          + "the lock comes off - then it slides like any other." },
+  ],
   /* Each booster is explained and pressed in the same step. There is no NEXT to
      click past first: a card that can be dismissed is a card that gets
      dismissed, and the player ends up owning a booster they have never used.
@@ -1070,6 +1083,10 @@ function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
   if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
   if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
+  /* Every padlock on the board. Unlike the jump step there is nothing to choose
+     between them - the lesson is what the padlock means, and on the board it
+     first appears on there is exactly one. */
+  if (INTRO.id === "lock") return S.seats.filter(b => b.chain);
   // One seat, not every seat the jump could be spent on. Ringing all of them
   // taught nothing except which seats are the front colour, and on a full board
   // it covered the board. The jump is for a seat the queue cannot walk to, so

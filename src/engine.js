@@ -203,6 +203,77 @@ const queueOf = (g, k) => (k ? (g.queue2 || []) : g.queue);
    is the difference between a board that keeps its size and one that shrinks to
    make room, and nobody reads a queue by how much air is behind it. */
 const LANE_NEAR = 2.0, LANE_FAR = 1.55;
+
+/* ---- the line as a crowd rather than a column --------------------------
+   Two things, both seeded off the board so they are the same every time it is
+   opened, and both applying only to people who are STANDING. Anyone mid-step is
+   left alone: the walk cycle already says where they are looking and how they
+   are placed, and a second opinion on either fights it.
+
+   ⚠ Everything here has to survive there being no idle render loop. The board
+   redraws on taps and while something is animating, and otherwise not at all -
+   see scheduleGlance(), which is what buys the glances the few redraws a second
+   they need without leaving a full-room repaint running behind a player who is
+   just thinking. */
+
+/** A stable number per person in a line. Position, not identity - the queue is
+    a list of colours and nobody in it is anybody in particular. */
+function glanceSeed(g, dk, i) {
+    return (((g.level | 0) * 73856093) ^ ((dk + 1) * 19349663) ^ ((i + 1) * 83492791)) >>> 0;
+}
+
+/** How far back before anyone looks around. The front two are next through the
+    door and watching it; it is the people with nothing to do yet who look. */
+const GLANCE_FROM = 2;
+/** ⚠ 1, not blitWalk's default .74 - see the note there. Everyone in a line is
+    the same size whether they are standing, glancing or stepping up. */
+const QUEUE_SPRITE = 1;
+/** ⚠ Long on purpose. Short periods put the whole back of the line swivelling
+    at once, which reads as a nervous tic rather than as waiting - and every
+    change of facing costs one redraw of the room, so the period is also the
+    idle cost. 4.2-9.2s each, staggered by seed, is a glance every couple of
+    seconds somewhere in the line and about 1.5 redraws a second at worst. */
+const GLANCE_MIN = 4200, GLANCE_SPAN = 5000;
+const GLANCE_HOLD = 700, GLANCE_HOLD_SPAN = 520;
+
+/** Where person `i` is looking at time `t`: "l", "r", or null for straight on. */
+function glanceAt(g, dk, i, t) {
+    if (i < GLANCE_FROM) return null;
+    const s = glanceSeed(g, dk, i);
+    const period = GLANCE_MIN + s % GLANCE_SPAN;
+    const hold = GLANCE_HOLD + (s >> 7) % GLANCE_HOLD_SPAN;
+    const ph = (((t - (s >> 13) % period) % period) + period) % period;
+    return ph >= hold ? null : ((s >> 19) & 1 ? "l" : "r");
+}
+
+/** Milliseconds until person `i` next changes what they are looking at.
+    ⚠ This is what makes the idle loop affordable: the board is repainted at the
+    moment a head turns and at no other, rather than on a timer that repaints
+    whether anything changed or not. */
+function glanceNext(g, dk, i, t) {
+    if (i < GLANCE_FROM) return Infinity;
+    const s = glanceSeed(g, dk, i);
+    const period = GLANCE_MIN + s % GLANCE_SPAN;
+    const hold = GLANCE_HOLD + (s >> 7) % GLANCE_HOLD_SPAN;
+    const ph = (((t - (s >> 13) % period) % period) + period) % period;
+    return ph < hold ? hold - ph : period - ph;
+}
+
+/** Boards this narrow get a line that is not a ruler edge. ⚠ Only the narrow
+    ones: 5x8 is 1556 of the 2085 boards and its queue runs down a lane with the
+    room on one side and the frame on the other, where scatter reads as people
+    standing on the tracks rather than as a crowd. 4 wide and under is 91
+    boards, and those have the air for it. */
+const DRIFT_MAX_W = 4;
+
+/** How far person `i` stands off the centre of the lane, in world units. */
+function queueDrift(g, dk, i) {
+    if (g.W > DRIFT_MAX_W) return [0, 0];
+    const s = glanceSeed(g, dk, i);
+    return [((s % 997) / 997 - .5) * SX * .30,
+            (((s >> 10) % 991) / 991 - .5) * SZ * .12];
+}
+
 function stopAt(g, k) {
   const [dc, dr] = doorCell(g, k);
   return [cellW(dc) + (dc === 0 ? -SX * LANE_FAR : SX * LANE_NEAR), cellZ(dr)];
@@ -261,7 +332,12 @@ const FIXED = b => b.colour === 0;
 let JUMP = false;
 
 function placements(g, b) {
-  if (b.locked || FIXED(b)) return [];
+  /* ⚠ `chain` belongs here rather than in FIXED(). A grey fixture never moves
+     and only ever takes the first colour; a chained seat is an ordinary seat of
+     its own colour that happens to be bolted down until somebody sits in it, and
+     accepts() must go on treating it as ordinary or nobody could ever sit there
+     and it could never come free. */
+  if (b.locked || b.chain || FIXED(b)) return [];
   if (JUMP) {
     const out = [];
     for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++)
@@ -297,6 +373,11 @@ function load(n) {
     len: s.length > 5 ? s[5] : s[2],                // footprint; the binary levels had none
     occ: new Array(s[2]).fill(null),                // one entry per place
     pending: 0, locked: false,
+    /* ⚠ `chain`, not `locked`. `locked` already means "a walker is on their way
+       to this seat" and is cleared the moment they sit; this is the padlock on
+       the back of the seat, and sitting is what OPENS it. Two opposite meanings
+       on one name would have been a bug waiting to happen. */
+    chain: !!(raw.mods && raw.mods[i] && raw.mods[i].isLocked),
   }));
   const g = { W, H, hole, occ, seats, door: 0, level: n, name: raw.id || raw.name,
               token: ++LOAD_TOKEN };
@@ -587,12 +668,19 @@ function blit(frame, wx, wy, wz, alpha, scale) {
                 px - f[4] * k, py - f[5] * k, f[2] * k, f[3] * k);
   ctx.globalAlpha = 1;
 }
-/** One frame of the walk cycle: facing d/r/u/l, phase 0-3. */
-function blitWalk(colour, facing, phase, wx, wy, wz) {
+/** One frame of the walk cycle: facing d/r/u/l, phase 0-3.
+
+    ⚠ `scale` defaults to the .74 the floor has always used, and the QUEUE passes
+    1 instead. Both atlases are baked at scale 74 and the two sprites measure the
+    same - idle_blue's body is 83x65, wu0_blue's is 83x64 - so .74 draws a
+    walking figure at 74% of a standing one. Out on the floor nothing stands
+    beside a walker to say so; in the line they are shoulder to shoulder, and
+    somebody stepping up used to shrink by a quarter as they went. */
+function blitWalk(colour, facing, phase, wx, wy, wz, scale) {
   const f = WMETA.frames["w" + facing + phase + "_" + colour];
   if (!f) return blit("idle_" + colour, wx, wy, wz, 1);
   const [px, py] = P(wx, wy, wz);
-  const k = LAY.s / WMETA.scale * .74;
+  const k = LAY.s / WMETA.scale * (scale == null ? .74 : scale);
   ctx.drawImage(walkAtlas, f[0], f[1], WMETA.tile, WMETA.tile,
                 px - WMETA.pivot[0] * k, py - WMETA.pivot[1] * k,
                 WMETA.tile * k, WMETA.tile * k);
@@ -667,9 +755,57 @@ function drawBlock(wx, wz, alpha) {
   ctx.restore();
 }
 
+/* The padlock on the back of a chained seat. Drawn rather than an atlas frame:
+   it has to sit on nine seat colours at four rotations and three footprints, and
+   a sprite for each is 108 frames for one small piece of metal. Sat behind the
+   seat and a little above it, so it reads as hanging off the back rather than
+   as something a passenger is holding. */
+function drawPadlock(b, wx, wz, alpha) {
+  const k = LAY.s * .115;                            // a padlock is about a quarter of a cell
+  /* ⚠ High enough that the body clears the seat back. Hung at seat height the
+     cushion covered everything but the shackle, which on its own reads as a
+     scratch rather than as a lock. Behind and above: the seat still overlaps its
+     foot, so it hangs off the back rather than floating over the cushion. */
+  const back = b.dir & 1 ? [0, -SZ * .34] : [0, -SZ * .38];
+  const [px, py] = P(wx + back[0], 1.02, wz + back[1]);
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  // the shackle
+  ctx.beginPath();
+  ctx.arc(px, py - k * 1.55, k * .82, Math.PI, 0);
+  ctx.lineWidth = k * .58;
+  ctx.strokeStyle = "#232c44"; ctx.stroke();
+  ctx.lineWidth = k * .30;
+  ctx.strokeStyle = "#cdd5ea"; ctx.stroke();
+  // the body, with its ink outline the way every other piece on the board carries one
+  const w = k * 2.5, h = k * 2.0, x = px - w / 2, y = py - k * .95;
+  const body = (fill, inset) => {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x + inset, y + inset, w - inset * 2, h - inset * 2, k * .48);
+    else ctx.rect(x + inset, y + inset, w - inset * 2, h - inset * 2);
+    ctx.fillStyle = fill; ctx.fill();
+  };
+  /* ⚠ Steel, not gold. A gold padlock disappears on a yellow seat, and the seat
+     under it is one of nine colours - so the body is a neutral the palette does
+     not contain, inside an ink outline as thick as everything else on the board
+     carries. */
+  body("#232c44", 0);
+  body("#e4e9f6", k * .26);
+  // the keyhole
+  ctx.beginPath();
+  ctx.arc(px, y + h * .46, k * .28, 0, Math.PI * 2);
+  ctx.fillStyle = "#232c44"; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(px, y + h * .46); ctx.lineTo(px, y + h * .78);
+  ctx.lineWidth = k * .22; ctx.strokeStyle = "#232c44"; ctx.stroke();
+  ctx.restore();
+}
+
 /** A seat, or a crate where the board carries one instead. */
 function paintPiece(b, wx, wz, alpha) {
   if (isBlock(b)) return drawBlock(wx, wz, alpha);
+  if (b.chain) drawPadlock(b, wx, wz, alpha);        // behind the seat, so first
   if (HARD && RICH) seatSheen(b, wx, wz, alpha);
   const per = packing(b);
   if (per <= 1) {
@@ -863,6 +999,114 @@ function drawCinema(E) {
    means a palette, an outside painter, and an entry in THEMES; nothing else in
    the engine needs to learn the name.                                        */
 
+/* ---- the ground the line stands on -------------------------------------
+   The station always had one - a platform with an edge, a deck, a safety line
+   and a tactile strip - and no other theme had anything at all, so four rooms
+   out of five queued their passengers on undifferentiated ground. These give
+   each of them its own approach.
+
+   ⚠ There is a rule in the outside painters and it still holds: "dressing drawn
+   under the people the player is reading is just noise over the one thing they
+   need to see". A runner does not break it - the station's deck has been under
+   the line since the beginning - but anything with pattern or contrast in it
+   does. So each lane is ONE flat surface plus edges, and every detail with a
+   shape to it is placed outboard, past where anybody stands.
+
+   ⚠ Drawn at -.018, above every outside painter (which work between -.05 and
+   -.023) and below the room floor at 0. The queue sprites anchor at y = 0, so
+   the lane has to be under them without being under the room. */
+const LANE_W = SX * .70;                // half-width: wide enough to stand a person on
+
+/** Every line this board has, as [centre x, which way is away from the room].
+
+    ⚠ Both, and the same treatment on each. A board with two doors has a queue
+    on either side of the room, and dressing only the near one left the far line
+    standing on the bare deck that drawRoom lays for it - two lines waiting for
+    the same room, on two different floors.
+
+    The numbers are stopAt()'s, resolved: the near door sits at column W-1 and
+    its line stands LANE_NEAR out from the cell centre, the far door at column 0
+    with LANE_FAR the other way. Written out rather than calling stopAt because
+    that needs a door row this has no use for. */
+function laneLanes(E) {
+    const out = [[E.x1 + SX * (LANE_NEAR - .5), 1]];
+    if (E.g.doors && E.g.doors.length > 1) out.push([E.x0 - SX * (LANE_FAR - .5), -1]);
+    return out;
+}
+
+/** slab() wants its x bounds in order, and a mirrored lane hands them over
+    backwards. Sorting here keeps every painter free to write "outboard by d"
+    and mean it on both sides. */
+const laneSlab = (a, b, z0, z1, y, fill) =>
+    slab(Math.min(a, b), z0, Math.max(a, b), z1, y, fill);
+
+/** Surface, two edges, and nothing in the middle. */
+function laneBed(E, lx, fill, edge) {
+    slab(lx - LANE_W, E.gz0, lx + LANE_W, E.gz1, -.020, fill);
+    if (!edge) return;
+    slab(lx - LANE_W, E.gz0, lx - LANE_W + .11, E.gz1, -.019, edge);
+    slab(lx + LANE_W - .11, E.gz0, lx + LANE_W, E.gz1, -.019, edge);
+}
+
+/** A red carpet, because a cinema is the one room that would actually lay one. */
+function laneCinema(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#6e1922", "#c39a4a");
+        // the rope, outboard - a continuous line rather than posts, for the same
+        // reason the concert's footlights are one strip: at this size separate
+        // uprights read as dashes of paint
+        laneSlab(lx + s * (LANE_W + SX * .30), lx + s * (LANE_W + SX * .38),
+                 E.gz0, E.gz1, -.018, "#c39a4a");
+    }
+}
+
+/** Poured concourse, painted either side, with the kerb nosing outboard. */
+function laneStadium(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, STADIUM.deckA, STADIUM.line);
+        laneSlab(lx + s * (LANE_W + SX * .22), lx + s * (LANE_W + SX * .34),
+                 E.gz0, E.gz1, -.018, STADIUM.nosing);
+    }
+}
+
+/** A corridor runner, in the lockers' teal so the two belong to one room. */
+function laneClassroom(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#41706b", "#5f918b");
+        // the joins between one mat and the next, outboard of the line
+        for (let z = E.gz0; z < E.gz1; z += SZ * 2.2)
+            laneSlab(lx + s * (LANE_W + SX * .16), lx + s * (LANE_W + SX * .30),
+                     z, z + SZ * .5, -.018, CLASSROOM.trim);
+    }
+}
+
+/** Matting and a barrier, the way a crowd is actually funnelled to a door. */
+function laneConcert(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#232833", "#39404e");
+        // one warm line picked up off the footlights, so the pit and the lane agree
+        laneSlab(lx + s * (LANE_W + SX * .26), lx + s * (LANE_W + SX * .32),
+                 E.gz0, E.gz1, -.018, "rgba(255,201,120,.30)");
+    }
+}
+
+/** The station already stands its line on a platform - drawStation lays the
+    deck, and drawRoom lays one for the far line. What belongs here is the part
+    that is the LANE rather than the ground: the safety line and the tactile
+    strip, on the room side of wherever anybody stands.
+
+    ⚠ Moved out of drawStation rather than copied. Drawn there for the near side
+    and again here for the far one, the two would be a pair of numbers that have
+    to be kept equal by hand, and the whole point of this pass is that the two
+    lines match. */
+function laneStation(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneSlab(lx - s * SX * .64, lx - s * SX * .52, E.gz0, E.gz1, -.019, ROOM.safety);
+        for (let z = E.gz0; z < E.gz1; z += SZ * .34)   // the strip you feel underfoot
+            laneSlab(lx - s * SX * .44, lx - s * SX * .36, z, z + SZ * .17, -.019, ROOM.tactile);
+    }
+}
+
 function drawStation(E) {
   const { x0, x1, z0, T, OX, gx0, gx1, gz0, gz1 } = E;
 
@@ -883,9 +1127,9 @@ function drawStation(E) {
   // the platform: a dark edge where it drops to the track, then the deck
   slab(OX, gz0, gx1, gz1, -.030, ROOM.platformEdge);
   slab(OX + SX * .13, gz0, gx1, gz1, -.028, ROOM.platform);
-  slab(OX + SX * .30, gz0, OX + SX * .42, gz1, -.026, ROOM.safety);
-  for (let z = gz0; z < gz1; z += SZ * .34)   // the strip you feel underfoot
-    slab(OX + SX * .50, z, OX + SX * .58, z + SZ * .17, -.026, ROOM.tactile);
+  // ⚠ The safety line and the tactile strip are NOT here - they moved to
+  // laneStation(), which draws them at every line the board has rather than
+  // only at this one. See the note there.
 
   // The name board, so the place says what it is. Up past the far end of the
   // carriage, where nobody in the line ever stands, and level with the wall
@@ -1217,32 +1461,32 @@ function finClassroom(E, f, stage) {
    plate - true if a ?bg= plate may stand in for this theme's outside          */
 const THEMES = {
   station: {
-    head: .09, plate: true, outside: drawStation,
+    head: .09, plate: true, outside: drawStation, lane: laneStation,
     finale: finStation, shift: trainOut, cheer: .12,
     skin: { wall: ROOM.livery, trim: ROOM.trim, top: ROOM.liveryTop, lip: ROOM.liveryLip,
             fa: ROOM.floorA, fb: ROOM.floorB, grout: ROOM.grout, glass: ROOM.glass,
             door: ROOM.mat },
   },
   cinema: {
-    head: .27, page: CINEMA.outside, outside: drawCinema, finale: finCinema, cheer: .05,
+    head: .27, page: CINEMA.outside, outside: drawCinema, lane: laneCinema, finale: finCinema, cheer: .05,
     skin: { wall: CINEMA.wall, trim: CINEMA.trim, top: CINEMA.wallLip, lip: CINEMA.grout,
             fa: CINEMA.carpetA, fb: CINEMA.carpetB, grout: CINEMA.grout, glass: null,
             door: CINEMA.wallLip },
   },
   stadium: {
-    head: .22, page: STADIUM.night, outside: drawStadium, finale: finStadium, cheer: .20,
+    head: .22, page: STADIUM.night, outside: drawStadium, lane: laneStadium, finale: finStadium, cheer: .20,
     skin: { wall: STADIUM.wall, trim: STADIUM.trim, top: STADIUM.wallLip, lip: STADIUM.grout,
             fa: STADIUM.deckA, fb: STADIUM.deckB, grout: STADIUM.grout, glass: null,
             door: STADIUM.nosing },
   },
   concert: {
-    head: .24, page: CONCERT.dark, outside: drawConcert, finale: finConcert, cheer: .18,
+    head: .24, page: CONCERT.dark, outside: drawConcert, lane: laneConcert, finale: finConcert, cheer: .18,
     skin: { wall: CONCERT.wall, trim: CONCERT.trim, top: CONCERT.wallLip, lip: CONCERT.grout,
             fa: CONCERT.parqA, fb: CONCERT.parqB, grout: CONCERT.grout, glass: null,
             door: CONCERT.stageLip },
   },
   classroom: {
-    head: .20, page: CLASSROOM.lino, outside: drawClassroom, finale: finClassroom, cheer: .08,
+    head: .20, page: CLASSROOM.lino, outside: drawClassroom, lane: laneClassroom, finale: finClassroom, cheer: .08,
     skin: { wall: CLASSROOM.wall, trim: CLASSROOM.trim, top: CLASSROOM.wallLip,
             lip: CLASSROOM.grout, fa: CLASSROOM.linoA, fb: CLASSROOM.linoB,
             grout: CLASSROOM.grout, glass: null, door: CLASSROOM.tray },
@@ -2196,19 +2440,33 @@ function drawRoom(g) {
   // A painted plate stands in for the station ground and nothing else: the other
   // themes draw a whole building out there, which no ground tile can replace.
   if (!(painted && TH.plate)) TH.outside(E);
-  if (TH.party) TH.party(E);          // the hard-level dressing, see PARTY
-  if (f != null && TH.finale) TH.finale(E, f, "back");
-  // A deck for the far line, on the boards that have one. Without it they are
-  // stood on the track: a sprite that fades with its place in the queue, against
-  // dark ground, is a line nobody can read - and the near line has had a
-  // platform under it since the beginning. Built from the room's own colours, so
-  // it belongs to whichever theme is up rather than being a station in a cinema.
+  /* A deck for the far line, on the boards that have one. Without it they are
+     stood on the track: a sprite against dark ground is a line nobody can read,
+     and the near line has had a platform under it since the beginning. Built
+     from the room's own colours, so it belongs to whichever theme is up rather
+     than being a station in a cinema.
+
+     ⚠ Here, not after the dressing. It used to be drawn last of the ground
+     passes, which was fine while it was the only thing the far line stood on -
+     and wrong the moment lane() started dressing that side too, because the
+     deck then painted over the lane it is supposed to sit under. It also means
+     a Big Event wash now tints it, which is what makes the two lines match on
+     a dressed board.
+
+     The "line you stand behind" that used to be drawn here is gone: every theme's
+     lane() now supplies its own edge, on both sides, and two of them stacked up
+     as a double stripe. */
   if (twoDoors) {
     const K = TH.skin;
-    slab(gx0, gz0, OX2, gz1, -.030, K.lip);                        // the drop to the track
-    slab(gx0, gz0, OX2 - SX * .13, gz1, -.028, K.fa);              // the deck
-    slab(OX2 - SX * .42, gz0, OX2 - SX * .30, gz1, -.026, K.trim); // the line you stand behind
+    slab(gx0, gz0, OX2, gz1, -.030, K.lip);             // the drop to the track
+    slab(gx0, gz0, OX2 - SX * .13, gz1, -.028, K.fa);   // the deck
   }
+  // ⚠ After the ground and the deck, before party(), so a Big Event wash tints
+  // the lane with everything else rather than leaving a clean stripe through
+  // the middle of a dressed room.
+  if (TH.lane) TH.lane(E);
+  if (TH.party) TH.party(E);          // the hard-level dressing, see PARTY
+  if (f != null && TH.finale) TH.finale(E, f, "back");
   SHIFT = moved;
 
   // ---- the carriage ----
@@ -2372,7 +2630,7 @@ function draw() {
   const qnow = performance.now();
   for (let dk = 0; dk < (g.doors ? g.doors.length : 1); dk++) {
     const q = queueOf(g, dk);
-    const [laneX, laneZ] = stopAt(g, dk);
+    const [laneX0, laneZ] = stopAt(g, dk);
     for (let i = 0; i < Math.min(q.length, 7); i++) {
       const st = g.qsteps && g.qsteps[dk] && g.qsteps[dk][i];
       const back = st ? placesBack(st, qnow) : 0;       // places still to walk
@@ -2380,8 +2638,18 @@ function draw() {
       // whole place and standing still, and drawing that as a walk frame turns the
       // back half of the line to face away for as long as anyone is boarding.
       const walking = back > 1e-3 && qnow >= st.t0;
-      const pos = i + back, wz = laneZ + pos * QUEUE_PITCH * queueDir(g, dk);
+      const pos = i + back, wz0 = laneZ + pos * QUEUE_PITCH * queueDir(g, dk);
       const nm = SPRITE[colName(q[i])] || "grey";
+      /* ⚠ The drift is blended between the place being left and the place being
+         taken. Keyed to the index alone it would be right at both ends and a
+         teleport in between: when the line moves up, person i takes the offset
+         that belonged to i, and their sprite would jump sideways on the frame
+         the step completes. `back` is how much of the step is still to walk, so
+         this reads their old offset at the start and their new one at the end. */
+      const f = Math.max(0, Math.min(1, back));
+      const dA = queueDrift(g, dk, i), dB = queueDrift(g, dk, i + 1);
+      const laneX = laneX0 + dA[0] * (1 - f) + dB[0] * f;
+      const wz = wz0 + dA[1] * (1 - f) + dB[1] * f;
       // No fade. It was there to push the tail of the line back behind the head,
       // but the line is information - who is coming, in what colour, in what
       // order - and a player reading the back of it was reading it through a
@@ -2390,12 +2658,25 @@ function draw() {
       const a = 1;
       push(laneX, wz, () => {
         shadow(laneX, wz, .3);
-        if (!walking) return blit("idle_" + nm, laneX, 0, wz, a);
+        if (!walking) {
+          /* Standing, and every so often looking off down the platform. The
+             walk atlas already carries all four facings, so a glance is phase 0
+             of the sideways cycle - a standing figure turned, not a new sprite.
+             ⚠ Phase 0 only. Any other phase has a leg forward, and a person
+             striding on the spot at the back of a queue is worse than one
+             standing still. */
+          const gl = glanceAt(g, dk, i, qnow);
+          if (!gl) return blit("idle_" + nm, laneX, 0, wz, a);
+          ctx.globalAlpha = a;
+          blitWalk(nm, gl, 0, laneX, 0, wz, QUEUE_SPRITE);
+          ctx.globalAlpha = 1;
+          return;
+        }
         // Stepping up: away from the camera, and the legs cycle on the distance
         // covered, the same way they do for someone out on the floor.
         ctx.globalAlpha = a;
         blitWalk(nm, "u", Math.floor((st.from - back) * QUEUE_PITCH / STRIDE) % WMETA.phases,
-                 laneX, 0, wz);
+                 laneX, 0, wz, QUEUE_SPRITE);
         ctx.globalAlpha = 1;
       });
     }
@@ -2430,7 +2711,58 @@ function draw() {
 
   if (FIN && RICH && TH.finale && ROOME) TH.finale(ROOME, FIN.f, "over");
   onOverlay(g);                  // the shell's own marks, on top of the room
+  scheduleGlance(g);
 }
+
+/* ---- the only thing that repaints a board nobody is touching -------------
+   This game has no idle render loop, and that is deliberate: `draw()` repaints
+   the whole room - walls, floor, every seat, the party dressing - and leaving
+   that running behind a player who is sitting and thinking is battery spent on
+   nothing. Every other animation here owns a rAF loop that ends when its work
+   does.
+
+   So the glances get a timer rather than a loop, and it sleeps until the next
+   head actually turns instead of waking on a fixed tick. On a full line that is
+   somewhere between one and two repaints a second while the player thinks, and
+   none at all once the queue is empty.
+
+   ⚠ It must never run alongside something that is already animating. Two things
+   calling draw() at their own rates is not twice as smooth, it is a repaint
+   budget spent twice - so every animated state below cancels it, and the rAF
+   loop that owns that state repaints instead. */
+let glanceTimer = 0;
+function cancelGlance() { if (glanceTimer) { clearTimeout(glanceTimer); glanceTimer = 0; } }
+
+function scheduleGlance(g) {
+    cancelGlance();
+    if (!RICH || !ready || S !== g) return;
+    if (g.phase !== "play") return;                 // a card is up, or the board is over
+    if (g.qraf || (g.anim && g.anim.length) || FIN || HELD) return;   // something else owns the frames
+    // ⚠ `typeof`, because the editor build has no shell and no PAUSED at all.
+    // Reading it bare threw a ReferenceError on every draw in level_player.
+    if (typeof PAUSED !== "undefined" && PAUSED) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const now = performance.now();
+    let wait = Infinity;
+    for (let dk = 0; dk < (g.doors ? g.doors.length : 1); dk++) {
+        const q = queueOf(g, dk);
+        for (let i = GLANCE_FROM; i < Math.min(q.length, 7); i++)
+            wait = Math.min(wait, glanceNext(g, dk, i, now));
+    }
+    if (!isFinite(wait)) return;                    // nobody left in line to look around
+    glanceTimer = setTimeout(() => { glanceTimer = 0; if (S === g) draw(); },
+                             Math.max(60, Math.min(wait, 4000)));
+}
+
+/* Tab in the background: stop repainting entirely, and pick up again on return.
+   ⚠ A setTimeout does not stop when the tab is hidden the way rAF does - it is
+   throttled, not paused - so without this the timer keeps firing full room
+   repaints at a phone whose screen is off. */
+if (typeof document !== "undefined")
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) cancelGlance();
+        else if (S) draw();
+    });
 
 /* ---------------- input ---------------- */
 const seatAt = (g, c, r) => { const id = g.occ[idx(g, c, r)]; return id < 0 ? null : g.seats[id]; };
@@ -2563,6 +2895,10 @@ cv.addEventListener("pointerdown", ev => {
      of a drag. */
   if (onSeatPick(seat)) { releaseHeld(); draw(); return; }
   if (seat.locked) { trace({ ev: "refused", seat: seat.id, reason: "locked" }); bump(); say("Somebody is already walking to that seat."); releaseHeld(); draw(); return; }
+  /* ⚠ Before the placements test below, or a chained seat with room around it
+     would be refused as "no room beside it", which is the wrong reason and sends
+     the player off shifting neighbours that were never the problem. */
+  if (seat.chain) { trace({ ev: "refused", seat: seat.id, reason: "chained" }); bump(); say("Padlocked. Seat somebody in it and the lock comes off."); releaseHeld(); draw(); return; }
   const targets = placements(S, seat);
   if (!targets.length) {                      // boxed in on every side
     trace({ ev: "refused", seat: seat.id, reason: "no placements" });
@@ -2773,6 +3109,7 @@ function autoBoard(instant) {
       seat.locked = seat.pending > 0;
       if (seat.claim) seat.claim.delete(slot);
       seat.occ[slot] = ci; S.seated++;
+      seat.chain = false;                  // sat in, so the padlock is off
       onSeated();
     };
     if (instant) { sitDown(); launch(); return; }
@@ -2957,6 +3294,7 @@ function jumpBoard(g, seat) {
     seat.locked = seat.pending > 0;
     if (seat.claim) seat.claim.delete(slot);
     seat.occ[slot] = ci; S.seated++;
+    seat.chain = false;                    // the jump booster opens it too
     onSeated();
     onHud(); draw();
     /* Whoever else can now reach a seat gets on, and the board is finished here
