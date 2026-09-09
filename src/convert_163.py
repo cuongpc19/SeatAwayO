@@ -52,7 +52,7 @@ import collections, json, os
 LEVELS = "lv/levels_163.json"
 PANELS = "lv/panels_163.json"
 DOORS = "lv/doors_163.json"
-OUT = "lv/boards_163.json"
+OUT = os.environ.get("BOARDS_OUT", "lv/boards_163.json")
 
 # ⚠ The ladder does not start at ID 0. The bundle carries two campaigns: an
 # older one in IDs 0..1004, still ramping 2, 3, 4, 5 seats from the front like a
@@ -76,6 +76,23 @@ OUT = "lv/boards_163.json"
 TUTORIAL_ID = 0
 FIRST_ID = 1006
 LAST_ID = 2508      # 5000+ is event content, not the campaign
+
+# ⚠ Which ladder to build, from the environment so that both can be built from
+# one converter and stay honest about which is which.
+#
+#   "id"       the ladder above: board 0, then every id 1006..2508 in order.
+#              Ours. It rests on the reading in the note above, that ids 0..1004
+#              are an older campaign - and lv/timedata_163.json contradicts that
+#              reading, so this is kept only until the two can be told apart on
+#              a real device.
+#
+#   "timedata" the order the APK itself ships. lv/timedata_163.json is the
+#              TimeData TextAsset out of datapack.unity3d: 2100 rows of
+#              (level, board id, seconds), which is both the ladder and the
+#              clock. Nothing here is fitted - the seconds are read, not
+#              guessed, and clock() is not called at all.
+LADDER = os.environ.get("LADDER", "id")
+TIMEDATA = "lv/timedata_163.json"
 
 SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
 MIN_SECONDS = 60
@@ -197,6 +214,23 @@ def clock(riders):
     return max(MIN_SECONDS, int(round(SECONDS_PER_RIDER * riders / 5)) * 5)
 
 
+def grade_a(lv):
+    """0 normal, 1 Hard, 2 VeryHard, for the APK's own level number.
+
+    Over the 2100 levels it ships, all 209 ending in 5 from L15 and all 209
+    ending in 9 from L19 carry a vehicle other than the ordinary 5x8 bus, and
+    that bus never once appears on either. Levels 5 and 9 are the exceptions -
+    still the small tutorial buses - which is why the two rules start where they
+    do. Nothing marks a board hard by itself; the position is the mark."""
+    if lv is None:
+        return 0
+    if lv >= 15 and lv % 10 == 5:
+        return 1
+    if lv >= 19 and lv % 10 == 9:
+        return 2
+    return 0
+
+
 def capacity(s):
     return 4 if s["fourSeater"] else 3 if s["tripleSeat"] else 2 if s["doubleSeat"] else 1
 
@@ -206,8 +240,30 @@ def convert():
     doors = json.load(open(DOORS))
     boards, flags, dropped = [], collections.Counter(), []
     src = json.load(open(LEVELS))
-    ordered = ([r for r in src if r["id"] == TUTORIAL_ID]
-               + [r for r in src if FIRST_ID <= r["id"] <= LAST_ID])
+    clocks, levels = {}, {}
+    if LADDER == "timedata":
+        # One row per level, in level order, naming the board and its seconds.
+        # A row whose board did not survive the layout pass is dropped rather
+        # than substituted: a made-up board in the middle of the real order
+        # would be the one thing here that is not the APK.
+        byid = {r["id"]: r for r in src}
+        rows = json.load(open(TIMEDATA))["campaign"]
+        ordered = []
+        for lv, bd, secs in rows:
+            if bd not in byid:
+                continue
+            ordered.append(byid[bd])
+            # ⚠ Both, and the level number is the one that matters. 15 boards
+            # of the 2100 will not lay out - every one of them a bench four
+            # seats long on a grid five wide - so the array closes up behind
+            # them and position stops being the APK's level number from L87 on.
+            # The hard/very-hard mark is read off the APK's number, not off the
+            # position, or the rhythm would slip by one at every gap.
+            clocks[len(ordered)] = secs
+            levels[len(ordered)] = lv
+    else:
+        ordered = ([r for r in src if r["id"] == TUTORIAL_ID]
+                   + [r for r in src if FIRST_ID <= r["id"] <= LAST_ID])
     for pos, r in enumerate(ordered, 1):
         W, H, cells = G[r["panel"]]
         seats, extra = [], {}
@@ -281,7 +337,15 @@ def convert():
             # they take Firecar's row rather than a symmetry of our own.
             "door2": second_row(doors, r["panel"], H) if r["queue2"] else None,
             "panel": r["panel"], "w": W, "h": H,
-            "time": clock(len(r["queue"]) + len(r["queue2"])),
+            "time": clocks.get(pos) or clock(len(r["queue"]) + len(r["queue2"])),
+            # ⚠ Read off the level number, not off the board. Over the 2100
+            # levels the APK ships, all 209 levels ending in 5 from L15 and all
+            # 209 ending in 9 from L19 carry a vehicle other than the ordinary
+            # 6x8 bus, and that bus never once appears on either. Nothing marks
+            # a board as hard by itself; the position is the mark. Ends in 5 is
+            # Hard, ends in 9 is VeryHard - the latter runs one seat larger and
+            # ten seconds longer on the median.
+            "diff": grade_a(levels.get(pos)) if LADDER == "timedata" else 0,
             "moves": r["moveCount"],
             "holes": holes,                  # the carriage gap, empty otherwise
             "seats": seats,                  # c, r, capacity, colour, dir
@@ -294,6 +358,9 @@ def convert():
             "colouredGrid": r["colouredGrid"],
             "seatArms": r["seatArms"],
         })
+        # Only on the APK ladder, so the other one stays byte-identical.
+        if LADDER == "timedata":
+            boards[-1]["apkLevel"] = levels.get(pos)
     return boards, flags, dropped
 
 

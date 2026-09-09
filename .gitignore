@@ -53,3 +53,4 @@ Desktop.ini
 # Firebase CLI deploy cache. Written on every `firebase deploy`, meaningless
 # anywhere else.
 .firebase/
+/a.html

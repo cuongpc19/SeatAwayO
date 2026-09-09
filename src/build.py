@@ -348,7 +348,7 @@ def live_config():
     return json.dumps(out, separators=(",", ":"))
 
 
-def build(head_file, shell_file, out, host="none"):
+def build(head_file, shell_file, out, host="none", levels=None):
     """One page.
 
     `host` picks which platform door is compiled in, and it is a build-time
@@ -370,8 +370,8 @@ def build(head_file, shell_file, out, host="none"):
     # here rather than filtered out afterwards, because "afterwards" is the step
     # that gets skipped - see TEST_CLOCK.
     global SHIP_LEVELS
-    ship = None
-    if host != "none":
+    ship = levels                        # an explicit campaign wins over both
+    if ship is None and host != "none":
         if SHIP_LEVELS is None: SHIP_LEVELS = levels_json(test=False)
         ship = SHIP_LEVELS
     page = (fill(page, ship).replace("/*__MOVIE__*/", movie_uri())
@@ -460,6 +460,32 @@ if "game" in targets:
     # ⚠ Proved, not assumed: the plain web build must carry no host SDK at all.
     if "sdk.crazygames.com" in page:
         sys.exit("index.html carries a host SDK - the platform split has leaked")
+if "plana" in targets:
+    """The APK's own ladder, side by side with ours so the two can be played
+    against each other rather than argued about.
+
+    lv/boards_163a.json is built by `LADDER=timedata python convert_163.py`:
+    2085 levels in the order TimeData gives, each carrying the seconds TimeData
+    gives, and marked Hard / VeryHard by the APK's own level number. Every board
+    already arrives with `diff` set, so the flat 240/180 below is skipped by the
+    guard that exists for exactly this - a rule of ours must never be laid over
+    the real thing.
+
+    ⚠ Its own save key. Both pages are served from one origin, and localStorage
+    is keyed by origin: sharing a key would have the two ladders overwriting
+    each other's progress, and `unlocked` means a different board in each.
+    """
+    keep = CAMPAIGN
+    globals()["CAMPAIGN"] = "lv/boards_163a.json"
+    apk_levels = levels_json(test=False)          # ⚠ after CAMPAIGN moves, not before
+    globals()["CAMPAIGN"] = keep
+    page = build("game_head.html", "game_shell.js", "../a.html", levels=apk_levels)
+    swapped = page.replace('"seatmatch.save.v2"', '"seatmatch.apkladder.save.v1"')
+    if swapped == page:
+        sys.exit("a.html: the save key was not swapped - it would share progress with the main build")
+    open("../a.html", "w", encoding="utf-8").write(swapped)
+    print("  plana     ../a.html - APK ladder, own save key")
+
 if "crazy" in targets:
     out = "../dist/index.html"
     check_crazy(build("game_head.html", "game_shell.js", out, host="crazy"), out)
