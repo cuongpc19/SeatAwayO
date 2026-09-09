@@ -10,9 +10,15 @@ The binary campaign only ever used seven combinations:
 1.63.1 adds four more - three-seaters at every rotation and one four-seater.
 They are rare, 95 seats across 45 boards, but a missing frame draws nothing at
 all rather than falling back, so the board would show empty squares where the
-seats are. (1,1) and (1,3) are deliberately absent: a single cell covers the
-same square whichever way it points, and the converter folds those onto the
-axis that has art.
+seats are.
+
+⚠ (1,1) and (1,3) used to be left out, on the grounds that a single cell
+covers the same square whichever way it points and the converter could fold them
+onto the axis that had art. The square is the same; the SEAT is not. A passenger
+may not walk in through the back of a seat - see entryDirs() in engine.js - so
+turning one 90 degrees moves the side that is blocked, and the fold was quietly
+changing the puzzle on 40 levels. They are the benches that run down the walls
+of the metro and limo boards: 209 seats over 47 boards, first at level 67.
 
 Long seats are ONE piece spanning several cells, not a row of single seats, so
 each variant gets its own sprite sized to its own bounding box.
@@ -32,7 +38,7 @@ ORDER = ["red", "orange", "yellow", "green", "sky", "blue", "purple", "pink", "g
 # 1/3 seat run down the screen, so those must face left or right.
 DIRECT_SPIN = {0: math.pi, 1: -math.pi / 2, 2: 0.0, 3: math.pi / 2}
 VARIANTS = [(1, 0), (2, 0), (1, 2), (2, 2), (2, 1), (2, 3), (3, 3),
-            (3, 0), (3, 1), (3, 2), (4, 0)]
+            (3, 0), (3, 1), (3, 2), (4, 0), (1, 1), (1, 3)]
 
 
 

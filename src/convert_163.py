@@ -366,7 +366,15 @@ def convert():
             # it points, so the rotation is folded onto the axis that has art
             # rather than leaving 487 seats with no sprite at all, which draws
             # nothing and reads as an empty square.
-            seats.append([c, row, n, seat_colour(s), (d & 2) if n == 1 else d])
+            # ⚠ The real direction, single cell or not. This used to fold a
+            # one-cell seat's 1 or 3 onto 0 or 2, because the atlas had no art
+            # for those and one cell covers the same square either way. The
+            # square does; the seat does not. entryDirs() bars the cell behind a
+            # seat's back, so turning one 90 degrees moves which side is blocked
+            # - the fold was changing the puzzle on the 40 levels that run
+            # benches down the walls, first at level 67. The art is there now;
+            # see VARIANTS in art/seat_atlas.py.
+            seats.append([c, row, n, seat_colour(s), d])
             # staticSeat ships as grey and turnNumber as the rotation; the engine
             # runs both, so neither belongs in mods.
             mods = {k: True for k in ("isLocked", "vanish", "split",
