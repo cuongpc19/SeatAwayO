@@ -61,6 +61,22 @@ def wide(w_off, top, thick, apron, leg, r=.16, spec=.50):
     return P
 
 
+WATER = (206, 232, 244)
+CAP = (46, 146, 242)
+
+
+def bottle(x, y0, h, rad, cap=CAP, water=WATER, z=0.0):
+    """A water bottle standing on the table: body, shoulder, neck, cap."""
+    return [
+        dict(geo=rbox((x, y0 + h * .40, z), (rad * 2, h * .80, rad * 2), rad * .82),
+             fixed=water, spec=.62, shin=26),
+        dict(geo=rbox((x, y0 + h * .86, z), (rad * 1.15, h * .22, rad * 1.15), rad * .5),
+             fixed=water, spec=.60, shin=26),
+        dict(geo=rbox((x, y0 + h * 1.02, z), (rad * 1.3, h * .16, rad * 1.3), rad * .45),
+             fixed=cap, spec=.46, shin=20),
+    ]
+
+
 def wide_c(wood, dark, **kw):
     P = wide(.22, .74, .34, .18, .16, r=.19, **kw)
     for q in P:
@@ -68,11 +84,13 @@ def wide_c(wood, dark, **kw):
     return P
 
 
+TOP_SURFACE = .74 + .34 / 2          # where the table's lid ends
+
 OPTS = [
-    ("G go (hien tai)", wide(.22, .74, .34, .18, .16, r=.19)),
-    ("H xam ghe",       wide_c(GY, GY_D)),
-    ("I xam sang hon",  wide_c(tuple(min(255, int(c * 1.10)) for c in GY), GY)),
-    ("J xam am hon",    wide_c((166, 164, 158), (132, 130, 124))),
+    ("K khong chai", wide_c(GY, GY_D)),
+    ("P h1.4 r.17",  wide_c(GY, GY_D) + bottle(-.22, TOP_SURFACE, 1.40, .17, z=-.10)),
+    ("R thon r.14",  wide_c(GY, GY_D) + bottle(-.24, TOP_SURFACE, 1.45, .14, z=-.10)),
+    ("S thon r.12",  wide_c(GY, GY_D) + bottle(-.26, TOP_SURFACE, 1.50, .12, z=-.10)),
 ]
 
 seat = colorize(fit(seat_parts(1)), PALETTE["sky"])

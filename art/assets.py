@@ -208,6 +208,21 @@ def table_parts():
             P.append(dict(geo=rbox((sx * (W / 2 - LEG), base / 2, sz * (D / 2 - LEG * .7)),
                                    (LEG * 1.7, base, LEG * 1.7), LEG * .5),
                           fixed=DARK, spec=0.26))
+
+    # A water bottle left on it. ⚠ Off to one side and set back, and taller
+    # than it looks like it needs to be: the camera is steep, so the table's own
+    # lid is a thin strip at the top of the shape and anything standing at its
+    # centre is swallowed by the front face. At half this height only the cap
+    # cleared. It is what stops the piece being a bare grey slab, and it is the
+    # only colour on it - the grey has a job and cannot also be decoration.
+    SURFACE = TOP + THICK / 2
+    BH, BR, BX, BZ = 1.45, 0.14, -0.24, -0.10
+    P.append(dict(geo=rbox((BX, SURFACE + BH * .40, BZ), (BR * 2, BH * .80, BR * 2), BR * .82),
+                  fixed=(206, 232, 244), spec=0.62, shin=26))
+    P.append(dict(geo=rbox((BX, SURFACE + BH * .86, BZ), (BR * 1.15, BH * .22, BR * 1.15), BR * .5),
+                  fixed=(206, 232, 244), spec=0.60, shin=26))
+    P.append(dict(geo=rbox((BX, SURFACE + BH * 1.02, BZ), (BR * 1.3, BH * .16, BR * 1.3), BR * .45),
+                  fixed=PALETTE["blue"], spec=0.46, shin=20))
     return P
 
 
