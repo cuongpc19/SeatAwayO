@@ -86,11 +86,24 @@ def wide_c(wood, dark, **kw):
 
 TOP_SURFACE = .74 + .34 / 2          # where the table's lid ends
 
+GREEN = PALETTE["green"]
+RED = PALETTE["red"]
+T = TOP_SURFACE
+
 OPTS = [
-    ("K khong chai", wide_c(GY, GY_D)),
-    ("P h1.4 r.17",  wide_c(GY, GY_D) + bottle(-.22, TOP_SURFACE, 1.40, .17, z=-.10)),
-    ("R thon r.14",  wide_c(GY, GY_D) + bottle(-.24, TOP_SURFACE, 1.45, .14, z=-.10)),
-    ("S thon r.12",  wide_c(GY, GY_D) + bottle(-.26, TOP_SURFACE, 1.50, .12, z=-.10)),
+    ("1 chai",
+     wide_c(GY, GY_D) + bottle(-.24, T, 1.45, .14, z=-.10)),
+    ("2 chai",
+     wide_c(GY, GY_D) + bottle(-.34, T, 1.45, .13, z=-.12)
+                      + bottle(.06, T, 1.30, .13, cap=GREEN, z=-.02)),
+    ("3 chai",
+     wide_c(GY, GY_D) + bottle(-.42, T, 1.48, .12, z=-.13)
+                      + bottle(-.10, T, 1.32, .12, cap=GREEN, z=-.03)
+                      + bottle(.24, T, 1.42, .12, cap=RED, z=-.11)),
+    ("3 chai xit lai",
+     wide_c(GY, GY_D) + bottle(-.36, T, 1.50, .115, z=-.14)
+                      + bottle(-.08, T, 1.34, .115, cap=GREEN, z=-.04)
+                      + bottle(.18, T, 1.44, .115, cap=RED, z=-.12)),
 ]
 
 seat = colorize(fit(seat_parts(1)), PALETTE["sky"])

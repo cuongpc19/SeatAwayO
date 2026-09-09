@@ -209,20 +209,28 @@ def table_parts():
                                    (LEG * 1.7, base, LEG * 1.7), LEG * .5),
                           fixed=DARK, spec=0.26))
 
-    # A water bottle left on it. ⚠ Off to one side and set back, and taller
-    # than it looks like it needs to be: the camera is steep, so the table's own
-    # lid is a thin strip at the top of the shape and anything standing at its
-    # centre is swallowed by the front face. At half this height only the cap
-    # cleared. It is what stops the piece being a bare grey slab, and it is the
-    # only colour on it - the grey has a job and cannot also be decoration.
+    # Water bottles left on it. ⚠ Taller than they look like they need to be:
+    # the camera is steep, so the table's own lid is a thin strip at the top of
+    # the shape and anything standing at its centre is swallowed by the front
+    # face. A bottle at bottle scale was invisible; at half this height only the
+    # cap cleared. They are the only colour on the piece and the only thing that
+    # says somebody left them there - the grey is carrying the "does not move"
+    # job and cannot also be decoration.
+    #
+    # Three, at three heights and three depths. Evenly spaced and level they
+    # read as a row of pillars; staggered, as bottles somebody put down.
     SURFACE = TOP + THICK / 2
-    BH, BR, BX, BZ = 1.45, 0.14, -0.24, -0.10
-    P.append(dict(geo=rbox((BX, SURFACE + BH * .40, BZ), (BR * 2, BH * .80, BR * 2), BR * .82),
-                  fixed=(206, 232, 244), spec=0.62, shin=26))
-    P.append(dict(geo=rbox((BX, SURFACE + BH * .86, BZ), (BR * 1.15, BH * .22, BR * 1.15), BR * .5),
-                  fixed=(206, 232, 244), spec=0.60, shin=26))
-    P.append(dict(geo=rbox((BX, SURFACE + BH * 1.02, BZ), (BR * 1.3, BH * .16, BR * 1.3), BR * .45),
-                  fixed=PALETTE["blue"], spec=0.46, shin=20))
+    WATER = (206, 232, 244)
+    BR = 0.12
+    for bx, bh, bz, cap in ((-0.42, 1.48, -0.13, PALETTE["blue"]),
+                            (-0.10, 1.32, -0.03, PALETTE["green"]),
+                            (0.24, 1.42, -0.11, PALETTE["red"])):
+        P.append(dict(geo=rbox((bx, SURFACE + bh * .40, bz), (BR * 2, bh * .80, BR * 2), BR * .82),
+                      fixed=WATER, spec=0.62, shin=26))
+        P.append(dict(geo=rbox((bx, SURFACE + bh * .86, bz), (BR * 1.15, bh * .22, BR * 1.15), BR * .5),
+                      fixed=WATER, spec=0.60, shin=26))
+        P.append(dict(geo=rbox((bx, SURFACE + bh * 1.02, bz), (BR * 1.3, bh * .16, BR * 1.3), BR * .45),
+                      fixed=cap, spec=0.46, shin=20))
     return P
 
 
