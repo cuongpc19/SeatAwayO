@@ -91,7 +91,26 @@ LAST_ID = 2508      # 5000+ is event content, not the campaign
 #              (level, board id, seconds), which is both the ladder and the
 #              clock. Nothing here is fitted - the seconds are read, not
 #              guessed, and clock() is not called at all.
-LADDER = os.environ.get("LADDER", "id")
+#
+#   "hybrid"   what ships. Levels 1-14 are the "id" opening - board 0 then
+#              1006..1018 - and everything from 15 on is the APK's, picked up at
+#              its own level 15 so the numbering stays aligned and the Hard-on-5
+#              VeryHard-on-9 rhythm lands where the APK puts it.
+#
+#              The APK's own first fourteen are its oldest boards, ramping two
+#              seats at a time on a 3x6 grid with five minutes on each, and they
+#              read as a tutorial that has already been given. The 1006 block is
+#              a later, tighter opening. Taking one from each is a judgement
+#              about the first ten minutes of the game, not a claim about what
+#              the APK does - see HYBRID_OPENING_SECONDS.
+LADDER = os.environ.get("LADDER", "hybrid")
+
+# ⚠ Ours, and only for the fourteen levels above. The APK gives its own opening
+# 300s a level; these boards are not those boards, and four minutes is what the
+# flat clock had them at while they were being played. From 15 on every second
+# is the APK's own.
+HYBRID_OPENING = 14
+HYBRID_OPENING_SECONDS = 240
 TIMEDATA = "lv/timedata_163.json"
 
 SECONDS_PER_RIDER = 3.5      # fitted to the binary levels; see the module docstring
@@ -241,7 +260,24 @@ def convert():
     boards, flags, dropped = [], collections.Counter(), []
     src = json.load(open(LEVELS))
     clocks, levels = {}, {}
-    if LADDER == "timedata":
+    if LADDER == "hybrid":
+        byid = {r["id"]: r for r in src}
+        head = ([r for r in src if r["id"] == TUTORIAL_ID]
+                + [r for r in src if FIRST_ID <= r["id"] <= LAST_ID])[:HYBRID_OPENING]
+        ordered = list(head)
+        for i in range(len(ordered)):
+            clocks[i + 1] = HYBRID_OPENING_SECONDS
+            levels[i + 1] = i + 1              # graded normal; the rhythm starts at 15
+        # ⚠ Picked up at the APK's level 15, not at its 15th surviving row, so
+        # our level 15 is its level 15. Nothing is dropped before L87, so for
+        # the whole stretch this matters the two are the same thing.
+        for lv, bd, secs in json.load(open(TIMEDATA))["campaign"]:
+            if lv <= HYBRID_OPENING or bd not in byid:
+                continue
+            ordered.append(byid[bd])
+            clocks[len(ordered)] = secs
+            levels[len(ordered)] = lv
+    elif LADDER == "timedata":
         # One row per level, in level order, naming the board and its seconds.
         # A row whose board did not survive the layout pass is dropped rather
         # than substituted: a made-up board in the middle of the real order
@@ -345,7 +381,7 @@ def convert():
             # a board as hard by itself; the position is the mark. Ends in 5 is
             # Hard, ends in 9 is VeryHard - the latter runs one seat larger and
             # ten seconds longer on the median.
-            "diff": grade_a(levels.get(pos)) if LADDER == "timedata" else 0,
+            "diff": grade_a(levels.get(pos)) if LADDER in ("timedata", "hybrid") else 0,
             "moves": r["moveCount"],
             "holes": holes,                  # the carriage gap, empty otherwise
             "seats": seats,                  # c, r, capacity, colour, dir
@@ -358,8 +394,8 @@ def convert():
             "colouredGrid": r["colouredGrid"],
             "seatArms": r["seatArms"],
         })
-        # Only on the APK ladder, so the other one stays byte-identical.
-        if LADDER == "timedata":
+        # Only on the APK ladders, so the plain id one stays byte-identical.
+        if LADDER in ("timedata", "hybrid"):
             boards[-1]["apkLevel"] = levels.get(pos)
     return boards, flags, dropped
 

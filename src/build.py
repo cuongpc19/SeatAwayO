@@ -196,8 +196,19 @@ def levels_json(test=True):
         marked = sum(1 for b in boards if b.get("diff"))
         print("  tuning    %d of %d levels graded hard, from the level number" % (marked, n))
         print("  tuning    clock flat: %ds plain, %ds hard" % (PLAIN_SECONDS, HARD_SECONDS))
-        for lv in sorted(TEST_CLOCK) if test else []:
-            print("  TEST      level %d clock forced to %ds" % (lv, TEST_CLOCK[lv]))
+    # ⚠ Outside the block above. A campaign that arrives with its own difficulty
+    # skips all of that, and the test clock used to go with it - so the one lever
+    # for reaching the Time Out screen without playing four minutes disappeared
+    # the moment the real data was wired in.
+    if test and TEST_CLOCK:
+        n = 0
+        for b in boards:
+            if b.get("variant"):
+                continue
+            n += 1
+            if n in TEST_CLOCK:
+                b["time"] = TEST_CLOCK[n]
+                print("  TEST      level %d clock forced to %ds" % (n, TEST_CLOCK[n]))
     print("  campaign  %s, %d boards" % (CAMPAIGN, len(boards)))
     return json.dumps(boards, separators=(",", ":"))
 
@@ -483,8 +494,8 @@ if "plana" in targets:
     # ⚠ Every occurrence, not just the declaration. The privacy page names the
     # storage key in prose, and a policy that names the wrong key is wrong in
     # the one place a reader would check it.
-    swapped = page.replace("seatmatch.save.v2", "seatmatch.apkladder.save.v1")
-    if "seatmatch.save.v2" in swapped or swapped == page:
+    swapped = page.replace("seatmatch.save.v3", "seatmatch.apkladder.save.v1")
+    if "seatmatch.save.v3" in swapped or swapped == page:
         sys.exit("a.html: the save key survived the swap - it would share progress with the main build")
     open("../a.html", "w", encoding="utf-8").write(swapped)
     print("  plana     ../a.html - APK ladder, own save key")

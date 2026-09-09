@@ -152,7 +152,11 @@ const has = f => Math.max(save.unlocked, CUR || 0) >= unlockedAt(f);
 
    Keeping it empty also settles the other direction: a reset here clears this
    key alone, and cannot reach into a save that belongs to another build. */
-const SAVE_KEY = "seatmatch.save.v2";
+/* ⚠ v3, because v2's level numbers no longer name the same boards. The ladder
+   moved to the APK's own order from level 15 on, so a v2 save saying "unlocked:
+   30" would open a board its owner has never seen and hand them stars for it.
+   OLD_KEYS stays empty: adopting that save is exactly what must not happen. */
+const SAVE_KEY = "seatmatch.save.v3";
 const OLD_KEYS = [];
 const blank = () => ({
   unlocked: 1, stars: {}, coins: 0,
