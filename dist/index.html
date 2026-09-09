@@ -5097,7 +5097,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "a0e9f62+";
+const BUILD = "5b78222+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -6667,10 +6667,13 @@ function blip(freq, dur, type, peak, delay) {
    went from .09 to .015 and then out altogether; the drag has the seat moving
    under the finger and a short buzz, which is feedback enough.
 
-   ⚠ `seated` is a fifth of what it was. It is the sound of the level going
-   right, so it stays - but it fires once per passenger and a board seats
-   thirty, which is a lot of chiming for something that is not an ending. */
-const SEATED_PEAK = .018;
+   ⚠ `seated` is a tenth of what it was, halved once more after .018 still read
+   as a chime. It is the sound of the level going right so it stays, but it fires
+   once per passenger and a board seats thirty - at that rate it has to sit under
+   the room rather than on top of it. .009 renders 0.0090 peak and 0.0020 RMS,
+   nineteen dB under the win jingle and level with the station horn, which is the
+   band a sound this frequent belongs in. */
+const SEATED_PEAK = .009;
 
 const SFX = {
   seated: () => { blip(560, .08, "sine", SEATED_PEAK); blip(840, .11, "sine", SEATED_PEAK * .78, .06); },
