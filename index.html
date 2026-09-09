@@ -1631,7 +1631,12 @@ const FIXED = b => b.colour === 0;
 let JUMP = false;
 
 function placements(g, b) {
-  if (b.locked || FIXED(b)) return [];
+  /* ⚠ `chain` belongs here rather than in FIXED(). A grey fixture never moves
+     and only ever takes the first colour; a chained seat is an ordinary seat of
+     its own colour that happens to be bolted down until somebody sits in it, and
+     accepts() must go on treating it as ordinary or nobody could ever sit there
+     and it could never come free. */
+  if (b.locked || b.chain || FIXED(b)) return [];
   if (JUMP) {
     const out = [];
     for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++)
@@ -1667,6 +1672,11 @@ function load(n) {
     len: s.length > 5 ? s[5] : s[2],                // footprint; the binary levels had none
     occ: new Array(s[2]).fill(null),                // one entry per place
     pending: 0, locked: false,
+    /* ⚠ `chain`, not `locked`. `locked` already means "a walker is on their way
+       to this seat" and is cleared the moment they sit; this is the padlock on
+       the back of the seat, and sitting is what OPENS it. Two opposite meanings
+       on one name would have been a bug waiting to happen. */
+    chain: !!(raw.mods && raw.mods[i] && raw.mods[i].isLocked),
   }));
   const g = { W, H, hole, occ, seats, door: 0, level: n, name: raw.id || raw.name,
               token: ++LOAD_TOKEN };
@@ -2044,9 +2054,57 @@ function drawBlock(wx, wz, alpha) {
   ctx.restore();
 }
 
+/* The padlock on the back of a chained seat. Drawn rather than an atlas frame:
+   it has to sit on nine seat colours at four rotations and three footprints, and
+   a sprite for each is 108 frames for one small piece of metal. Sat behind the
+   seat and a little above it, so it reads as hanging off the back rather than
+   as something a passenger is holding. */
+function drawPadlock(b, wx, wz, alpha) {
+  const k = LAY.s * .115;                            // a padlock is about a quarter of a cell
+  /* ⚠ High enough that the body clears the seat back. Hung at seat height the
+     cushion covered everything but the shackle, which on its own reads as a
+     scratch rather than as a lock. Behind and above: the seat still overlaps its
+     foot, so it hangs off the back rather than floating over the cushion. */
+  const back = b.dir & 1 ? [0, -SZ * .34] : [0, -SZ * .38];
+  const [px, py] = P(wx + back[0], 1.02, wz + back[1]);
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  // the shackle
+  ctx.beginPath();
+  ctx.arc(px, py - k * 1.55, k * .82, Math.PI, 0);
+  ctx.lineWidth = k * .58;
+  ctx.strokeStyle = "#232c44"; ctx.stroke();
+  ctx.lineWidth = k * .30;
+  ctx.strokeStyle = "#cdd5ea"; ctx.stroke();
+  // the body, with its ink outline the way every other piece on the board carries one
+  const w = k * 2.5, h = k * 2.0, x = px - w / 2, y = py - k * .95;
+  const body = (fill, inset) => {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x + inset, y + inset, w - inset * 2, h - inset * 2, k * .48);
+    else ctx.rect(x + inset, y + inset, w - inset * 2, h - inset * 2);
+    ctx.fillStyle = fill; ctx.fill();
+  };
+  /* ⚠ Steel, not gold. A gold padlock disappears on a yellow seat, and the seat
+     under it is one of nine colours - so the body is a neutral the palette does
+     not contain, inside an ink outline as thick as everything else on the board
+     carries. */
+  body("#232c44", 0);
+  body("#e4e9f6", k * .26);
+  // the keyhole
+  ctx.beginPath();
+  ctx.arc(px, y + h * .46, k * .28, 0, Math.PI * 2);
+  ctx.fillStyle = "#232c44"; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(px, y + h * .46); ctx.lineTo(px, y + h * .78);
+  ctx.lineWidth = k * .22; ctx.strokeStyle = "#232c44"; ctx.stroke();
+  ctx.restore();
+}
+
 /** A seat, or a crate where the board carries one instead. */
 function paintPiece(b, wx, wz, alpha) {
   if (isBlock(b)) return drawBlock(wx, wz, alpha);
+  if (b.chain) drawPadlock(b, wx, wz, alpha);        // behind the seat, so first
   if (HARD && RICH) seatSheen(b, wx, wz, alpha);
   const per = packing(b);
   if (per <= 1) {
@@ -2256,12 +2314,33 @@ function drawCinema(E) {
    ⚠ Drawn at -.018, above every outside painter (which work between -.05 and
    -.023) and below the room floor at 0. The queue sprites anchor at y = 0, so
    the lane has to be under them without being under the room. */
-const laneAt = E => E.x1 + SX * 1.5;    // where stopAt puts the near line, exactly
 const LANE_W = SX * .70;                // half-width: wide enough to stand a person on
 
+/** Every line this board has, as [centre x, which way is away from the room].
+
+    ⚠ Both, and the same treatment on each. A board with two doors has a queue
+    on either side of the room, and dressing only the near one left the far line
+    standing on the bare deck that drawRoom lays for it - two lines waiting for
+    the same room, on two different floors.
+
+    The numbers are stopAt()'s, resolved: the near door sits at column W-1 and
+    its line stands LANE_NEAR out from the cell centre, the far door at column 0
+    with LANE_FAR the other way. Written out rather than calling stopAt because
+    that needs a door row this has no use for. */
+function laneLanes(E) {
+    const out = [[E.x1 + SX * (LANE_NEAR - .5), 1]];
+    if (E.g.doors && E.g.doors.length > 1) out.push([E.x0 - SX * (LANE_FAR - .5), -1]);
+    return out;
+}
+
+/** slab() wants its x bounds in order, and a mirrored lane hands them over
+    backwards. Sorting here keeps every painter free to write "outboard by d"
+    and mean it on both sides. */
+const laneSlab = (a, b, z0, z1, y, fill) =>
+    slab(Math.min(a, b), z0, Math.max(a, b), z1, y, fill);
+
 /** Surface, two edges, and nothing in the middle. */
-function laneBed(E, fill, edge) {
-    const lx = laneAt(E);
+function laneBed(E, lx, fill, edge) {
     slab(lx - LANE_W, E.gz0, lx + LANE_W, E.gz1, -.020, fill);
     if (!edge) return;
     slab(lx - LANE_W, E.gz0, lx - LANE_W + .11, E.gz1, -.019, edge);
@@ -2270,36 +2349,61 @@ function laneBed(E, fill, edge) {
 
 /** A red carpet, because a cinema is the one room that would actually lay one. */
 function laneCinema(E) {
-    laneBed(E, "#6e1922", "#c39a4a");
-    const lx = laneAt(E);
-    // the rope, outboard - a continuous line rather than posts, for the same
-    // reason the concert's footlights are one strip: at this size separate
-    // uprights read as dashes of paint
-    slab(lx + LANE_W + SX * .30, E.gz0, lx + LANE_W + SX * .38, E.gz1, -.018, "#c39a4a");
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#6e1922", "#c39a4a");
+        // the rope, outboard - a continuous line rather than posts, for the same
+        // reason the concert's footlights are one strip: at this size separate
+        // uprights read as dashes of paint
+        laneSlab(lx + s * (LANE_W + SX * .30), lx + s * (LANE_W + SX * .38),
+                 E.gz0, E.gz1, -.018, "#c39a4a");
+    }
 }
 
 /** Poured concourse, painted either side, with the kerb nosing outboard. */
 function laneStadium(E) {
-    laneBed(E, STADIUM.deckA, STADIUM.line);
-    const lx = laneAt(E);
-    slab(lx + LANE_W + SX * .22, E.gz0, lx + LANE_W + SX * .34, E.gz1, -.018, STADIUM.nosing);
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, STADIUM.deckA, STADIUM.line);
+        laneSlab(lx + s * (LANE_W + SX * .22), lx + s * (LANE_W + SX * .34),
+                 E.gz0, E.gz1, -.018, STADIUM.nosing);
+    }
 }
 
 /** A corridor runner, in the lockers' teal so the two belong to one room. */
 function laneClassroom(E) {
-    laneBed(E, "#41706b", "#5f918b");
-    const lx = laneAt(E);
-    // the joins between one mat and the next, outboard of the line
-    for (let z = E.gz0; z < E.gz1; z += SZ * 2.2)
-        slab(lx + LANE_W + SX * .16, z, lx + LANE_W + SX * .30, z + SZ * .5, -.018, CLASSROOM.trim);
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#41706b", "#5f918b");
+        // the joins between one mat and the next, outboard of the line
+        for (let z = E.gz0; z < E.gz1; z += SZ * 2.2)
+            laneSlab(lx + s * (LANE_W + SX * .16), lx + s * (LANE_W + SX * .30),
+                     z, z + SZ * .5, -.018, CLASSROOM.trim);
+    }
 }
 
 /** Matting and a barrier, the way a crowd is actually funnelled to a door. */
 function laneConcert(E) {
-    laneBed(E, "#232833", "#39404e");
-    const lx = laneAt(E);
-    // one warm line picked up off the footlights, so the pit and the lane agree
-    slab(lx + LANE_W + SX * .26, E.gz0, lx + LANE_W + SX * .32, E.gz1, -.018, "rgba(255,201,120,.30)");
+    for (const [lx, s] of laneLanes(E)) {
+        laneBed(E, lx, "#232833", "#39404e");
+        // one warm line picked up off the footlights, so the pit and the lane agree
+        laneSlab(lx + s * (LANE_W + SX * .26), lx + s * (LANE_W + SX * .32),
+                 E.gz0, E.gz1, -.018, "rgba(255,201,120,.30)");
+    }
+}
+
+/** The station already stands its line on a platform - drawStation lays the
+    deck, and drawRoom lays one for the far line. What belongs here is the part
+    that is the LANE rather than the ground: the safety line and the tactile
+    strip, on the room side of wherever anybody stands.
+
+    ⚠ Moved out of drawStation rather than copied. Drawn there for the near side
+    and again here for the far one, the two would be a pair of numbers that have
+    to be kept equal by hand, and the whole point of this pass is that the two
+    lines match. */
+function laneStation(E) {
+    for (const [lx, s] of laneLanes(E)) {
+        laneSlab(lx - s * SX * .64, lx - s * SX * .52, E.gz0, E.gz1, -.019, ROOM.safety);
+        for (let z = E.gz0; z < E.gz1; z += SZ * .34)   // the strip you feel underfoot
+            laneSlab(lx - s * SX * .44, lx - s * SX * .36, z, z + SZ * .17, -.019, ROOM.tactile);
+    }
 }
 
 function drawStation(E) {
@@ -2322,9 +2426,9 @@ function drawStation(E) {
   // the platform: a dark edge where it drops to the track, then the deck
   slab(OX, gz0, gx1, gz1, -.030, ROOM.platformEdge);
   slab(OX + SX * .13, gz0, gx1, gz1, -.028, ROOM.platform);
-  slab(OX + SX * .30, gz0, OX + SX * .42, gz1, -.026, ROOM.safety);
-  for (let z = gz0; z < gz1; z += SZ * .34)   // the strip you feel underfoot
-    slab(OX + SX * .50, z, OX + SX * .58, z + SZ * .17, -.026, ROOM.tactile);
+  // ⚠ The safety line and the tactile strip are NOT here - they moved to
+  // laneStation(), which draws them at every line the board has rather than
+  // only at this one. See the note there.
 
   // The name board, so the place says what it is. Up past the far end of the
   // carriage, where nobody in the line ever stands, and level with the wall
@@ -2656,7 +2760,7 @@ function finClassroom(E, f, stage) {
    plate - true if a ?bg= plate may stand in for this theme's outside          */
 const THEMES = {
   station: {
-    head: .09, plate: true, outside: drawStation,
+    head: .09, plate: true, outside: drawStation, lane: laneStation,
     finale: finStation, shift: trainOut, cheer: .12,
     skin: { wall: ROOM.livery, trim: ROOM.trim, top: ROOM.liveryTop, lip: ROOM.liveryLip,
             fa: ROOM.floorA, fb: ROOM.floorB, grout: ROOM.grout, glass: ROOM.glass,
@@ -3635,23 +3739,33 @@ function drawRoom(g) {
   // A painted plate stands in for the station ground and nothing else: the other
   // themes draw a whole building out there, which no ground tile can replace.
   if (!(painted && TH.plate)) TH.outside(E);
-  // ⚠ After outside(), which paints the whole ground, and before party(),
-  // so a Big Event wash tints the lane with everything else rather than
-  // leaving one clean stripe through the middle of a dressed room.
+  /* A deck for the far line, on the boards that have one. Without it they are
+     stood on the track: a sprite against dark ground is a line nobody can read,
+     and the near line has had a platform under it since the beginning. Built
+     from the room's own colours, so it belongs to whichever theme is up rather
+     than being a station in a cinema.
+
+     ⚠ Here, not after the dressing. It used to be drawn last of the ground
+     passes, which was fine while it was the only thing the far line stood on -
+     and wrong the moment lane() started dressing that side too, because the
+     deck then painted over the lane it is supposed to sit under. It also means
+     a Big Event wash now tints it, which is what makes the two lines match on
+     a dressed board.
+
+     The "line you stand behind" that used to be drawn here is gone: every theme's
+     lane() now supplies its own edge, on both sides, and two of them stacked up
+     as a double stripe. */
+  if (twoDoors) {
+    const K = TH.skin;
+    slab(gx0, gz0, OX2, gz1, -.030, K.lip);             // the drop to the track
+    slab(gx0, gz0, OX2 - SX * .13, gz1, -.028, K.fa);   // the deck
+  }
+  // ⚠ After the ground and the deck, before party(), so a Big Event wash tints
+  // the lane with everything else rather than leaving a clean stripe through
+  // the middle of a dressed room.
   if (TH.lane) TH.lane(E);
   if (TH.party) TH.party(E);          // the hard-level dressing, see PARTY
   if (f != null && TH.finale) TH.finale(E, f, "back");
-  // A deck for the far line, on the boards that have one. Without it they are
-  // stood on the track: a sprite that fades with its place in the queue, against
-  // dark ground, is a line nobody can read - and the near line has had a
-  // platform under it since the beginning. Built from the room's own colours, so
-  // it belongs to whichever theme is up rather than being a station in a cinema.
-  if (twoDoors) {
-    const K = TH.skin;
-    slab(gx0, gz0, OX2, gz1, -.030, K.lip);                        // the drop to the track
-    slab(gx0, gz0, OX2 - SX * .13, gz1, -.028, K.fa);              // the deck
-    slab(OX2 - SX * .42, gz0, OX2 - SX * .30, gz1, -.026, K.trim); // the line you stand behind
-  }
   SHIFT = moved;
 
   // ---- the carriage ----
@@ -4080,6 +4194,10 @@ cv.addEventListener("pointerdown", ev => {
      of a drag. */
   if (onSeatPick(seat)) { releaseHeld(); draw(); return; }
   if (seat.locked) { trace({ ev: "refused", seat: seat.id, reason: "locked" }); bump(); say("Somebody is already walking to that seat."); releaseHeld(); draw(); return; }
+  /* ⚠ Before the placements test below, or a chained seat with room around it
+     would be refused as "no room beside it", which is the wrong reason and sends
+     the player off shifting neighbours that were never the problem. */
+  if (seat.chain) { trace({ ev: "refused", seat: seat.id, reason: "chained" }); bump(); say("Padlocked. Seat somebody in it and the lock comes off."); releaseHeld(); draw(); return; }
   const targets = placements(S, seat);
   if (!targets.length) {                      // boxed in on every side
     trace({ ev: "refused", seat: seat.id, reason: "no placements" });
@@ -4290,6 +4408,7 @@ function autoBoard(instant) {
       seat.locked = seat.pending > 0;
       if (seat.claim) seat.claim.delete(slot);
       seat.occ[slot] = ci; S.seated++;
+      seat.chain = false;                  // sat in, so the padlock is off
       onSeated();
     };
     if (instant) { sitDown(); launch(); return; }
@@ -4474,6 +4593,7 @@ function jumpBoard(g, seat) {
     seat.locked = seat.pending > 0;
     if (seat.claim) seat.claim.delete(slot);
     seat.occ[slot] = ci; S.seated++;
+    seat.chain = false;                    // the jump booster opens it too
     onSeated();
     onHud(); draw();
     /* Whoever else can now reach a seat gets on, and the board is finished here
@@ -4689,7 +4809,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "81b80f3+";
+const BUILD = "5601efd+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -5216,6 +5336,11 @@ const FEATURES = [
   { id: "area", label: "ADD LINE", from: () => unlockedAt("booster_area") },
   { id: "twin", label: "DOUBLE SEAT",
     from: () => firstBoard(b => b.seats.some(s => s[2] > 1)) },
+  /* ⚠ Read off the board like the others. The padlock arrives on its own level
+     rather than with a booster, and reading it off the data means the card
+     follows the seat if the ladder ever moves again - which it has, twice. */
+  { id: "lock", label: "LOCKED SEAT",
+    from: () => firstBoard(b => Object.values(b.mods || {}).some(m => m.isLocked)) },
   { id: "time", label: "TIME BOOSTER", from: () => unlockedAt("booster_time") },
 ];
 
@@ -5661,6 +5786,14 @@ const INTRO_RUNS = {
     { spot: "seats", btn: "GOT IT",
       text: "The ringed seat is bolted down. It does not move, whatever you drag." },
   ],
+  /* Two sentences because it is two facts, and the second is the one that makes
+     it a puzzle piece rather than an obstacle: the padlock is not permanent, and
+     what opens it is the thing the player is doing anyway. */
+  lock: [
+    { spot: "seats", btn: "GOT IT",
+      text: "The ringed seat is padlocked and will not budge. Seat a passenger in it and "
+          + "the lock comes off - then it slides like any other." },
+  ],
   /* Each booster is explained and pressed in the same step. There is no NEXT to
      click past first: a card that can be dismissed is a card that gets
      dismissed, and the player ends up owning a booster they have never used.
@@ -5874,6 +6007,10 @@ function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
   if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
   if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
+  /* Every padlock on the board. Unlike the jump step there is nothing to choose
+     between them - the lesson is what the padlock means, and on the board it
+     first appears on there is exactly one. */
+  if (INTRO.id === "lock") return S.seats.filter(b => b.chain);
   // One seat, not every seat the jump could be spent on. Ringing all of them
   // taught nothing except which seats are the front colour, and on a full board
   // it covered the board. The jump is for a seat the queue cannot walk to, so
