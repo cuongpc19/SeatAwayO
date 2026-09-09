@@ -1435,10 +1435,19 @@ function ambChord(freqs, dur, peak, delay) {
 /** A train horn, somewhere off down the line. Long, then short - the shape a
     horn is actually blown in, and the reason two blasts read as a train where
     one reads as a note. */
+/* ⚠ Quiet, and quieter than it looks. ambChord() puts all three partials
+   under one envelope, so what leaves it is about THREE times `peak` - at .033
+   the horn was pushing .10, held for a second and a half, arriving with no
+   warning on the frame a level ends. A sustained low chord reads far louder
+   than a blip of the same peak, which is why it was startling while the win
+   jingle at .09 is not. The room is meant to be somewhere behind the card, not
+   an event of its own. */
+const HORN_PEAK = .009;
+
 function ambHorn() {
   const chord = [311, 370, 466];        // a minor triad; air horns are chords
-  ambChord(chord, 1.6, .033, 0);
-  ambChord(chord, .60, .025, 2.05);
+  ambChord(chord, 1.6, HORN_PEAK, 0);
+  ambChord(chord, .60, HORN_PEAK * .76, 2.05);
 }
 
 /** Two seconds of pink-ish noise, made once and kept.
