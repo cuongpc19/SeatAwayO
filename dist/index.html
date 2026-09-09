@@ -5097,7 +5097,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "5b78222+";
+const BUILD = "a02b150+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -6675,8 +6675,50 @@ function blip(freq, dur, type, peak, delay) {
    band a sound this frequent belongs in. */
 const SEATED_PEAK = .009;
 
+/* A body dropping onto a cushion, not a note. Two things make it that rather
+   than a drum:
+
+   ⚠ The pitch FALLS. A held tone at any frequency is a note; weight landing is
+   a pitch that drops as it settles, 165Hz to 62 in an eighth of a second. The
+   old cue was 560 and 840 held flat, which is a chime however quietly it is
+   played - the frequency was the problem, not only the level.
+
+   ⚠ A breath of noise under it, low-passed to a few hundred hertz. That is the
+   cushion; without it the drop is a kick drum. It is a fifth of the tone's
+   level - any louder and it reads as a hiss rather than as upholstery. */
+function thud(peak) {
+  if (!save.sound || PLATFORM.hostMuted()) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const t = AC.currentTime;
+    const lp = AC.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 430; lp.Q.value = .7;
+    lp.connect(AC.destination);
+
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(165, t);
+    o.frequency.exponentialRampToValueAtTime(62, t + .13);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + .010);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .21);
+    o.connect(g); g.connect(lp);
+    o.start(t); o.stop(t + .23);
+
+    const src = AC.createBufferSource(), ng = AC.createGain();
+    src.buffer = ambNoiseBuf();
+    src.loop = true;
+    ng.gain.setValueAtTime(.0001, t);
+    ng.gain.exponentialRampToValueAtTime(peak * .2, t + .008);
+    ng.gain.exponentialRampToValueAtTime(.0001, t + .12);
+    src.connect(ng); ng.connect(lp);
+    src.start(t); src.stop(t + .14);
+  } catch (e) { /* no output device, or a browser that refuses one */ }
+}
+
 const SFX = {
-  seated: () => { blip(560, .08, "sine", SEATED_PEAK); blip(840, .11, "sine", SEATED_PEAK * .78, .06); },
+  seated: () => thud(SEATED_PEAK),
   buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
   win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
   lose:   () => { blip(300, .22, "sawtooth", .06); blip(190, .34, "sawtooth", .06, .13); },
