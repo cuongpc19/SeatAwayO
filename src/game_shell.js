@@ -48,12 +48,13 @@ const RESET_ASKED = flag("reset");
    on its own hands you the earliest one you have not seen, which is the grey
    seat from level 7, not the one you came to look at. */
 const INTRO_ONLY = LINK.get("intro");
-/* ?pace=N scales how long a crossing takes, for comparing one value against
-   another without a rebuild. 1 is the pace measured off the recording; the
-   default is in engine.js. Out of range values are ignored rather than clamped:
-   a typo should not hand anybody a board that takes a minute to cross. */
+/* ?pace=N forces one crossing pace on every board, for comparing one value
+   against another without a rebuild. 1 is the pace measured off the recording;
+   left off, the pace comes off the room's size - see walkPace() in engine.js.
+   Out of range values are ignored rather than clamped: a typo should not hand
+   anybody a board that takes a minute to cross. */
 const PACE_ASKED = parseFloat(LINK.get("pace"));
-if (PACE_ASKED >= 0.2 && PACE_ASKED <= 3) WALK_PACE = PACE_ASKED;
+if (PACE_ASKED >= 0.2 && PACE_ASKED <= 3) PACE_FORCED = PACE_ASKED;
 const WIN_ASKED = flag("win");
 if (RESET_ASKED) {
   LINK.delete("reset");

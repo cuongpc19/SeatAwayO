@@ -69,16 +69,31 @@ let OPEN_MS = 2000;
 const BASE_MS_PER_UNIT = 143;                       // ms per grid unit walked
 const MIN_WALK_MS = 285;                            // a walk is never snappier than this
 
-/* ⚠ Multiplies the DISTANCE term only, never the floor. Big boards read as slow
-   and small ones do not, and the reason is not the pace - that is 143ms a cell
-   everywhere - it is that the walk is four or five cells instead of one. Under
-   two cells the floor is what decides the duration, so a value below 1 leaves
-   every board up to about level 16 untouched and shortens only the long
-   crossings. Scaling the whole duration instead would speed up the opening,
-   where nobody has complained and where the beat is doing tutorial work.
+/* ⚠ The ROOM decides the pace, not the walk. Big boards read as slow and small
+   ones do not, and it is not the pace that differs - that is 143ms a cell
+   everywhere - it is that a 7x11 asks for a five-cell crossing where a 3x6 asks
+   for one. The first attempt at this keyed off the length of each walk, which
+   is wrong in a way that only shows up mid-game: a 4x6 with half its seats
+   moved throws up a seven-cell crossing too, that walk got shortened along with
+   the big ones, and level 11 came out hurried.
 
-   1 is the measured original. `?pace=N` overrides it for a side-by-side. */
-let WALK_PACE = 0.72;
+   So it is read off W + H, once, and every walk in a room shares it. 4x6 and
+   under keep the measured original exactly; it tapers to BIG_PACE at 7x11, the
+   largest vehicle in the game.
+
+   `?pace=N` forces one value everywhere, for a side-by-side. */
+const SMALL_SPAN = 10;         // 4x6 - the opening, untouched
+const BIG_SPAN = 18;           // 7x11 - the party bus and the coach
+const BIG_PACE = 0.72;
+let PACE_FORCED = 0;           // ?pace=, 0 = off
+
+function walkPace(g) {
+  if (PACE_FORCED) return PACE_FORCED;
+  const span = g.W + g.H;
+  if (span <= SMALL_SPAN) return 1;
+  if (span >= BIG_SPAN) return BIG_PACE;
+  return 1 - (1 - BIG_PACE) * (span - SMALL_SPAN) / (BIG_SPAN - SMALL_SPAN);
+}
 // The little jump onto the seat. 217 was measured off the recording and is the
 // one beat in the sequence worth stretching: it is the moment the move pays off,
 // and at walking speed it went by before it read as a jump at all.
@@ -2822,7 +2837,7 @@ function autoBoard(instant) {
 
     if (total < 1e-6) { hop(); return; }
 
-    const dur = Math.max(MIN_WALK_MS, total * BASE_MS_PER_UNIT * WALK_PACE) / SPEED;
+    const dur = Math.max(MIN_WALK_MS, total * BASE_MS_PER_UNIT * walkPace(S)) / SPEED;
     const t0 = performance.now();
     const tick2 = now => {
       if (stale()) return;
