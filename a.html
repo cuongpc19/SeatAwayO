@@ -200,6 +200,26 @@ body {
   background: radial-gradient(circle at 34% 30%, #ffe89a, var(--ms-gold) 55%, #c67a06);
   box-shadow: inset 0 -4px 0 rgba(0,0,0,.18);
 }
+/* Sits under the purse, on the same centre line. ⚠ Its top follows --wallet-y
+   rather than being a number of its own: the wallet moves with the frame, and a
+   fixed offset put this through the middle of it on a wide window. */
+.nexthard {
+  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 42) * 1px);
+  transform: translate(-50%, -50%);
+  font-family: var(--ms); font-size: 21px; color: #fff; white-space: nowrap;
+  -webkit-text-stroke: 5px var(--ms-ink); paint-order: stroke fill;
+}
+.nexthard b { color: var(--ms-gold); }
+.nexthard[hidden] { display: none; }
+/* The size of what is ahead. Quieter than the line above it: one is a thing to
+   plan for, the other is a horizon. */
+.waiting {
+  left: calc(var(--ui-cx) * 1px); top: calc((var(--wallet-y) + 72) * 1px);
+  transform: translate(-50%, -50%);
+  font-family: var(--ms); font-size: 17px; color: rgba(255,255,255,.86);
+  white-space: nowrap; -webkit-text-stroke: 4px var(--ms-ink); paint-order: stroke fill;
+}
+.waiting[hidden] { display: none; }
 .ver {
   left: calc(var(--ui-cx) * 1px); top: 1120px; transform: translateX(-50%);
   font-size: 16px; color: #fff; opacity: .55; white-space: nowrap;
@@ -357,15 +377,72 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 
 
 /* ---------- level grid ---------- */
-#levels { overflow-y: auto; -webkit-overflow-scrolling: touch;
+/* ⚠ Capped, or it does not scroll - it grows. #app is min-height:100dvh with no
+   ceiling, so a screen taller than the viewport pushes the whole page and the
+   WINDOW scrolls while this element sits still. `overflow-y: auto` then makes it
+   the scrollport for its own sticky children without ever scrolling, which
+   silently disables them. Every other screen fits the viewport; this is the one
+   that does not. */
+#levels { overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0;
+  max-height: 100vh; max-height: 100dvh;
   padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l)); }
+/* ⚠ Pinned. The screen scrolls itself, and buildGrid() centres the cell the
+   player is on - which by level 60 is a long way down, taking the heading and
+   the count off the top with it. The one line that says how far along they are
+   was the first thing to disappear on the screen that exists to say it. */
+#levels .topbar, #levels .l-sum {
+  position: sticky; z-index: 2;
+  /* ⚠ The app's own top colour, not a tint. At the top of the list the bar has
+     to be invisible - it is the background - and once the list moves under it,
+     the same colour reads as a bar rather than as a smudge. */
+  background: var(--sky-hi); box-shadow: 0 8px 12px -8px rgba(0,0,0,.5);
+}
+#levels .topbar { top: 0; padding-bottom: .5rem; }
+#levels .l-sum { top: 3.1rem; margin: 0; padding: .35rem 0 .7rem; box-shadow: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .5rem; }
+/* ⚠ Not a button any more, whatever the class is called. This screen says how
+   far along the player is and no longer starts a level, so the cells take no
+   pointer: a cursor that promises a click the cell will not honour is worse than
+   no cursor. The name stays because the CSS, the markup and buildGrid() all
+   share it, and renaming three things to say the same one is churn. */
 .cellbtn {
-  aspect-ratio: 1; border: 0; border-radius: 14px; cursor: pointer; font-family: var(--disp);
+  aspect-ratio: 1; border: 0; border-radius: 14px; cursor: default; font-family: var(--disp);
   font-weight: 800; font-size: 1rem; color: #fff; position: relative;
   background: linear-gradient(180deg, #6d84a8, #4c5f7d); box-shadow: 0 3px 0 rgba(0,0,0,.28);
+  /* ⚠ Centred here rather than inherited. These were <button> until this screen
+     stopped starting levels, and a button centres its own text - a div does not,
+     so every number slid into the top-left corner. */
+  display: grid; place-items: center; padding-top: .34rem;
 }
+/* Where the player is standing: gold, ringed and lifted off the grid. The one
+   cell on this screen that has to be findable without reading numbers. */
+.cellbtn.here {
+  background: linear-gradient(180deg, #ffd964, var(--gold-dk));
+  color: var(--ink); box-shadow: 0 0 0 3px #fff, 0 4px 0 rgba(0,0,0,.32);
+  transform: scale(1.06); z-index: 1;
+}
+.cellbtn.here .d, .cellbtn.here .s { color: var(--ink); text-shadow: none; }
+/* The gap between what is next and the far end. Flat and unlit: it is not a
+   level, and a cell that looks like the others invites a tap. */
+/* ⚠ Spans the row and stops one short, which puts the far end in the corner.
+   A grid item told to start at column 1 has to begin a fresh row, so the run of
+   dots always gets its own line and the level after it lands in the last
+   column - the corner being where a reader looks for "and it ends at". */
+.cellbtn.dots {
+  grid-column: 1 / -2; aspect-ratio: auto; min-height: 2.2rem;
+  background: none; box-shadow: none; color: rgba(255,255,255,.55);
+  font-size: 1.3rem; letter-spacing: .38em; place-items: center;
+}
+.l-sum {
+  margin: 0 0 .7rem; text-align: center; font-family: var(--disp); font-weight: 800;
+  font-size: .82rem; letter-spacing: .04em; color: rgba(255,255,255,.82);
+}
+.l-sum b { color: var(--gold); font-size: 1.05rem; }
 .cellbtn.done { background: linear-gradient(180deg, var(--go), var(--go-dk)); }
+/* Not reached yet. ⚠ Declared BEFORE the two difficulty rules so they win: on a
+   screen that only shows what is coming, every cell is unreached, and a grey
+   that beats the warning colours would leave nothing to see. */
+.cellbtn.ahead { background: rgba(20,28,44,.34); color: rgba(255,255,255,.7); }
 /* ---------- the hard levels ----------
    `difficultLevel` off the APK board: 0, 1 or 2. 118 of the 600 campaign levels
    carry one, and the game shows it in two places - the tile here, and the level
@@ -378,11 +455,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
    be shouting. */
 .cellbtn.hard  { background: linear-gradient(180deg, #ef7d4d, #c1502a); }
 .cellbtn.shard { background: linear-gradient(180deg, #a95ce2, #7233ab); }
-.cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); cursor: not-allowed; }
+.cellbtn.locked { background: rgba(20,28,44,.4); color: rgba(255,255,255,.4); }
 .cellbtn .s { position: absolute; inset: auto 0 3px 0; font-size: .55rem; letter-spacing: .1em; color: var(--gold); }
+/* ⚠ A band across the top, and the number is padded down to clear it. They used
+   to be laid over each other - "HARD" and "75" in the same few pixels - which
+   read as neither. */
 .cellbtn .d {
-  position: absolute; inset: 4px 0 auto 0; font-size: .44rem; font-weight: 800;
-  letter-spacing: .07em; color: rgba(255,255,255,.95); text-shadow: 0 1px 0 rgba(0,0,0,.25);
+  position: absolute; inset: 3px 0 auto 0; font-size: .42rem; font-weight: 800;
+  letter-spacing: .06em; color: rgba(255,255,255,.95); text-shadow: 0 1px 0 rgba(0,0,0,.3);
 }
 .cellbtn.locked .d { color: rgba(255,255,255,.42); text-shadow: none; }
 /* The grade rides beside the level pill as its own control, so "Level 9" keeps
@@ -601,6 +681,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 #c-next { left: 270px; top: calc(670px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
 #c-home { left: 270px; top: calc(752px + var(--dy) + var(--dz)); transform: translate(-50%, -50%); }
 #c-next:active, #c-home:active { transform: translate(-50%, calc(-50% + 3px)); }
+#c-home[hidden] { display: none; }
 
 /* Paper falling past the card. */
 .confetti { inset: 0; overflow: hidden; pointer-events: none; }
@@ -1006,6 +1087,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
         <span class="gap"></span>
         <i class="coin"></i><span id="h-coins">0</span>
       </div>
+      <div class="nexthard" id="h-nexthard"></div>
+      <div class="waiting" id="h-waiting"></div>
       <div class="ver" id="h-ver"></div>
     </div>
   </section>
@@ -1013,9 +1096,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
   <section id="levels" class="screen">
     <div class="topbar">
       <button class="icon-btn" id="l-back" aria-label="Back">&larr;</button>
-      <div class="meter"><div class="meter-top"><span class="lvl">CHOOSE A LEVEL</span></div></div>
+      <div class="meter"><div class="meter-top"><span class="lvl" id="l-title">YOUR PROGRESS</span></div></div>
       <span></span>
     </div>
+    <p class="l-sum" id="l-sum"></p>
     <div class="grid" id="l-grid"></div>
   </section>
 
@@ -4866,7 +4950,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "a8fbfc1+";
+const BUILD = "78f8d19+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -5258,7 +5342,11 @@ const DW = 540, DH = 1160;
    phone and shorter on a squat desktop frame, and a PLAY button written as
    "952" is drawn below the bottom edge of the one screen it exists for. */
 const PLAY_UP = 208;
-const WALLET_UP = 98;
+/* ⚠ 140, not 98. Two lines now sit under the purse and the build stamp is
+   pinned at 1120, so at 98 they landed on top of it. The ceiling is the PLAY
+   button: its foot is at 990, so the purse cannot rise past about 1011 without
+   touching it. */
+const WALLET_UP = 132;
 
 const WIDE_FROM = 1.2;             // where furniture becomes a landscape menu
 const WIDE_COL = .95;              // how much room the column beside the art may take
@@ -5334,6 +5422,25 @@ function refreshHome() {
   $("h-play").textContent = lvl > 1 ? "LEVEL " + lvl : "PLAY";
   $("h-stars").textContent = totalStars();
   $("h-coins").textContent = save.coins;
+  /* ⚠ Read off the boards, not off the 5-and-9 rule. The rule is what GRADES
+     them, but the ladder drops fifteen boards the APK carries, so our level 88
+     is its 89 and the marked ones do not land on a tidy rhythm of ours. Scanning
+     for the next graded board is the only reading that cannot drift. */
+  const nh = $("h-nexthard");
+  if (nh) {
+    const at = nextHardFrom(Math.min(save.unlocked, CAMPAIGN.length));
+    nh.hidden = !at;
+    if (at) nh.innerHTML = "Next hard level: <b>" + at + "</b>";
+  }
+  /* ⚠ Rounded down off CAMPAIGN.length, not written out. "2,000+" has to stay
+     true if the ladder moves, and it has moved twice; a number typed here is a
+     second copy of the campaign that goes stale without anything failing. */
+  const wt = $("h-waiting");
+  if (wt) {
+    const round = Math.floor(CAMPAIGN.length / 500) * 500;
+    wt.hidden = round < 500;
+    wt.textContent = round.toLocaleString("en-US") + "+ levels waiting for you";
+  }
   $("h-star-icon").innerHTML = STAR_ON;
   const left = hearts(), w = heartIn();
   const heart = $("h-hearts");
@@ -5346,22 +5453,74 @@ function refreshHome() {
   $("h-ver").textContent = BUILT ? "build " + BUILT : "";
 }
 
+/* ⚠ A progress board, not a picker. It used to start any cleared level, which
+   made the ladder optional - a player could hop back to an easy one, and the
+   number on the home button stopped meaning where they are. It answers one
+   question now: how far along am I. Nothing here starts a level; PLAY is the
+   only way onto a board, and the cells are divs rather than buttons so there is
+   nothing to press.
+
+   ⚠ Still a window, not all 2085. A wall of two thousand cells is not a
+   picture of progress, it is a scroll bar - so it shows the run up to where the
+   player is with a little of what is ahead, and the line above it carries the
+   total. */
+/* ⚠ What is AHEAD, not what is behind. The levels already cleared were most of
+   what this screen showed, and they are the part the player has no use for: they
+   cannot be replayed and the stars for them are already summed on the line
+   above. What is worth showing is the road - where they stand, what is coming,
+   and how much of it there is.
+
+   The tail is the point of the ellipsis. Two thousand cells is a scroll bar, not
+   a fact; a run of the next few, a gap, and the last level says "there are two
+   thousand of these" in one glance. */
+/* ⚠ Ours. Past this level a win ends at the home screen instead of on the next
+   board - see overlay(). The first levels run one into the next because that is
+   the stretch where stopping is what loses a player. */
+const HOME_AFTER = 10;
+
+/** The next level carrying a warning, from `n` on. Hard and super hard both
+    count: to a player they are the same thing arriving, and splitting them here
+    would be a distinction the home screen cannot afford the room to draw. */
+function nextHardFrom(n) {
+  for (let i = Math.max(1, n); i <= CAMPAIGN.length; i++) if (diffOf(i)) return i;
+  return 0;
+}
+
+const GRID_AHEAD = 29;          // the level they are on, plus this many to come
+
 function buildGrid() {
   const grid = document.getElementById("l-grid");
   grid.innerHTML = "";
-  // Far more boards than anyone will scroll: show what is reachable plus a
-  // little runway, so the picker stays a picker and not a 633-row wall.
-  const upto = Math.min(CAMPAIGN.length, save.unlocked + 24);
-  for (let n = 1; n <= upto; n++) {
-    const b = document.createElement("button");
-    const st = save.stars[n] || 0;
+  const last = CAMPAIGN.length;
+  const here = Math.min(save.unlocked, last);
+  const upto = Math.min(last, here + GRID_AHEAD);
+  const sum = $("l-sum");
+  if (sum) sum.innerHTML = "LEVEL <b>" + here + "</b> OF " + last
+      + " &middot; " + totalStars() + " STARS";
+
+  const cell = n => {
+    const b = document.createElement("div");
     const d = diffOf(n);
-    b.className = "cellbtn " + (n > save.unlocked ? "locked" : st ? "done" : "")
-                + (d ? " " + d.cls : "");
-    b.innerHTML = (d ? '<span class="d">' + d.tile + "</span>" : "")
-                + n + (st ? '<span class="s">' + "★".repeat(st) + "</span>" : "");
-    if (n <= save.unlocked) b.onclick = () => startLevel(n);
+    /* ⚠ `ahead`, not `locked`. Locked was styled to win over the difficulty
+       colours, which was right when a cleared board and an unreachable one sat
+       side by side. Every cell here is unreached, so that rule painted the whole
+       screen one grey and swallowed the one thing it is meant to show. */
+    b.className = "cellbtn " + (n === here ? "here" : "ahead") + (d ? " " + d.cls : "");
+    b.innerHTML = (d ? '<span class="d">' + d.tile + "</span>" : "") + n;
     grid.appendChild(b);
+  };
+
+  for (let n = here; n <= upto; n++) cell(n);
+  /* The gap, then the far end. Only when there is actually something between
+     them - on the last thirty levels there is nothing to elide. */
+  if (upto < last - 1) {
+    const dots = document.createElement("div");
+    dots.className = "cellbtn dots";
+    dots.textContent = "\u2026";
+    grid.appendChild(dots);
+    cell(last);
+  } else {
+    for (let n = upto + 1; n <= last; n++) cell(n);
   }
 }
 
@@ -6941,7 +7100,15 @@ function overlay(title, stars, coins, streak, sum, feat, cleared) {
   $("c-streak").textContent = streak;
   $("c-sum").hidden = !!stars;
   $("c-sum").innerHTML = sum;
-  $("c-next").textContent = stars ? "NEXT LEVEL" : "TRY AGAIN";
+  /* ⚠ From HOME_AFTER on, a win ends at the home screen rather than on the next
+     board. The first levels run one into the next because that is the stretch
+     where stopping is what loses a player; past it, going through Home is what
+     puts the progress board, the purse and the next hard level in front of them
+     between attempts. Only one button then - NEXT LEVEL and HOME both leading
+     home is the same button twice. */
+  const goHome = !!stars && cleared >= HOME_AFTER;
+  $("c-next").textContent = !stars ? "TRY AGAIN" : goHome ? "CONTINUE" : "NEXT LEVEL";
+  $("c-home").hidden = goHome;
 
   const box = $("c-stars");
   box.innerHTML = "";
@@ -7032,8 +7199,10 @@ $("g-menu").onclick = openSettings;
 document.getElementById("rv-go").onclick = revive;
 document.getElementById("rv-x").onclick = declineRevive;
 document.getElementById("c-home").onclick = () => { hideCard(); show("home"); };
-document.getElementById("c-next").onclick = () =>
+document.getElementById("c-next").onclick = () => {
+  if (S.phase === "win" && CUR >= HOME_AFTER) { hideCard(); show("home"); return; }
   startLevel(S.phase === "win" ? CUR + 1 : CUR);
+};
 addEventListener("resize", () => { fitDesign(); draw(); });
 
 let last = performance.now();
