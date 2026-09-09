@@ -1435,14 +1435,24 @@ function ambChord(freqs, dur, peak, delay) {
 /** A train horn, somewhere off down the line. Long, then short - the shape a
     horn is actually blown in, and the reason two blasts read as a train where
     one reads as a note. */
-/* ⚠ Quiet, and quieter than it looks. ambChord() puts all three partials
-   under one envelope, so what leaves it is about THREE times `peak` - at .033
-   the horn was pushing .10, held for a second and a half, arriving with no
-   warning on the frame a level ends. A sustained low chord reads far louder
-   than a blip of the same peak, which is why it was startling while the win
-   jingle at .09 is not. The room is meant to be somewhere behind the card, not
-   an event of its own. */
-const HORN_PEAK = .009;
+/* ⚠ Set against RMS, not against peak, and that is the whole point. Two
+   things had to be found the hard way here:
+
+   ambChord() puts all three partials under ONE envelope, so what leaves it is
+   about three times `peak`. At .033 the horn rendered at 0.105 - louder at the
+   peak than the win jingle it lands on top of.
+
+   ⚠ And cutting the peak was not enough. At .009 the peak was 0.029, ten dB
+   under the jingle, and it still startled - because a 1.6-second chord is
+   judged on the energy it carries, and its RMS was 0.0058 against the jingle's
+   0.0086. Three and a half dB. The ear was right and the peak reading was
+   measuring the wrong thing.
+
+   At .003 the horn renders 0.0096 peak and 0.0020 RMS - thirteen dB of energy
+   below the jingle, which is a room heard through a wall rather than an event
+   of its own. Measured by rendering it offline through the same filter and
+   envelope, not by listening and guessing. */
+const HORN_PEAK = .003;
 
 function ambHorn() {
   const chord = [311, 370, 466];        // a minor triad; air horns are chords
