@@ -251,6 +251,29 @@ def grade_a(lv):
 
 
 def capacity(s):
+    """How many people the seat holds. NOT its footprint once you reach four.
+
+    ⚠ `fourSeater` is a 2x2 booth, not a bench four cells long, and reading it
+    as a bench is why 12 of the 13 boards carrying one are dropped by convert()
+    - the run overflows the grid or lands on a neighbour. Laid out as 2x2 all 19
+    boards in the bundle that have one come out clean. Two more signals agree:
+    capacity summed per colour equals the queue's colour counts on all 19, and
+    every one of the 30 four-seaters has turnNumber 0 while two- and three-cell
+    seats use all four directions - a square needs no direction.
+
+    The one thing that says otherwise is our own art. art/seat_atlas.py lists
+    VARIANTS (4, 0) and seat_parts() builds a bench `cells * CELL` wide, so
+    s4_0_* is a 472x92 strip - four cells in a row. That sprite is a consequence
+    of this function, not evidence about the APK, and it took a detour to notice.
+
+    Fixing it is three places and a re-render: the footprint here, cellsOf() and
+    placeCell() in engine.js (four sitters, one per corner, facing unknown - the
+    data does not say), and a square variant in seat_atlas.py. It buys back the
+    15 levels convert() drops, which is what makes our level number drift from
+    the APK's by one at L87 and by 15 by the end of the ladder.
+
+    Deferred on 2026-09-09: 15 levels of 2100, every one of them playable, and
+    nothing before L87 is affected."""
     return 4 if s["fourSeater"] else 3 if s["tripleSeat"] else 2 if s["doubleSeat"] else 1
 
 
