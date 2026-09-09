@@ -105,7 +105,17 @@ const QUEUE_PITCH = 1.15;                           // world units between two p
 const QUEUE_STEP_MS = QUEUE_PITCH * BASE_MS_PER_UNIT;   // one place up the line, at walking pace
 const QUEUE_GAP_MS = 110;                           // before the person behind follows
 const idx = (g, c, r) => r * g.W + c;
-const inBoard = (g, c, r) => c >= 0 && c < g.W && r >= 0 && r < g.H && !g.hole[idx(g, c, r)];
+/* ⚠ A blocked cell is out of the board for every purpose the game reasons
+   about - a seat may not sit on it, a walker may not cross it - which is why it
+   belongs here rather than only in isFree(). The floor pass tests g.hole
+   directly, so the tile under a bench is still painted. */
+const inBoard = (g, c, r) => c >= 0 && c < g.W && r >= 0 && r < g.H
+  && !g.hole[idx(g, c, r)] && !(g.block && g.block[idx(g, c, r)]);
+/* ⚠ `block`, not `hole`. A hole is a cell with no floor - the gap between two
+   railway carriages - and the room skips drawing anything there. A blocked cell
+   has floor, and a bench bolted to it: nobody walks through it and no seat
+   slides onto it, but the tile is still painted and the carriage-gap pass must
+   not mistake it for a gap. */
 const isFree = (g, c, r) => inBoard(g, c, r) && g.occ[idx(g, c, r)] < 0;
 
 /** The grid cells a seat covers. SeatDirect 0 and 2 lie along x, 1 and 3 along z.
@@ -379,8 +389,11 @@ function load(n) {
        on one name would have been a bug waiting to happen. */
     chain: !!(raw.mods && raw.mods[i] && raw.mods[i].isLocked),
   }));
-  const g = { W, H, hole, occ, seats, door: 0, level: n, name: raw.id || raw.name,
-              token: ++LOAD_TOKEN };
+  const block = new Uint8Array(W * H);
+  const fixtures = (raw.fixtures || []).filter(f => f[0] >= 0 && f[0] < W && f[1] >= 0 && f[1] < H);
+  for (const [c, r] of fixtures) block[r * W + c] = 1;
+  const g = { W, H, hole, occ, seats, block, fixtures, door: 0, level: n,
+              name: raw.id || raw.name, token: ++LOAD_TOKEN };
   for (const b of seats) for (const [c, r] of cellsOf(b)) occ[idx(g, c, r)] = b.id;
 
   // The shipped level data never records the door. In the recording it sits on
@@ -752,6 +765,96 @@ function drawBlock(wx, wz, alpha) {
   ctx.moveTo(c[0][0], c[0][1]); ctx.lineTo(c[2][0], c[2][1]);
   ctx.moveTo(c[1][0], c[1][1]); ctx.lineTo(c[3][0], c[3][1]);
   ctx.stroke();
+  ctx.restore();
+}
+
+/* ---- a bench bolted to the floor ---------------------------------------
+   The level data gives a cell and a number, and the number picks the prop per
+   vehicle rather than per rule: panel 8 uses 0 and 1, panel 6 uses 2 and 3,
+   panel 10 uses 4 and 5, panel 9 uses 6. It is the vehicle's own furniture, so
+   it takes the room's colours rather than the palette the seats come in - the
+   pieces stay plain and the room is where the dressing goes.
+
+   A stone bench: a slab on two legs, with a small ornament on top that changes
+   with the theme. Drawn rather than an atlas frame, like the padlock, and for
+   the same reason - 24 of them exist in the whole bundle.
+
+   `kind` only picks the ornament. Nothing in the data says what prop 4 is as
+   opposed to prop 5, so the shapes are ours; what is read from the data is
+   where they stand and that they block the cell. */
+/* ⚠ The bench is stone in every room; only what stands on it changes. Taking
+   the bench's colours from the theme skin was the first try and it came out as
+   a flat plate: the skin's greys ARE the floor's greys, so the slab had nothing
+   to stand against. Warm stone reads against every one of the five rooms, and
+   the ornament is what says which room this is.
+
+   Heights are in world units, and they have to be generous - at .30 the front
+   face projected down to a few pixels and the whole thing read as a rug. */
+const BENCH = { top: "#ded6c6", face: "#b3aa96", leg: "#8b8371", ink: "#4b4536" };
+/* ⚠ These are big numbers on purpose. The projection gives a unit of x 28.7px
+   and a unit of z 27.9px, but a unit of HEIGHT only 6.9 - four times flatter -
+   so a slab half a unit thick renders as three pixels and the bench reads as a
+   rug. The seats do not have this problem because they are pre-rendered sprites
+   rather than geometry. A 2.3 slab is about 16px, which is the same order as
+   the 36px seat sprite. */
+let BENCH_LEG = .60, BENCH_SLAB = 1.50, BENCH_DEEP = .11;
+
+/** What stands on the bench, per room. The data numbers its props per vehicle,
+    not per room, and says nothing about what any of them is - so the number is
+    not read here. What a player sees is a bench dressed for the room they are
+    in, which is the thing that was described. */
+const ORNAMENT = { station: "lamp", cinema: "box", stadium: "pot",
+                   concert: "lamp", classroom: "pot" };
+
+function drawFixture(wx, wz, kind) {
+  const a = SX * .38, d = SZ * BENCH_DEEP;
+  const h1 = BENCH_LEG, h2 = BENCH_LEG + BENCH_SLAB;
+  ctx.save();
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = BENCH.ink;
+  ctx.lineWidth = Math.max(1, LAY.s * .026);
+  const face = (pts, fill) => {
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  };
+  // two legs under the front edge, then the slab: front face, then top
+  for (const lx of [-a * .58, a * .58])
+    face([P(wx + lx - a * .18, 0, wz + d), P(wx + lx + a * .18, 0, wz + d),
+          P(wx + lx + a * .18, h1, wz + d), P(wx + lx - a * .18, h1, wz + d)], BENCH.leg);
+  face([P(wx - a, h1, wz + d), P(wx + a, h1, wz + d),
+        P(wx + a, h2, wz + d), P(wx - a, h2, wz + d)], BENCH.face);
+  face([P(wx - a, h2, wz - d), P(wx + a, h2, wz - d),
+        P(wx + a, h2, wz + d), P(wx - a, h2, wz + d)], BENCH.top);
+
+  // the ornament, sitting on the slab towards its back edge
+  const sk = themeNow().skin, orn = ORNAMENT[THEME] || "pot";
+  const u = SX * .17, oz = wz - d * .5;          // across the slab, near its back
+  const UP = 1.1;                                // one "cell" of height, see above
+  if (orn === "pot") {
+    face([P(wx - u * .70, h2, oz), P(wx + u * .70, h2, oz),
+          P(wx + u * .50, h2 + UP * .95, oz), P(wx - u * .50, h2 + UP * .95, oz)],
+         sk.door || "#a2643a");
+    const [gx, gy] = P(wx, h2 + UP * 1.45, oz);
+    const rr = Math.max(4, LAY.s * .10);
+    ctx.beginPath(); ctx.arc(gx, gy, rr, 0, Math.PI * 2);
+    ctx.fillStyle = "#4fae57"; ctx.fill(); ctx.stroke();
+  } else if (orn === "box") {
+    face([P(wx - u * .80, h2, oz), P(wx + u * .80, h2, oz),
+          P(wx + u * .80, h2 + UP * 1.05, oz), P(wx - u * .80, h2 + UP * 1.05, oz)],
+         sk.trim || "#c9483f");
+    face([P(wx - u * .80, h2 + UP * 1.05, oz - SZ * .09), P(wx + u * .80, h2 + UP * 1.05, oz - SZ * .09),
+          P(wx + u * .80, h2 + UP * 1.05, oz), P(wx - u * .80, h2 + UP * 1.05, oz)],
+         sk.top || "#efe3cf");
+  } else {
+    const [ax, ay] = P(wx, h2, oz), [bx, by] = P(wx, h2 + UP * 1.75, oz);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    ctx.lineWidth = Math.max(2, LAY.s * .045); ctx.strokeStyle = BENCH.leg; ctx.stroke();
+    ctx.lineWidth = Math.max(1, LAY.s * .026); ctx.strokeStyle = BENCH.ink;
+    const rr = Math.max(4, LAY.s * .105);
+    ctx.beginPath(); ctx.arc(bx, by, rr, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffd964"; ctx.fill(); ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -2607,6 +2710,11 @@ function draw() {
   const held = HELD && HELD.moved ? HELD.seat : null;
   const gdx = held ? HELD.dx : 0, gdz = held ? HELD.dz : 0;
 
+  for (const f of (g.fixtures || [])) {
+    const fx = cellW(f[0]), fz = cellZ(f[1]);
+    push(fx, fz, () => { shadow(fx, fz, .40); drawFixture(fx, fz, f[2]); });
+  }
+
   for (const b of g.seats) {
     if (b === held) continue;                 // drawn last, riding the cursor
     const [sx, sz] = seatCentre(b);
@@ -3250,8 +3358,13 @@ function addLine(g) {
   if (g.anim.length || g.launching || g.lines) return false;
   const W = g.W + 1;
   const hole = new Uint8Array(W * g.H);
+  const block = new Uint8Array(W * g.H);
   for (let r = 0; r < g.H; r++)
-    for (let c = 0; c < g.W; c++) hole[r * W + c + 1] = g.hole[r * g.W + c];
+    for (let c = 0; c < g.W; c++) {
+      hole[r * W + c + 1] = g.hole[r * g.W + c];
+      block[r * W + c + 1] = g.block ? g.block[r * g.W + c] : 0;
+    }
+  for (const f of (g.fixtures || [])) f[0]++;      // the bench moves with the floor
   for (const b of g.seats) b.c++;
   /* ⚠ The doorway steps right with everything else. g.doors is fixed when the
      board loads, as [[W-1, row]] for the near door and [0, row] for the far one,
@@ -3261,7 +3374,7 @@ function addLine(g) {
      is what made the board unwinnable. The far door is already on column 0 and
      stays there - the new lane becomes the outer edge on that side. */
   if (g.doors) for (const d of g.doors) if (d[0] === g.W - 1) d[0] = W - 1;
-  g.W = W; g.hole = hole; g.lines = 1;
+  g.W = W; g.hole = hole; g.block = block; g.lines = 1;
   g.occ = new Int16Array(W * g.H).fill(-1);
   for (const b of g.seats) for (const [c, r] of cellsOf(b)) g.occ[idx(g, c, r)] = b.id;
   g.sel = null; g.drag = null; g.walkCells = null;

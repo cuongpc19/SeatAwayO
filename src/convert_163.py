@@ -422,6 +422,16 @@ def convert():
             "secondDoor": r["secondDoor"],
             "mods": extra,                   # per-seat rules the engine does not run yet
             "holeObstacles": r["holeObstacles"],
+            # ⚠ As cells, not as slot numbers. `obstacles` is kept beside it
+            # verbatim for anything that wants the raw record; this is the one
+            # the engine reads. A prop stands on an empty floor cell and blocks
+            # it - across all 24 in the bundle not one shares a cell with a
+            # seat - and its number picks which prop, per vehicle: panel 8 uses
+            # 0 and 1, panel 6 uses 2 and 3, panel 10 uses 4 and 5, panel 9
+            # uses 6. So it is the vehicle's own furniture rather than a rule.
+            "fixtures": [[G[r["panel"]][2][o["slot"]][0],
+                          G[r["panel"]][2][o["slot"]][1], o["kind"]]
+                         for o in r["obstacles"] if o["slot"] in G[r["panel"]][2]],
             "obstacles": r["obstacles"],
             "colouredGrid": r["colouredGrid"],
             "seatArms": r["seatArms"],
