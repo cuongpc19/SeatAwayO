@@ -1455,10 +1455,13 @@ function blip(freq, dur, type, peak, delay) {
    went from .09 to .015 and then out altogether; the drag has the seat moving
    under the finger and a short buzz, which is feedback enough.
 
-   ⚠ `seated` is a fifth of what it was. It is the sound of the level going
-   right, so it stays - but it fires once per passenger and a board seats
-   thirty, which is a lot of chiming for something that is not an ending. */
-const SEATED_PEAK = .018;
+   ⚠ `seated` is a tenth of what it was, halved once more after .018 still read
+   as a chime. It is the sound of the level going right so it stays, but it fires
+   once per passenger and a board seats thirty - at that rate it has to sit under
+   the room rather than on top of it. .009 renders 0.0090 peak and 0.0020 RMS,
+   nineteen dB under the win jingle and level with the station horn, which is the
+   band a sound this frequent belongs in. */
+const SEATED_PEAK = .009;
 
 const SFX = {
   seated: () => { blip(560, .08, "sine", SEATED_PEAK); blip(840, .11, "sine", SEATED_PEAK * .78, .06); },
