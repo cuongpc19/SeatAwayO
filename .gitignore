@@ -54,3 +54,10 @@ Desktop.ini
 # anywhere else.
 .firebase/
 /a.html
+
+# Sound experiments. Everything the game plays is synthesised at run time -
+# there is no sound bank and no loader - so these are working files, and 3 MB of
+# them. Nothing in src/ references any of these names.
+src/*.mp3
+src/*.webm
+src/*.raw

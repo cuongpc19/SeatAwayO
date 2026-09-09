@@ -96,8 +96,25 @@ changes.
 
 ### The dashboard — `public/stats.html`
 
-Games, winrate, average time, average moves and booster use per level, plus a **boards** column —
-the count of distinct fingerprints, which is the retune alarm.
+Nine headline cards, then five tables: **by level**, **by day**, **by build**, **by source** and
+**by booster**. Filtered by a time window (an hour up to everything, or a custom range), by build,
+by source, and with test games hidden until asked for.
+
+The by-level table is the one it exists for: winrate on a five-step ramp, games, wins, attempts per
+clear, **median** time and moves, average stars, booster use split by booster, % of level 1, and a
+**boards** column — the count of distinct fingerprints, which is the retune alarm. Anything with
+fewer than 8 games behind it prints grey rather than as a measured figure.
+
+⚠ **Winrate here is wins over attempts that finished**, because an end row is the only kind this
+game writes (§8). A player who opened a board and walked away is in none of it, so the levels people
+give up on are exactly the ones it flatters. Quit rate, drop-off and winrate per *player* need a
+start row and a random per-device code; the sibling project logs both and this one logs neither, so
+those columns are absent rather than approximated. Adding them is a change to
+[src/telemetry.js](src/telemetry.js) and to the rules' shape check, not to the page.
+
+⚠ **`dev` means different things in the two projects.** Here it is `0`/`1` for "played on
+localhost or a LAN address"; in Marble Sort's dashboard it is the per-device code. A column ported
+between the two pages without checking that will be wrong.
 
 Live as of 8 Sep 2026. Two things had to be true, and both now are:
 

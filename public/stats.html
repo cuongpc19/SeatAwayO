@@ -21,68 +21,197 @@
   only" and actually means any Google account on earth, and /runs is the whole
   dataset.
 
+  ⚠ Every table here is built from END rows, because an end row is the only kind
+  this game writes (ANALYTICS.md §8). That is not a gap in the page, it is a gap
+  in the log, and it is stated on the page itself rather than papered over: no
+  row exists for a level someone opened and walked away from, so "winrate" here
+  is wins over FINISHED attempts and cannot see abandonment. The sibling project
+  prints quit rate and per-player funnels because it also logs a start row and a
+  random per-device code; adding either here is a telemetry change, not a page
+  change.
+
   On what these numbers mean, and which question belongs to GA instead, see
   ANALYTICS.md §0.
 -->
 <style>
-  :root { color-scheme: light; --line: #dfe3ee; --ink: #22283a; --dim: #6b7288; }
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7fb; --panel: #fff; --ink: #22283a; --dim: #6b7288; --line: #dfe3ee;
+    --accent: #3b6fd4; --head: #f0f2f8; --code: #e7eaf3;
+    --hi: #fff6e0; --hi-line: #f0d79a;
+  }
+  /* ⚠ Every colour above is stated on bare `:root` and only overridden here. A
+     colour whose one definition lives inside this block is a colour the light
+     theme does not have. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171a22; --panel: #20242e; --ink: #e6e9f2; --dim: #9aa2b8; --line: #313644;
+      --accent: #7aa7f0; --head: #262b37; --code: #2b3140;
+      --hi: #2e2a1c; --hi-line: #514529;
+    }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 24px 18px 80px; background: #f6f7fb; color: var(--ink);
+  body { margin: 0; padding: 24px 18px 80px; background: var(--bg); color: var(--ink);
          font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 78rem; margin: 0 auto; }
+  main { max-width: 88rem; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin: 0 0 .15em; }
-  h2 { font-size: 1.05rem; margin: 2.2em 0 .6em; }
+  h2 { font-size: 1.05rem; margin: 2.2em 0 .5em; }
   .sub { color: var(--dim); margin: 0 0 1.6em; }
   button { font: inherit; padding: .45em 1em; border: 1px solid var(--line); border-radius: 8px;
-           background: #fff; cursor: pointer; }
-  button.p { background: #3b6fd4; border-color: #3b6fd4; color: #fff; }
-  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1.4em; }
+           background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.p { background: var(--accent); border-color: var(--accent); color: #fff; }
+  select, input[type="datetime-local"] {
+    font: inherit; padding: .4em; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+  }
+  /* The build labels carry a hash and a count, and a select sizes itself to its
+     widest option - left alone it pushes the rest of the toolbar off the row. */
+  #build { max-width: 18rem; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1em; }
   .bar label { display: flex; gap: .4em; align-items: center; color: var(--dim); }
-  select { font: inherit; padding: .4em; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-  .cards { display: flex; gap: 12px; flex-wrap: wrap; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px;
-          padding: 14px 18px; min-width: 8.5rem; }
-  .card b { display: block; font-size: 1.7rem; font-weight: 600; letter-spacing: -.02em; }
-  .card span { color: var(--dim); font-size: .86rem; }
-  .wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  /* The custom-range controls sit as one group, so they read as one control
+     rather than two that happen to be adjacent - and the group hides whole. */
+  .pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pick[hidden] { display: none; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 13px 16px; }
+  .card b { display: block; font-size: 1.65rem; font-weight: 600; letter-spacing: -.02em; }
+  .card span { display: block; color: var(--dim); font-size: .86rem; }
+  .card span.d { opacity: .75; }
+  .wrap { overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-  th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th, td { padding: 6px 11px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
-  th { position: sticky; top: 0; background: #f0f2f8; font-weight: 600; z-index: 1; }
+  /* ⚠ Headers wrap, cells do not. A wrapped number is a number split over two
+     lines, and these columns are read by scanning down them. The breaks are put
+     in with <br> rather than left to the browser, because the widest headers
+     here ("Winrate", "Attempts/clear") have no space to break at.
+     ⚠ `vertical-align:bottom` so a one-line header sits on the same baseline as
+     a two-line one; without it the short ones float up and the strip is ragged. */
+  thead th { position: sticky; top: 0; background: var(--head); color: var(--dim); font-weight: 600;
+             z-index: 2; white-space: normal; vertical-align: bottom; line-height: 1.25; }
+  /* Level (and Day, and Build) stays put while the rest scrolls sideways - the
+     level table is wider than any screen, and a row of numbers with the level
+     scrolled off is a row of numbers about nothing.
+     ⚠ Needs its own background: a sticky cell floats over what passes beneath
+     it, and a transparent one shows both at once. */
+  th:first-child, td:first-child { position: sticky; left: 0; background: var(--panel); z-index: 1; }
+  thead th:first-child { background: var(--head); z-index: 3; }
+  /* ⚠ And in the by-level table Winrate rides along with it. It is the one
+     number the table exists for, so parking it beside Level and then letting it
+     scroll away would undo the move. A second sticky column needs an exact left
+     offset, which means pinning the first column's width - border-box, or the
+     11px padding lands outside the 58 and the two overlap. */
+  #lv th:first-child, #lv td:first-child { width: 58px; min-width: 58px; }
+  #lv th:nth-child(2), #lv td:nth-child(2) {
+    position: sticky; left: 58px; background: var(--panel); z-index: 1; box-shadow: 1px 0 0 var(--line);
+  }
+  #lv thead th:nth-child(2) { background: var(--head); z-index: 3; }
   tbody tr:last-child td { border-bottom: 0; }
+  /* Winrate's own five-step ramp, red at the bottom to green at the top.
+     ⚠ Deliberately not shared with .warn/.ok, which mean "wrong" and "right" on
+     the Boards column - winrate runs the other way, and sharing the classes
+     would mean any tweak to the ramp silently repainted an unrelated column.
+     ⚠ 70-90 is the plain ink rather than a colour of its own: a level landing
+     where it was aimed does not need to shout, and reserving colour for the
+     ends is what makes the ends carry. */
+  .wr1 { color: #d2452f; } .wr2 { color: #e0762a; } .wr3 { color: #c98a12; }
+  .wr4 { color: var(--ink); } .wr5 { color: #2e9b57; }
+  /* The warm tones go muddy on a dark ground - lifted as a set, so the steps
+     stay evenly spaced rather than fixing the one that looks worst. */
+  @media (prefers-color-scheme: dark) {
+    .wr1 { color: #f2695a; } .wr2 { color: #f0913f; } .wr3 { color: #e0b23c; } .wr5 { color: #4fc27e; }
+  }
+  .thin { color: var(--dim); }
   .warn { color: #b3341f; font-weight: 600; }
   .ok { color: #1d7a44; }
-  .note { background: #fff6e0; border: 1px solid #f0d79a; border-radius: 10px;
+  /* The campaign's own hard flags, on the level itself rather than in a column
+     of their own: it is a property of the board, not a measurement. */
+  tr.hard td:first-child::after { content: " \2605"; color: #c98a12; }
+  tr.shard td:first-child::after { content: " \2605\2605"; color: #d2452f; }
+  .spark { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent);
+           vertical-align: middle; margin-right: 6px; opacity: .5; }
+  .note { background: var(--hi); border: 1px solid var(--hi-line); border-radius: 10px;
           padding: 12px 16px; margin: 1em 0; }
-  code { background: #e7eaf3; border-radius: 5px; padding: .1em .38em; overflow-wrap: anywhere; }
+  .mini { color: var(--dim); font-size: .86rem; margin: 0 0 .7em; }
+  .read { color: var(--dim); font-size: .88rem; max-width: 62rem; }
+  .read b { color: var(--ink); }
+  code { background: var(--code); border-radius: 5px; padding: .1em .38em; overflow-wrap: anywhere; }
   #msg { margin: 1em 0; }
-  .mini { color: var(--dim); font-size: .86rem; }
 </style>
 </head>
 <body><main>
 
 <h1>Seat Match &mdash; gameplay stats</h1>
-<p class="sub">One row per finished level, straight from the Realtime Database.
-Player counts and countries are <em>not</em> here &mdash; those are Firebase Analytics' job.</p>
+<p class="sub">One row per <em>finished</em> level, straight from the Realtime Database.
+Player counts, countries and sessions are <em>not</em> here &mdash; those are Firebase Analytics' job.</p>
 
 <div class="bar">
   <button class="p" id="go">Sign in with Google</button>
-  <button id="reload" hidden>Reload</button>
+
+  <select id="days" hidden>
+    <option value="0.0416667">last 1 hour</option>
+    <option value="0.25">last 6 hours</option>
+    <option value="1" selected>last 24 hours</option>
+    <option value="2">last 2 days</option>
+    <option value="7">last 7 days</option>
+    <option value="30">last 30 days</option>
+    <option value="99999">everything</option>
+    <option value="custom">custom range&hellip;</option>
+  </select>
+  <span class="pick" id="pick" hidden>
+    <input type="datetime-local" id="from" step="3600" title="Start of the window, this machine's own timezone">
+    <span class="thin">&rarr;</span>
+    <input type="datetime-local" id="to" step="3600" title="End of the window, this machine's own timezone">
+  </span>
+
+  <select id="build" hidden><option value="">all builds</option></select>
+  <select id="src" hidden><option value="">all sources</option></select>
   <label hidden id="devwrap"><input type="checkbox" id="dev"> count test games</label>
-  <label hidden id="buildwrap">build <select id="build"><option value="">all</option></select></label>
-  <span class="mini" id="who"></span>
+  <button id="reload" hidden>reload</button>
+  <span style="flex:1"></span>
+  <span class="mini" id="who" style="margin:0"></span>
 </div>
 
 <div id="msg"></div>
+
 <div id="out" hidden>
   <div class="cards" id="tot"></div>
+
   <h2>By level</h2>
-  <p class="mini">Sorted by level. <b class="warn">A level showing more than one
-  fingerprint has been retuned</b> &mdash; its rows are two different boards and
-  must not be averaged together. That is the mistake this column exists to stop.</p>
-  <div class="wrap"><table id="lv"></table></div>
+  <p class="mini" id="lvnote"></p>
+  <div class="wrap" style="max-height:70vh"><table id="lv"></table></div>
+
   <h2>By day</h2>
-  <div class="wrap"><table id="day"></table></div>
+  <p class="mini">Days are cut in this machine's timezone, off the player's own clock.
+  <b>Furthest</b> is the highest level anyone finished that day.</p>
+  <div class="wrap" style="max-height:44vh"><table id="day"></table></div>
+
+  <h2>By build</h2>
+  <p class="mini">⚠ <b>First and last seen are players' clocks, not deploy times.</b>
+  <code>build.py</code> stamps a git short hash, which carries no time, so the only stamps
+  available are read off <code>t</code> &mdash; and real rows arrive hours early and hours late
+  from people whose device clock is simply wrong. A <code>+</code> on the hash means the tree was
+  dirty when it was built: those rows were played on code that is not the commit they name.</p>
+  <div class="wrap"><table id="bld"></table></div>
+
+  <h2>By source</h2>
+  <p class="mini">Where the game was played. <b>GA ran</b> is the share of rows whose
+  <code>gtag.js</code> actually loaded &mdash; when that sits near zero the GA property is empty
+  because the script never arrived, not because the tracking is wrong (ANALYTICS.md §6).
+  ⚠ <b>Test games</b> is blank until the checkbox counts them in: it says which host they came
+  from, and the rows are filtered out of every table before it can say anything.</p>
+  <div class="wrap"><table id="src2"></table></div>
+
+  <h2>Boosters</h2>
+  <p class="mini">A revive is <b>two rows</b>, not one: the loss is posted before the player pays,
+  so the bought continuation is a second row carrying <code>revive</code>. Counting rows counts
+  <em>games</em>, not levels attempted.</p>
+  <div class="wrap"><table id="bst"></table></div>
+
+  <h2>Reading the columns</h2>
+  <p class="read" id="read"></p>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -101,46 +230,94 @@ firebase.initializeApp({
 
 const $ = id => document.getElementById(id);
 const msg = h => { $("msg").innerHTML = h; };
-let ROWS = [];
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/** ⚠ Eight games. Three attempts at 100% is not an easy level, it is three
+    attempts. Every rate on this page greys itself out below this rather than
+    printing a figure that reads exactly like a measured one. */
+const MIN_N = 8;
+
+/** The booster ids telemetry.js can send, in the order they are worth reading.
+    ⚠ `time-free` is the one the tutorial hands out, and it is kept apart from
+    the paid `time`: a free booster is not a player deciding they were stuck. */
+const BOOSTERS = [
+  ["jump", "Jump"],
+  ["area", "Add line"],
+  ["time", "Extra time"],
+  ["time-free", "Free time"],
+  ["revive", "Revive"],
+];
+
+let ROWS = [];          // every row read, oldest first
+let SKEW = 0;           // rows dated into the future, which no window may trust
+
+/* ---------------- auth ---------------- */
 
 $("go").onclick = () => {
   firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
-    .catch(e => msg('<div class="note">Sign-in failed: ' + e.message + "</div>"));
+    .catch(e => msg('<div class="note">Sign-in failed: ' + esc(e.message) + "</div>"));
 };
-$("reload").onclick = () => pull();
-$("dev").onchange = render;
-$("build").onchange = render;
+$("reload").onclick = () => {
+  const u = firebase.auth().currentUser;
+  pull(u && u.uid);
+};
 
 firebase.auth().onAuthStateChanged(u => {
   if (!u) return;
   $("go").hidden = true;
-  $("reload").hidden = false;
   $("who").textContent = u.email + "  ·  uid " + u.uid;
   pull(u.uid);
 });
 
+/* ---------------- read ---------------- */
+
 function pull(uid) {
   msg("Reading…");
-  // limitToLast on the push keys, which are chronological, so this needs no
-  // index. 40k rows is far more than the dashboard needs and far less than a
-  // runaway read.
+  // limitToLast on the push keys, which are minted by the SERVER in write order
+  // and are the one ordering in this data that a player's device cannot get
+  // wrong. 40k rows is far more than the dashboard needs and far less than a
+  // runaway read - and unlike orderBy="t" it needs no `.indexOn` in the rules,
+  // so the page works against the rules that are already deployed.
   firebase.database().ref("runs").limitToLast(40000).once("value")
     .then(s => {
       ROWS = [];
       s.forEach(c => { const v = c.val(); if (v && v.lvl) ROWS.push(v); });
+      // ⚠ `t` is Date.now() on the player's phone. Rows have arrived dated days
+      // ahead from people whose clock is wrong, and one of them would sit in
+      // every window on this page including "last 1 hour". Dropped from the
+      // windowing rather than quietly kept, and counted so the drop is visible.
+      const cutoff = Date.now() + 36e5;
+      SKEW = ROWS.filter(r => (r.t || 0) > cutoff).length;
       msg("");
       $("out").hidden = false;
-      $("devwrap").hidden = $("buildwrap").hidden = false;
-      const builds = Array.from(new Set(ROWS.map(r => r.build))).sort();
-      $("build").innerHTML = '<option value="">all</option>' +
-        builds.map(b => '<option>' + esc(b) + "</option>").join("");
+      for (const id of ["days", "build", "src", "devwrap", "reload"]) $(id).hidden = false;
+
+      // The build list, newest first: the build you want is almost always the
+      // live one, and sorting the bare hashes puts it anywhere in the list.
+      // ⚠ Ordered on arrival order (the push keys this read came back in), not
+      // on `t`, for the same reason the window is guarded above.
+      const seen = new Map();
+      for (const r of ROWS) if (r.build) seen.set(r.build, (seen.get(r.build) || 0) + 1);
+      const order = [];
+      for (let i = ROWS.length - 1; i >= 0; i--) {
+        const b = ROWS[i].build;
+        if (b && order.indexOf(b) < 0) order.push(b);
+      }
+      $("build").innerHTML = '<option value="">all builds</option>' +
+        order.map(b => '<option value="' + esc(b) + '">' + esc(b) + " · " + seen.get(b) +
+                       "</option>").join("");
+
+      const srcs = Array.from(new Set(ROWS.map(r => r.from || "web"))).sort();
+      $("src").innerHTML = '<option value="">all sources</option>' +
+        srcs.map(b => "<option>" + esc(b) + "</option>").join("");
+
       render();
     })
     .catch(e => {
-      // ⚠ The uid is printed even on success elsewhere, but here especially:
-      // the overwhelmingly likely cause of a denial is signing in with a
-      // different Google account from the one the rule names, and without the
-      // uid on screen there is nothing to compare against.
+      // ⚠ The uid is printed here especially: the overwhelmingly likely cause of
+      // a denial is signing in with a different Google account from the one the
+      // rule names, and without the uid on screen there is nothing to compare.
       msg('<div class="note"><b>' + esc(e.message) + "</b><br><br>" +
           "If that says <em>Permission denied</em>, the read rule does not name you yet. " +
           "Put this uid into <code>database.rules.json</code> &rarr; " +
@@ -150,59 +327,338 @@ function pull(uid) {
     });
 }
 
-const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
-  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const pct = (a, b) => b ? (100 * a / b).toFixed(0) + "%" : "–";
+/* ---------------- helpers ---------------- */
+
+const pct = (a, b) => b ? (100 * a / b).toFixed(0) + "%" : "—";
+
+/** Winrate's ramp. ⚠ Green is high, not correct: the ladder aims each level at
+    its own target, so a green level well above target is one that got easier
+    than it was meant to be. */
+function band(v, n) {
+  if (!n || n < MIN_N) return "thin";
+  if (v < 30) return "wr1";
+  if (v < 50) return "wr2";
+  if (v < 70) return "wr3";
+  if (v < 90) return "wr4";
+  return "wr5";
+}
+
+/** The middle of a series.
+
+    ⚠ The mean is the wrong middle for a game's length. An attempt is timed
+    until the player finishes it, so somebody who leaves the tab sitting on the
+    board writes a half-hour game, and a handful of those move a level's average
+    and not its median. The mean is still in the cell's hover - the two far
+    apart is itself the finding. A median needs the whole series kept, which is
+    why the tallies below accumulate arrays rather than running totals. */
+function median(a) {
+  if (!a.length) return 0;
+  const s = a.slice().sort((x, y) => x - y), h = s.length >> 1;
+  return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2;
+}
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+
+function secs(ms) {
+  if (!ms) return "—";
+  const s = Math.round(ms / 1000);
+  return s < 60 ? s + "s" : Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+/** A cell whose figure is the median, whose hover is the mean and the count,
+    and which greys itself out when too few attempts stand behind it. */
+function midCell(arr, fmt) {
+  if (!arr.length) return '<td class="thin">—</td>';
+  const cls = arr.length < MIN_N ? ' class="thin"' : "";
+  return "<td" + cls + ' title="mean ' + fmt(mean(arr)) + " over " + arr.length +
+         ' attempts">' + fmt(median(arr)) + "</td>";
+}
+
+const spark = (n, max) =>
+  '<span class="spark" style="width:' + Math.max(1, Math.round(38 * n / (max || 1))) + 'px"></span>';
+
+/* ---------------- filtering ---------------- */
+
+$("days").onchange = () => {
+  const custom = $("days").value === "custom";
+  $("pick").hidden = !custom;
+  if (custom && !$("from").value) {
+    // Seeded with the last day, so the group opens on something real rather
+    // than on two empty fields that render every table blank.
+    const iso = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+    $("to").value = iso(new Date());
+    $("from").value = iso(new Date(Date.now() - 864e5));
+  }
+  render();
+};
+for (const id of ["from", "to", "build", "src", "dev"]) $(id).onchange = render;
+
+/** The rows every table on the page is drawn from. */
+function filtered() {
+  const cutoff = Date.now() + 36e5;
+  let lo = 0, hi = Infinity;
+  if ($("days").value === "custom") {
+    lo = $("from").value ? new Date($("from").value).getTime() : 0;
+    hi = $("to").value ? new Date($("to").value).getTime() : Infinity;
+  } else {
+    lo = Date.now() - Number($("days").value) * 864e5;
+  }
+  const wantDev = $("dev").checked, b = $("build").value, sc = $("src").value;
+  return ROWS.filter(r =>
+    (wantDev || !r.dev) &&
+    (!b || r.build === b) &&
+    (!sc || (r.from || "web") === sc) &&
+    (r.t || 0) <= cutoff && (r.t || 0) >= lo && (r.t || 0) <= hi);
+}
+
+/* ---------------- render ---------------- */
 
 function render() {
-  const wantDev = $("dev").checked, wantBuild = $("build").value;
-  const rows = ROWS.filter(r => (wantDev || !r.dev) && (!wantBuild || r.build === wantBuild));
-  const wins = rows.filter(r => r.result === "win").length;
+  const rows = filtered();
+  const wins = rows.filter(r => r.result === "win");
   const lvls = new Set(rows.map(r => r.lvl));
-  $("tot").innerHTML = [
-    ["games", rows.length],
-    ["wins", wins],
-    ["winrate", pct(wins, rows.length)],
-    ["levels seen", lvls.size],
-    ["furthest", rows.length ? Math.max.apply(null, rows.map(r => r.lvl)) : 0],
-    ["with a booster", rows.filter(r => r.used).length],
-  ].map(([k, v]) => '<div class="card"><b>' + esc(v) + "</b><span>" + k + "</span></div>").join("");
+  const boosted = rows.filter(r => r.used && r.used.length);
+  const times = rows.map(r => r.ms || 0).filter(Boolean);
+  const threes = rows.filter(r => (r.stars | 0) === 3).length;
 
-  // ---- by level
+  $("tot").innerHTML = [
+    ["games", rows.length, rows.length ? "of " + ROWS.length + " read" : ""],
+    ["wins", wins.length, ""],
+    ["winrate", pct(wins.length, rows.length), "over finished attempts"],
+    ["attempts / clear", wins.length ? (rows.length / wins.length).toFixed(2) : "—",
+      "1.00 = nobody retried"],
+    ["median game", secs(median(times)), "mean " + secs(mean(times))],
+    ["levels seen", lvls.size, ""],
+    ["furthest", rows.length ? Math.max.apply(null, rows.map(r => r.lvl)) : 0, "of 600"],
+    ["with a booster", pct(boosted.length, rows.length), boosted.length + " games"],
+    ["3 stars", pct(threes, rows.length), ""],
+  ].map(([k, v, d]) => '<div class="card"><b>' + esc(v) + "</b><span>" + esc(k) + "</span>" +
+      (d ? '<span class="d">' + esc(d) + "</span>" : "") + "</div>").join("");
+
+  byLevel(rows);
+  byDay(rows);
+  byBuild(rows);
+  bySource(rows);
+  boosters(rows);
+  reading(rows);
+}
+
+function byLevel(rows) {
   const by = new Map();
   for (const r of rows) {
     let e = by.get(r.lvl);
-    if (!e) by.set(r.lvl, e = { n: 0, w: 0, ms: 0, mv: 0, sigs: new Set(), boost: 0 });
-    e.n++; e.w += r.result === "win" ? 1 : 0;
-    e.ms += r.ms || 0; e.mv += r.moves || 0;
-    e.sigs.add(r.sig); if (r.used) e.boost++;
+    if (!e) by.set(r.lvl, e = { n: 0, w: 0, ms: [], mv: [], st: 0, three: 0,
+                                sigs: new Set(), boost: 0, diff: 0, use: {} });
+    e.n++;
+    if (r.result === "win") e.w++;
+    if (r.ms) e.ms.push(r.ms);
+    if (r.moves) e.mv.push(r.moves);
+    e.st += r.stars | 0;
+    if ((r.stars | 0) === 3) e.three++;
+    e.sigs.add(r.sig);
+    e.diff = Math.max(e.diff, r.diff | 0);
+    if (r.used && r.used.length) {
+      e.boost++;
+      for (const u of r.used) e.use[u] = (e.use[u] || 0) + 1;
+    }
   }
+  const keys = Array.from(by.keys()).sort((a, b) => a - b);
+  const maxN = Math.max(1, ...keys.map(k => by.get(k).n));
+  const one = by.get(1);
+
   $("lv").innerHTML =
-    "<thead><tr><th>level</th><th>games</th><th>wins</th><th>winrate</th>" +
-    "<th>avg time</th><th>avg moves</th><th>boosted</th><th>boards</th></tr></thead><tbody>" +
-    Array.from(by.keys()).sort((a, b) => a - b).map(l => {
-      const e = by.get(l), many = e.sigs.size > 1;
-      return "<tr><td>" + l + "</td><td>" + e.n + "</td><td>" + e.w + "</td><td>" +
-        pct(e.w, e.n) + "</td><td>" + (e.ms / e.n / 1000).toFixed(0) + "s</td><td>" +
-        (e.mv / e.n).toFixed(1) + "</td><td>" + e.boost + "</td>" +
+    "<thead><tr><th>Level</th><th>Win<br>rate</th><th>Games</th><th>Wins</th>" +
+    "<th>Attempts<br>/ clear</th><th>Median<br>time</th><th>Median<br>moves</th>" +
+    "<th>Avg<br>stars</th><th>3&#9733;</th><th>Boosted</th>" +
+    BOOSTERS.map(([, n]) => "<th>" + n + "</th>").join("") +
+    "<th>% of<br>L1</th><th>Boards</th></tr></thead><tbody>" +
+    keys.map(l => {
+      const e = by.get(l), wr = e.n ? 100 * e.w / e.n : 0, many = e.sigs.size > 1;
+      const cls = e.diff === 2 ? "shard" : e.diff === 1 ? "hard" : "";
+      const few = e.n < MIN_N ? "thin" : "";
+      return "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + l + "</td>" +
+        '<td class="' + band(wr, e.n) + '">' + (e.n ? wr.toFixed(0) + "%" : "—") + "</td>" +
+        "<td>" + spark(e.n, maxN) + e.n + "</td>" +
+        "<td>" + e.w + "</td>" +
+        '<td class="' + few + '">' + (e.w ? (e.n / e.w).toFixed(2) : "—") + "</td>" +
+        midCell(e.ms, secs) +
+        midCell(e.mv, v => v.toFixed(0)) +
+        "<td>" + (e.n ? (e.st / e.n).toFixed(2) : "—") + "</td>" +
+        '<td class="' + few + '">' + pct(e.three, e.n) + "</td>" +
+        '<td class="' + few + '">' + pct(e.boost, e.n) + "</td>" +
+        BOOSTERS.map(([id]) => "<td>" + (e.use[id] || "") + "</td>").join("") +
+        '<td class="' + (one && one.n >= MIN_N ? "" : "thin") + '">' +
+          (one && one.n ? pct(e.n, one.n) : "—") + "</td>" +
         '<td class="' + (many ? "warn" : "ok") + '">' + e.sigs.size + "</td></tr>";
     }).join("") + "</tbody>";
 
-  // ---- by day
+  $("lvnote").innerHTML =
+    'Sorted by level. <b class="warn">A level showing more than one board has been retuned</b> ' +
+    "&mdash; its rows are two different boards and must not be averaged together. That is the " +
+    "mistake this column exists to stop. &#9733; marks a level the campaign flags hard, " +
+    "&#9733;&#9733; super hard." +
+    (SKEW ? ' <b class="warn">' + SKEW + " row" + (SKEW > 1 ? "s are" : " is") +
+            " dated into the future</b> and sits outside every window here." : "");
+}
+
+function byDay(rows) {
   const dd = new Map();
   for (const r of rows) {
-    const k = new Date(r.t || 0).toISOString().slice(0, 10);
+    const d = new Date(r.t || 0);
+    const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+              "-" + String(d.getDate()).padStart(2, "0");
     let e = dd.get(k);
-    if (!e) dd.set(k, e = { n: 0, w: 0, lv: new Set() });
-    e.n++; e.w += r.result === "win" ? 1 : 0; e.lv.add(r.lvl);
+    if (!e) dd.set(k, e = { n: 0, w: 0, lv: new Set(), ms: [], boost: 0, far: 0 });
+    e.n++;
+    if (r.result === "win") e.w++;
+    e.lv.add(r.lvl);
+    if (r.ms) e.ms.push(r.ms);
+    if (r.used && r.used.length) e.boost++;
+    e.far = Math.max(e.far, r.lvl);
   }
   $("day").innerHTML =
-    "<thead><tr><th>day</th><th>games</th><th>wins</th><th>winrate</th><th>levels</th></tr></thead><tbody>" +
+    "<thead><tr><th>Day</th><th>Games</th><th>Wins</th><th>Winrate</th><th>Levels</th>" +
+    "<th>Furthest</th><th>Median<br>time</th><th>Boosted</th></tr></thead><tbody>" +
     Array.from(dd.keys()).sort().reverse().map(k => {
-      const e = dd.get(k);
-      return "<tr><td>" + k + "</td><td>" + e.n + "</td><td>" + e.w + "</td><td>" +
-        pct(e.w, e.n) + "</td><td>" + e.lv.size + "</td></tr>";
+      const e = dd.get(k), wr = 100 * e.w / e.n;
+      return "<tr><td>" + k + "</td><td>" + e.n + "</td><td>" + e.w + "</td>" +
+        '<td class="' + band(wr, e.n) + '">' + wr.toFixed(0) + "%</td>" +
+        "<td>" + e.lv.size + "</td><td>" + e.far + "</td>" +
+        midCell(e.ms, secs) +
+        '<td class="' + (e.n < MIN_N ? "thin" : "") + '">' + pct(e.boost, e.n) + "</td></tr>";
     }).join("") + "</tbody>";
+}
+
+function byBuild(rows) {
+  const bb = new Map();
+  for (const r of rows) {
+    const k = r.build || "(none)";
+    let e = bb.get(k);
+    if (!e) bb.set(k, e = { n: 0, w: 0, lv: new Set(), ms: [], first: Infinity, last: 0 });
+    e.n++;
+    if (r.result === "win") e.w++;
+    e.lv.add(r.lvl);
+    if (r.ms) e.ms.push(r.ms);
+    e.first = Math.min(e.first, r.t || 0);
+    e.last = Math.max(e.last, r.t || 0);
+  }
+  const when = t => !t || t === Infinity ? "—" : new Date(t).toLocaleString();
+  $("bld").innerHTML =
+    "<thead><tr><th>Build</th><th>Games</th><th>Winrate</th><th>Levels</th>" +
+    "<th>Median<br>time</th><th>First seen</th><th>Last seen</th></tr></thead><tbody>" +
+    Array.from(bb.keys()).sort((a, b) => bb.get(b).last - bb.get(a).last).map(k => {
+      const e = bb.get(k), wr = 100 * e.w / e.n;
+      return "<tr><td>" + esc(k) + (/\+$/.test(k) ? ' <span class="warn">dirty</span>' : "") +
+        "</td><td>" + e.n + "</td>" +
+        '<td class="' + band(wr, e.n) + '">' + wr.toFixed(0) + "%</td>" +
+        "<td>" + e.lv.size + "</td>" + midCell(e.ms, secs) +
+        '<td class="thin">' + when(e.first) + '</td><td class="thin">' + when(e.last) +
+        "</td></tr>";
+    }).join("") + "</tbody>";
+}
+
+function bySource(rows) {
+  const ss = new Map();
+  for (const r of rows) {
+    const k = (r.from || "web") + "  ·  " + (r.host || "(no host)");
+    let e = ss.get(k);
+    if (!e) ss.set(k, e = { n: 0, w: 0, ga: 0, dev: 0 });
+    e.n++;
+    if (r.result === "win") e.w++;
+    e.ga += r.ga ? 1 : 0;
+    e.dev += r.dev ? 1 : 0;
+  }
+  $("src2").innerHTML =
+    "<thead><tr><th>Source &middot; host</th><th>Games</th><th>Winrate</th>" +
+    "<th>GA ran</th><th>Test games</th></tr></thead><tbody>" +
+    Array.from(ss.keys()).sort((a, b) => ss.get(b).n - ss.get(a).n).map(k => {
+      const e = ss.get(k), wr = 100 * e.w / e.n;
+      return "<tr><td>" + esc(k) + "</td><td>" + e.n + "</td>" +
+        '<td class="' + band(wr, e.n) + '">' + wr.toFixed(0) + "%</td>" +
+        '<td class="' + (e.n < MIN_N ? "thin" : "") + '">' + pct(e.ga, e.n) + "</td>" +
+        "<td>" + (e.dev || "") + "</td></tr>";
+    }).join("") + "</tbody>";
+}
+
+function boosters(rows) {
+  // ⚠ The comparison row, and the reason this table is worth having: a booster's
+  // own winrate means nothing on its own, because boosters are spent on the
+  // boards that were going badly. It is only readable against the games where
+  // nothing was spent at all.
+  const clean = rows.filter(r => !r.used || !r.used.length);
+  const cleanWr = clean.length ? 100 * clean.filter(r => r.result === "win").length / clean.length : 0;
+  const body = BOOSTERS.map(([id, name]) => {
+    const games = rows.filter(r => r.used && r.used.indexOf(id) >= 0);
+    let spent = 0;
+    for (const r of rows) if (r.used) for (const u of r.used) if (u === id) spent++;
+    const w = games.filter(r => r.result === "win").length;
+    const wr = games.length ? 100 * w / games.length : 0;
+    return "<tr><td>" + name + ' <span class="thin">' + id + "</span></td>" +
+      "<td>" + spent + "</td><td>" + games.length + "</td>" +
+      '<td class="' + (rows.length < MIN_N ? "thin" : "") + '">' +
+        pct(games.length, rows.length) + "</td>" +
+      '<td class="' + band(wr, games.length) + '">' +
+        (games.length ? wr.toFixed(0) + "%" : "—") + "</td>" +
+      "<td>" + new Set(games.map(r => r.lvl)).size + "</td></tr>";
+  }).join("");
+  $("bst").innerHTML =
+    "<thead><tr><th>Booster</th><th>Times<br>spent</th><th>Games it<br>appears in</th>" +
+    "<th>% of<br>games</th><th>Winrate of<br>those games</th><th>Levels</th></tr></thead><tbody>" +
+    body +
+    "<tr><td><b>No booster</b></td><td class=\"thin\">—</td><td>" + clean.length + "</td>" +
+    "<td>" + pct(clean.length, rows.length) + "</td>" +
+    '<td class="' + band(cleanWr, clean.length) + '">' +
+      (clean.length ? cleanWr.toFixed(0) + "%" : "—") + "</td>" +
+    "<td>" + new Set(clean.map(r => r.lvl)).size + "</td></tr></tbody>";
+}
+
+function reading(rows) {
+  $("read").innerHTML =
+    "<b>Winrate</b> &mdash; here, on the cards and in every table &mdash; runs low to high: " +
+    '<span class="wr1">under 30%</span>, <span class="wr2">30-50%</span>, ' +
+    '<span class="wr3">50-70%</span>, <span class="wr4">70-90%</span>, ' +
+    '<span class="wr5">90%+</span>, <span class="thin">grey</span> = fewer than ' + MIN_N +
+    " games, which is too few to mean anything. ⚠ Green is high, not <em>correct</em>: the ladder " +
+    "aims each level at its own target, so a green level well above target is one that got easier " +
+    "than it was meant to be.<br><br>" +
+
+    "⚠ <b>Every number here is over attempts that finished.</b> The game writes a row when a level " +
+    "ends and at no other time, so a player who opened a board and walked away is in none of these " +
+    "tables &mdash; not as a loss, not as a quit, not at all. That makes this winrate a ceiling " +
+    "rather than a measurement: the levels people give up on are exactly the ones it flatters. " +
+    "Quit rate, drop-off and winrate per <em>player</em> need a start row and a per-device code, " +
+    "and this game logs neither &mdash; no arrangement of this page can recover them " +
+    "(ANALYTICS.md §8).<br><br>" +
+
+    "<b>Games</b> is finished attempts, not people and not levels: someone who took four goes is " +
+    "in it four times, and a <b>revive is a second row</b> because the loss was already posted " +
+    "before they paid. <b>Attempts / clear</b> is Games ÷ Wins on the same board &mdash; 1.00 is a " +
+    "level nobody needed twice, 3.00 is three goes for every clear. It is the closest thing here " +
+    "to a retry count, and it counts boards rather than players.<br><br>" +
+
+    "<b>Median time</b> is the middle finished attempt &mdash; half were quicker, half slower. " +
+    "⚠ The mean is the wrong middle: an attempt is timed until the player finishes it, so somebody " +
+    "who leaves the tab open writes a half-hour game, and a handful of those move an average and " +
+    "not a median. <b>Hover</b> any median for the mean and the count behind it; the two far apart " +
+    "is itself the finding. <b>Median moves</b> is the same shape, and both count won and lost " +
+    "attempts together.<br><br>" +
+
+    "<b>% of L1</b> is this level's games over level 1's games. ⚠ It is a ratio of two <em>game " +
+    "counts</em>, not a funnel of people: someone on level 30 today mostly played level 1 weeks " +
+    "ago, so a short window counts them here and not there, and the column can read above 100%. " +
+    "Read it on 7 or 30 days, and read it as reach, never as retention.<br><br>" +
+
+    "<b>Boards</b> is how many distinct fingerprints have been seen at that level &mdash; the " +
+    "retune alarm, and the reason this database exists rather than GA. A level with two boards has " +
+    "had its generator or its clock changed underneath the number, and its rows are two different " +
+    "games. ⚠ Do not read any other column on a row where this is above 1 until the window is " +
+    "narrowed to one build.<br><br>" +
+
+    "<b>Test games</b> are rows played on localhost or a LAN address. They carry <code>dev: 1</code> " +
+    "and are hidden until the checkbox says otherwise. ⚠ In the sibling project's dashboard " +
+    "<code>dev</code> is a per-device code and means something else entirely &mdash; the two pages " +
+    "do not share a schema, and a column ported between them without checking will be wrong." +
+    (rows.length ? "" :
+      '<br><br><b class="warn">Nothing in this window.</b> Widen it, or count test games.');
 }
 </script>
 </main></body>

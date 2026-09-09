@@ -90,6 +90,7 @@ function themeFor(level) {
 }
 
 function applyTheme(level) {
+  const wasTheme = THEME;
   THEME = themeFor(level);
   /* A marked board is played in the same room with the party thrown in it - see
      PARTY in the engine. Read off the board, exactly like the chip and the
@@ -105,6 +106,9 @@ function applyTheme(level) {
   // whatever the canvas does not cover should be the room's own colour, not the
   // one left behind by the level before it. themeNow(), not THEMES: a party
   // paints a different page behind the same room.
+  // ⚠ A cue belongs to the board that was cleared. Moving to a room of another
+  // kind while its tail is still sounding plays a station horn in a classroom.
+  if (THEME !== wasTheme) ambStop();
   const page = themeNow().page;
   document.getElementById("play").style.background = page || "#98a1ab";
 }
@@ -1362,6 +1366,274 @@ const SFX = {
   no:     () => blip(160, .13, "square", .05),
 
 };
+/* ---- room sound ---------------------------------------------------------
+   Not a soundtrack, and no longer a bed: the noises a place makes, now and
+   then, with silence in between.
+
+   ⚠ The first cut ran a continuous filtered-noise bed under the board - a
+   station rumble, slowly drifting, with trains passing through it. It measured
+   correctly and it was rejected on the only test that matters, which is
+   listening to it: a drone under a puzzle game is a thing to switch off. What
+   carried the place was never the bed. It was the horn.
+
+   So: no bed anywhere, in any theme. If a room needs a sound, it gets an event,
+   spaced far enough apart to stay welcome.
+
+   No audio file either, for the same reason there is no sound bank - this build
+   is one HTML file and a minute of music is a megabyte. A handful of
+   oscillators costs nothing to ship and nothing to license, which for a game
+   going to a host that requires you to own your music is not a small thing.
+
+   ⚠ Gated on the same two switches as every cue: the in-game sound setting and
+   the host's mute, and the host wins. */
+const AMB_LEVEL = 1.0;
+let AMB = null;                   // { theme, master } while a cue is sounding
+
+/** A tone that belongs to the room rather than to the game.
+
+    ⚠ Not blip(). blip connects straight to AC.destination, so anything routed
+    through it bypasses the ambience master: it would not fade out when the
+    player leaves the board, and would still be sounding over the home screen. */
+function ambTone(freq, dur, peak, delay, type) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + .03);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(AMB.master);
+  o.start(t); o.stop(t + dur + .05);
+}
+
+/** Several partials under one envelope, through one filter.
+
+    ⚠ Three notes, not one. A single oscillator is a test tone however it is
+    shaped; what makes a horn sound like air forced through metal is the beating
+    between partials a few cents apart. The low-pass is what puts it in the
+    distance - take it off and the same chord is standing on the platform. */
+function ambChord(freqs, dur, peak, delay) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const f = AC.createBiquadFilter(), g = AC.createGain();
+  f.type = "lowpass"; f.frequency.value = 1150; f.Q.value = .6;
+  g.gain.setValueAtTime(.0001, t);
+  // A slow attack is most of what "far away" means: close sounds start abruptly.
+  g.gain.exponentialRampToValueAtTime(peak, t + .18);
+  g.gain.setValueAtTime(peak, t + dur * .5);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  f.connect(g); g.connect(AMB.master);
+  freqs.forEach((hz, i) => {
+    const o = AC.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(hz * (1 + (i - 1) * .0016), t);
+    o.connect(f);
+    o.start(t); o.stop(t + dur + .1);
+  });
+}
+
+/** A train horn, somewhere off down the line. Long, then short - the shape a
+    horn is actually blown in, and the reason two blasts read as a train where
+    one reads as a note. */
+function ambHorn() {
+  const chord = [311, 370, 466];        // a minor triad; air horns are chords
+  ambChord(chord, 1.6, .033, 0);
+  ambChord(chord, .60, .025, 2.05);
+}
+
+/** Two seconds of pink-ish noise, made once and kept.
+
+    ⚠ Noise is back, but only inside events. Nothing here loops under a board:
+    the rejected version was a noise bed running the whole level, and the lesson
+    was about the drone, not about the waveform. A crowd cannot be made any
+    other way - detuned oscillators give a choir, not a stand.
+
+    ⚠ Pink, not white. White through a band-pass is hiss with the ends cut off;
+    rolling the spectrum first is what makes it read as people. */
+let ambNoise = null;
+function ambNoiseBuf() {
+  if (ambNoise) return ambNoise;
+  const n = Math.floor(AC.sampleRate * 2);
+  ambNoise = AC.createBuffer(1, n, AC.sampleRate);
+  const d = ambNoise.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < n; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = .99765 * b0 + w * .0990460;
+    b1 = .96300 * b1 + w * .2965164;
+    b2 = .57000 * b2 + w * 1.0526913;
+    d[i] = (b0 + b1 + b2 + w * .1848) * .22;
+  }
+  return ambNoise;
+}
+
+/** A crowd, rising and falling. The filter opens as it swells: a stand getting
+    louder also gets brighter, and holding the colour still is most of what
+    makes a noise envelope sound like a fade on a tape rather than like people. */
+function ambCheer(secs, peak, f0, f1, delay) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = ambNoiseBuf(); src.loop = true;         // stopped below, never left running
+  f.type = "bandpass"; f.Q.value = .9;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.linearRampToValueAtTime(f1, t + secs * .40);
+  f.frequency.linearRampToValueAtTime(f0, t + secs);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + secs * .40);
+  g.gain.linearRampToValueAtTime(.0001, t + secs);
+  src.connect(f); f.connect(g); g.connect(AMB.master);
+  src.start(t); src.stop(t + secs + .1);
+}
+
+/** The stand finding its voice for a few seconds. */
+function ambRoar() { ambCheer(2.8, .200, 620, 1500); }
+
+/** An electric school bell: a clapper on a metal dome.
+
+    ⚠ Inharmonic partials, and a square LFO on the gain. A harmonic stack is a
+    church bell and a smooth tone is a doorbell; what says "school" is the ratio
+    between the partials being nothing musical, and the hammer buzzing against
+    the dome twenty times a second. */
+function ambBell() {
+  if (!AMB) return;
+  const t = AC.currentTime, dur = 1.9, peak = .036;
+  const env = AC.createGain();
+  env.gain.setValueAtTime(.0001, t);
+  env.gain.exponentialRampToValueAtTime(peak, t + .03);
+  env.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  env.connect(AMB.master);
+  const trem = AC.createGain();
+  trem.gain.value = .55;
+  const lfo = AC.createOscillator(), lg = AC.createGain();
+  lfo.type = "square"; lfo.frequency.value = 19; lg.gain.value = .45;
+  lfo.connect(lg); lg.connect(trem.gain);
+  lfo.start(t); lfo.stop(t + dur + .05);
+  trem.connect(env);
+  for (const r of [1, 2.76, 5.40]) {                 // nothing musical about these
+    const o = AC.createOscillator();
+    o.type = "triangle"; o.frequency.setValueAtTime(620 * r, t);
+    o.connect(trem);
+    o.start(t); o.stop(t + dur + .05);
+  }
+}
+
+/** One muffled beat from beyond the wall: a sine dropped through its own pitch,
+    with everything above the bottom taken off. */
+function ambThump(hz, dur, peak, delay) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(hz * 1.5, t);
+  o.frequency.exponentialRampToValueAtTime(hz, t + .06);
+  f.type = "lowpass"; f.frequency.value = 190;
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + .015);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(AMB.master);
+  o.start(t); o.stop(t + dur + .05);
+}
+
+/** A few bars leaking out of the hall, the way they do when a door opens: the
+    bass and the crowd, and nothing of the tune - a wall passes the bottom and
+    stops everything else, which is why this is thuds rather than notes. */
+function ambBars() {
+  const riff = [55, 55, 73.4, 55, 65.4];
+  riff.forEach((hz, i) => ambThump(hz, .40, .078, i * .44));
+  ambCheer(2.6, .015, 480, 1200, .2);
+}
+
+/* One cue per theme, played ONCE, on a level being cleared - never during play.
+
+   ⚠ The version before this ran them on a timer through the whole level. Two
+   things were wrong with it and only one was audible: a room that makes a noise
+   every half minute is a room the player is waiting on rather than reading, and
+   a sound with no cause is a sound that means nothing. Tied to the win it has a
+   job - it is the room reacting, arriving a beat before the card does.
+
+   ⚠ There is no `cinema`, and that is the design rather than a gap. A cinema's
+   defining sound is that it has none, and the honest alternatives were a
+   projector nobody would place or a rumble from the film next door. A theme
+   missing from this table is silent - see ambCue(). */
+const AMBIENCE = {
+  station: ambHorn,
+  stadium: ambRoar,
+  classroom: ambBell,
+  concert: ambBars,
+};
+
+/* ⚠ An AudioContext built before the player has touched anything starts
+   SUSPENDED, and calling resume() on it then does nothing - the browser wants a
+   trusted gesture, and a promise that was rejected before one arrived is not
+   retried by anybody. Nothing above notices: AMB is set, the timers run, the
+   oscillators start and stop on schedule, and not one sample reaches the
+   speaker. From the console it looks like it is working.
+
+   ⚠ It bites the deep link specifically - /?level=6 reaches a board with no
+   click anywhere behind it - which is exactly how this game is handed round for
+   testing. The route through the home screen has the PLAY button as its gesture
+   and never showed the fault.
+
+   So: try again on every gesture, forever, not once. `once: true` would spend
+   the listener on whichever gesture happened to come first, which may be one
+   that arrived before there was a context to resume. */
+function ambWake() {
+  if (AC && AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
+}
+for (const ev of ["pointerdown", "touchstart", "keydown"])
+  addEventListener(ev, ambWake, { capture: true, passive: true });
+
+function ambStop() {
+  if (!AMB) return;
+  const dead = AMB;
+  AMB = null;
+  try {
+    /* Faded, not cut. The cue is a second or two long and the player can press
+       NEXT LEVEL in the middle of one - dropping the gain to zero on that frame
+       is a click. The oscillators stop themselves at the time they were
+       scheduled to. */
+    dead.master.gain.cancelScheduledValues(AC.currentTime);
+    dead.master.gain.setValueAtTime(dead.master.gain.value, AC.currentTime);
+    dead.master.gain.linearRampToValueAtTime(.0001, AC.currentTime + .35);
+    setTimeout(() => { try { dead.master.disconnect(); } catch (e) {} }, 700);
+  } catch (e) { /* context already gone */ }
+}
+
+/** The room's own reaction to a board being cleared. One shot, then silence.
+
+    ⚠ Called AFTER setPaused(true) in onFinish, not before. setPaused routes
+    through ambSync(), which stops anything sounding - fired first, the cue would
+    be started and then cut down within the same function. */
+function ambCue() {
+  const play = AMBIENCE[THEME];
+  if (!play) return;                           // a theme with no cue: cinema
+  if (!save.sound || PLATFORM.hostMuted()) return;
+  ambStop();                                   // never two cues over each other
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const master = AC.createGain();
+    master.gain.setValueAtTime(AMB_LEVEL, AC.currentTime);
+    master.connect(AC.destination);
+    AMB = { theme: THEME, master };
+    play();
+  } catch (e) { AMB = null; /* no output device, or a browser that refuses one */ }
+}
+
+/** Anything that gates audio moving - the switch, the host's mute, leaving the
+    board - can only ever SILENCE now. Nothing starts a cue but a win. */
+function ambSync() {
+  if (PAUSED || !save.sound || PLATFORM.hostMuted()) ambStop();
+}
+
+/* ⚠ A tab in the background must go quiet. Unlike an rAF loop, a running
+   AudioContext is not paused by the browser - a phone with its screen off
+   would keep the station rumbling. */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) ambStop();
+});
+
 /* Android buzzes. iOS Safari has no Vibration API at all, so there the switch is
    simply inert - which is better than hiding it and guessing wrong about a
    browser we cannot test from here. */
@@ -1410,6 +1682,12 @@ function setPaused(v) {
   if (v === PAUSED) return;
   PAUSED = v;
   if (v) PLATFORM.gameplayStop(); else PLATFORM.gameplayStart();
+  /* ⚠ Here, and only here. This function is already the one choke point for
+     leaving and re-entering a board - the comment on show() explains what it
+     cost to learn that - so the room tone hangs off it rather than off each
+     exit. A bed started in startLevel() and stopped in three other places is a
+     bed still playing over the home screen the first time one is missed. */
+  ambSync();
 }
 function openSettings() {
   if (!S || S.phase !== "play" || cardEl.classList.contains("on")) return;
@@ -1429,6 +1707,7 @@ function toggleSetting(key) {
   persist(); syncToggles();
   if (key === "sound" && save.sound) SFX.seated();
   if (key === "vibe" && save.vibe) buzz(18);
+  if (key === "sound") ambSync();      // switching sound off silences a cue mid-tail
 }
 $("set-sound").onclick = () => toggleSetting("sound");
 $("set-vibe").onclick = () => toggleSetting("vibe");
@@ -1708,6 +1987,11 @@ onFinish = function (won) {
   TUT = null; tutKey = ""; $("coach").hidden = true;   // the lesson is over either way
   setPaused(true);                                     // a card is up: an ad may land here
   if (won) PLATFORM.happytime();
+  /* ⚠ After setPaused(true), which silences anything already sounding - fired
+     above it, this cue would be started and cut down inside the same function.
+     The card is already CHEER_MS behind the win, so the room is heard first and
+     then read over: a beat of the place reacting, then LEVEL COMPLETE. */
+  if (won) ambCue();
   const stars = won ? starsFor(S) : 0;
   const lvl = CUR;
   const pay = purse();
@@ -1804,7 +2088,7 @@ let BOOTED = false;
     save.seenBoosters = FEATURES.map(f => f.id).filter(id => id !== INTRO_ONLY);
     save.coins = Math.max(save.coins, 5000);   // so a locked-out price is not the thing being read
   }
-  PLATFORM.onHostMuteChange(() => syncToggles());
+  PLATFORM.onHostMuteChange(() => { syncToggles(); ambSync(); });
   PLATFORM.loadingStop();
 
   const asked = parseInt(LINK.get("level"), 10);
