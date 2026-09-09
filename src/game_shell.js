@@ -1357,8 +1357,16 @@ function blip(freq, dur, type, peak, delay) {
     o.start(t); o.stop(t + dur + .02);
   } catch (e) { /* no output device, or a browser that refuses one */ }
 }
+/* ⚠ `move` is the one that fires most - once per drag, dozens of times a
+   level - and it was at .09, which measured within a decibel of `seated`.
+   The reward for finding a passenger a seat was as loud as the act of
+   nudging a seat, and a sound that frequent at that level stops being
+   feedback and becomes a rattle. At .015 it is fifteen dB under `seated`: a
+   tick that says the drag landed and then gets out of the way. */
+const MOVE_PEAK = .015;
+
 const SFX = {
-  move:   () => blip(300, .09, "triangle", .09),
+  move:   () => blip(300, .09, "triangle", MOVE_PEAK),
   seated: () => { blip(560, .08, "sine", .09); blip(840, .11, "sine", .07, .06); },
   buy:    () => { blip(680, .07, "square", .05); blip(1020, .10, "square", .04, .07); },
   win:    () => [523, 659, 784, 1046].forEach((f, i) => blip(f, .28, "triangle", .09, i * .11)),
