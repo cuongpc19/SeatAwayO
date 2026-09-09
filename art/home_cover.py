@@ -115,13 +115,16 @@ TAGLINE = "find everyone a seat"
 FONT = "Baloo2-ExtraBold.ttf"       # the same face the UI headings use
 TITLE_Y = 0.30                      # the band the row above was laid out to leave free
 SAFE = 0.70                         # ⚠ see below
+# The tagline is the home screen's, not the store's. On a tile shrunk to 200px
+# wide it is a grey smear under the name, and a thumbnail has room for one idea.
+WITH_TAGLINE = True
 
 LIVERY = (248, 191, 26)             # --livery
 LIVERY_DK = (217, 156, 20)          # --livery-dk
 TRIM_DK = (168, 50, 32)             # --trim-dk
 
 
-def fitted(text, want_px, cap=260):
+def fitted(text, want_px, cap=640):
     """Largest size at which `text` still fits `want_px` wide."""
     lo, hi = 8, cap
     while lo < hi:
@@ -165,6 +168,9 @@ def lettering(img):
     d.text((x, y + s * 0.050), TITLE, font=f, fill=LIVERY_DK)
     d.text((x, y), TITLE, font=f, fill=LIVERY)
 
+    if not WITH_TAGLINE:
+        return img
+
     # the tagline, tracked out the way the CSS tracks it
     tf = ImageFont.truetype(FONT, int(s * 0.205))
     track = tf.size * 0.20
@@ -178,7 +184,7 @@ def lettering(img):
     return img
 
 
-def render(w, h, scale, row_y, title_y, safe, gap=2.45):
+def render(w, h, scale, row_y, title_y, safe, gap=2.45, tagline=True):
     """One cover, at whatever shape is asked for.
 
     The store wants 1920x1080, 800x1200 and 800x800 and the home screen wants
@@ -187,11 +193,12 @@ def render(w, h, scale, row_y, title_y, safe, gap=2.45):
     do it, because a 16:9 crop of a 2:3 render loses the row or the title.
 
     ⚠ The module constants really are rebound here. Every painter below reads
-    W/H/SCALE/ROW_Y/TITLE_Y/SAFE as globals, and threading six arguments through
+    W/H/SCALE/ROW_Y/TITLE_Y/SAFE/WITH_TAGLINE as globals, and threading six arguments through
     all of them to render one more size would be the larger change for no gain.
     Nothing calls two sizes at once."""
-    global W, H, SCALE, ROW_Y, TITLE_Y, SAFE
+    global W, H, SCALE, ROW_Y, TITLE_Y, SAFE, WITH_TAGLINE
     W, H, SCALE, ROW_Y, TITLE_Y, SAFE = w, h, scale, row_y, title_y, safe
+    WITH_TAGLINE = tagline
 
     t0 = time.time()
     cam = Cam(yaw=0.0, pitch=PITCH, scale=SCALE, ox=W / 2, oy=H * ROW_Y)
@@ -203,7 +210,10 @@ def render(w, h, scale, row_y, title_y, safe, gap=2.45):
              + seat(2, "yellow", 0.0) + rider("yellow", -CELL / 2) + rider("sky", CELL / 2)
              + seat(1, "grey", gap))
 
-    shadow = contact_shadow(scene, cam, W, H, blur=26, alpha=150)
+    # ⚠ The blur is a fraction of the frame, not 26px flat: the store covers
+    # render this scene at 1920 and at 800, and a fixed blur is a hard edge at
+    # one size and a smudge at the other. 26 at 1080, where it was tuned.
+    shadow = contact_shadow(scene, cam, W, H, blur=int(26 * W / 1080), alpha=150)
     lit = colorize(bake(scene, cam, W, H), (255, 255, 255))
     out = ground().convert("RGBA")
     out.alpha_composite(shadow)

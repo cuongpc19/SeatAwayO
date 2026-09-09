@@ -49,3 +49,7 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+
+# Firebase CLI deploy cache. Written on every `firebase deploy`, meaningless
+# anywhere else.
+.firebase/
