@@ -427,11 +427,18 @@ def check_crazy(page, out):
     # A placeholder that reached the bundle is a policy that names no one.
     holes = [s for s in ("PASTE_A_CONTACT_EMAIL", "PASTE_YOUR_UID") if s in page]
     # ⚠ A test clock that reached a store is a level nobody can finish, found by
-    # a player rather than by a build. Read off the campaign rather than off
-    # TEST_CLOCK, so it also catches a clock that got in some other way.
-    floor = min(PLAIN_SECONDS, HARD_SECONDS)
+    # a player rather than by a build.
+    #
+    # ⚠ Not a floor any more. This used to fail anything under the flat
+    # HARD_SECONDS, which was right while every level ran on 240 or 180 and
+    # wrong the moment the campaign started carrying the APK's own clocks -
+    # those go down to 30s, and thirty real levels tripped it. A floor cannot
+    # tell a fast level from a broken one. What it can tell is whether a
+    # TEST_CLOCK entry is sitting at its own level, which is the thing that
+    # must never ship.
     clocks = [int(n) for n in re.findall(r'"time":(\d+)', page)]
-    quick = sorted({c for c in clocks if c < floor})
+    quick = sorted(lv for lv, secs in TEST_CLOCK.items()
+                   if lv <= len(clocks) and clocks[lv - 1] == secs)
 
     rows = [(size <= 20 * 1024 * 1024, "under 20 MB - keeps the mobile front page",
              "%.2f MB, over the 20 MB limit" % (size / 1048576)),
@@ -443,8 +450,8 @@ def check_crazy(page, out):
             (priv, "privacy policy carried", "no privacy policy in the bundle"),
             (not holes, "no unfilled placeholders",
              "placeholders shipped: " + ", ".join(holes)),
-            (clocks and not quick, "no test clocks - every board at least %ds" % floor,
-             "boards under %ds shipped: %s" % (floor, quick)),
+            (clocks and not quick, "no test clocks - none of %s shipped" % sorted(TEST_CLOCK),
+             "test clocks shipped at levels: %s" % quick),
             (not strays, "no dev tools", "dev tools rode in: " + ", ".join(strays))]
 
     print("")
