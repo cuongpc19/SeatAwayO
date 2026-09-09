@@ -182,23 +182,32 @@ def table_parts():
     close to a seat's, its depth about half that, and it sits low on four stubby
     legs.
 
-    Fixed wood colours rather than a `k` multiplier: the seats take a palette
-    colour per frame and this must not, or nine tinted copies of one table would
-    read as seats of nine colours."""
+    ⚠ Grey, and specifically the grey seat's own grey. That colour already means
+    "this does not move" on every board in the game, taught by the fixed seats
+    from level 7 - so the table says what it is before the player tries to drag
+    it. Wood was prettier and told them nothing. The silhouette is what keeps
+    the two apart: a fixed seat is two bands with a gap, this is one slab on
+    legs.
+
+    Fixed colours rather than a `k` multiplier: the seats take a palette colour
+    per frame and this must not, or nine tinted copies of one table would read as
+    seats of nine colours."""
     W = CELL - 0.22
     D = W * 0.52
     TOP, THICK, APRON, LEG = 0.74, 0.34, 0.18, 0.16
+    LIGHT = PALETTE["grey"]
+    DARK = tuple(int(c * 0.78) for c in LIGHT)
     P = [dict(geo=rbox((0, TOP, 0), (W, THICK, D), 0.19),
-              fixed=WOOD, spec=0.50, shin=20),
+              fixed=LIGHT, spec=0.50, shin=20),
          dict(geo=rbox((0, TOP - THICK / 2 - APRON * .75, 0),
                        (W - 0.22, APRON, D - 0.18), 0.085),
-              fixed=WOOD_DARK, spec=0.34)]
+              fixed=DARK, spec=0.34)]
     base = TOP - THICK / 2 - APRON
     for sx in (-1, 1):
         for sz in (-1, 1):
             P.append(dict(geo=rbox((sx * (W / 2 - LEG), base / 2, sz * (D / 2 - LEG * .7)),
                                    (LEG * 1.7, base, LEG * 1.7), LEG * .5),
-                          fixed=WOOD_DARK, spec=0.26))
+                          fixed=DARK, spec=0.26))
     return P
 
 

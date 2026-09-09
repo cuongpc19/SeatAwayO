@@ -9,6 +9,11 @@ from PIL import Image, ImageDraw
 from toy3d import Cam, bake, colorize, _bounds
 from assets import rbox, seat_parts, PALETTE, CELL, WOOD, WOOD_DARK
 
+# The grey seat's own colour, so a grey table can be judged against the piece it
+# is borrowing its meaning from.
+GY = PALETTE["grey"]
+GY_D = tuple(int(c * 0.78) for c in GY)
+
 SCALE, PITCH, PAD = 74, 1.33, 10
 
 
@@ -56,15 +61,23 @@ def wide(w_off, top, thick, apron, leg, r=.16, spec=.50):
     return P
 
 
+def wide_c(wood, dark, **kw):
+    P = wide(.22, .74, .34, .18, .16, r=.19, **kw)
+    for q in P:
+        q["fixed"] = wood if q["fixed"] == WOOD else dark
+    return P
+
+
 OPTS = [
-    ("A hien tai",  table(.72, .66, .18, .13)),
-    ("E rong+thap", wide(.30, .62, .30, .00, .15)),
-    ("F co apron",  wide(.30, .70, .28, .16, .15)),
-    ("G day hon",   wide(.22, .74, .34, .18, .16, r=.19)),
+    ("G go (hien tai)", wide(.22, .74, .34, .18, .16, r=.19)),
+    ("H xam ghe",       wide_c(GY, GY_D)),
+    ("I xam sang hon",  wide_c(tuple(min(255, int(c * 1.10)) for c in GY), GY)),
+    ("J xam am hon",    wide_c((166, 164, 158), (132, 130, 124))),
 ]
 
 seat = colorize(fit(seat_parts(1)), PALETTE["sky"])
-tiles = [("GHE (de so)", seat)] + [(n, colorize(fit(p), (255, 255, 255))) for n, p in OPTS]
+grey = colorize(fit(seat_parts(1)), PALETTE["grey"])
+tiles = [("GHE mau", seat), ("GHE XAM co dinh", grey)]     + [(n, colorize(fit(p), (255, 255, 255))) for n, p in OPTS]
 
 Z = 3
 pad, head = 12, 26
