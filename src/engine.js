@@ -68,6 +68,17 @@ let OPEN_MS = 2000;
    rather than skating over it. */
 const BASE_MS_PER_UNIT = 143;                       // ms per grid unit walked
 const MIN_WALK_MS = 285;                            // a walk is never snappier than this
+
+/* ⚠ Multiplies the DISTANCE term only, never the floor. Big boards read as slow
+   and small ones do not, and the reason is not the pace - that is 143ms a cell
+   everywhere - it is that the walk is four or five cells instead of one. Under
+   two cells the floor is what decides the duration, so a value below 1 leaves
+   every board up to about level 16 untouched and shortens only the long
+   crossings. Scaling the whole duration instead would speed up the opening,
+   where nobody has complained and where the beat is doing tutorial work.
+
+   1 is the measured original. `?pace=N` overrides it for a side-by-side. */
+let WALK_PACE = 0.72;
 // The little jump onto the seat. 217 was measured off the recording and is the
 // one beat in the sequence worth stretching: it is the moment the move pays off,
 // and at walking speed it went by before it read as a jump at all.
@@ -1943,6 +1954,200 @@ function themeNow() {
   }));
 }
 
+/* ---- the interior walls ------------------------------------------------
+   A `hole` is a cell the floor skips, and 71 of the shipped boards carry a run
+   of them: a partition down the middle of the room, nine cells of an eleven-row
+   board, open at BOTH ends so the queue walks around either side.
+
+   ⚠ Until this was drawn, a hole was nothing but a cell the floor loop skipped,
+   so what the player saw was the cavity colour showing through - a dark patch
+   the same family as the floor it sat in. It read as a pit, or as a stripe of
+   pattern, rather than as something a passenger cannot cross, which is the one
+   thing about it that changes how the board is played.
+
+   It is built out of the room's own recipe - body, livery stripe, lit crown -
+   rather than colours of its own, so every theme dresses it without a table
+   here naming five more. */
+
+/** The hole cells as a few big rectangles rather than many little ones.
+
+    Greedy: take the first unclaimed cell, run right while the row holds, then
+    down while the whole width holds. ⚠ Merging matters even though the shipped
+    boards are all one column - a block drawn per CELL puts a stripe of trim
+    across the wall every 1.6 units, which reads as a row of bollards. */
+function holeRects(g) {
+    const seen = new Uint8Array(g.W * g.H), out = [];
+    for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
+        const i = r * g.W + c;
+        if (!g.hole[i] || seen[i]) continue;
+        let c1 = c;
+        while (c1 + 1 < g.W && g.hole[r * g.W + c1 + 1] && !seen[r * g.W + c1 + 1]) c1++;
+        let r1 = r;
+        for (;;) {
+            const nr = r1 + 1;
+            if (nr >= g.H) break;
+            let ok = true;
+            for (let k = c; k <= c1 && ok; k++) ok = !!g.hole[nr * g.W + k] && !seen[nr * g.W + k];
+            if (!ok) break;
+            r1 = nr;
+        }
+        for (let rr = r; rr <= r1; rr++) for (let cc = c; cc <= c1; cc++) seen[rr * g.W + cc] = 1;
+        out.push([c, r, c1, r1]);
+    }
+    return out;
+}
+
+/* ⚠ The partition's colours are computed from the FLOOR, not taken from
+   SKIN.wall, and that is the whole difference between it reading and not.
+   The skins were authored for a room seen against the outside, so their wall
+   colour has no duty to stand out from their own floor: cinema is wall #3a2c26
+   on carpet #332721, near enough the same tone that the block vanished into the
+   grid. Station is the other failure - its livery is #f8bf1a, and a canary
+   yellow bar through the middle of the board shouts louder than the seats.
+   Shifting away from the floor by a fixed amount gives every theme the same
+   contrast without a table here naming five more colours. */
+/** ⚠ Accepts what it also RETURNS. The first cut parsed hex only, and every
+    colour here is derived from another - so the moment one was fed back in,
+    parseInt read "rgb(117,107,103)" as NaN and the tone came out pure black.
+    That is where the black joints across the first wall came from, and it looks
+    like a styling choice rather than a parse failure, which is what made it
+    survive a look. */
+function wallRgb(c) {
+    const m = /^rgb\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/.exec(c);
+    if (m) return [+m[1], +m[2], +m[3]];
+    const h = c.replace("#", "");
+    const n = parseInt(h.length === 3 ? h.replace(/./g, d => d + d) : h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const wallStr = c => "rgb(" + c.map(v => Math.round(Math.max(0, Math.min(255, v)))).join(",") + ")";
+/** Perceived lightness, 0..1 - the weights are why a yellow floor counts as
+    light and a grey one of the same number does not. */
+function wallLum(c) {
+    const [r, g, b] = wallRgb(c);
+    return (r * .2126 + g * .7152 + b * .0722) / 255;
+}
+/** `k` < 0 darker, > 0 lighter.
+
+    ⚠ Lightening MULTIPLIES rather than mixing toward white, and that is the
+    difference between a warm brown wall and a grey slab. Mixing toward white
+    pulls every channel to the same place, so a dark colour lightened that way
+    loses its hue exactly when it is being lightened the most - which turned the
+    cinema's brown partition into a placeholder-grey bar on the carpet. Above
+    mid lightness a gain can only clip, so the mix is used there instead. */
+function wallTone(c, k) {
+    const p = wallRgb(c);
+    if (k < 0) return wallStr(p.map(v => v * (1 + k)));
+    return wallLum(c) < .55 ? wallStr(p.map(v => v * (1 + k * 2.6)))
+                            : wallStr(p.map(v => v + (255 - v) * k));
+}
+/** The same colour taken to a given lightness, hue intact. Used to guarantee
+    the partition separates from the floor it stands on however the theme was
+    painted. */
+function wallLift(c, target) {
+    const l = wallLum(c);
+    return l < .02 ? wallStr([255 * target, 255 * target, 255 * target])
+                   : wallStr(wallRgb(c).map(v => v * (target / l)));
+}
+
+/** The partition's body colour for a given skin.
+
+    Its own function so that anything measuring the design calls the same code
+    the game draws with. Written inline first, and the script checking the
+    contrast then carried a COPY of the expression - which is a number that
+    agrees with the game right up until one of the two is edited.
+
+    ⚠ The threshold is .20, not the .12 it started at. Measured across all five
+    themes at all three grades, .12 let three skins through unlifted at gaps of
+    .123, .132 and .145 - concert's plain room being the worst, a wall darker
+    than its own floor by barely more than a shade. Everything lifted lands near
+    .20, and .20 is what those three needed to match it. */
+function wallBody(SKIN) {
+    const floorL = wallLum(SKIN.fa), room = SKIN.wall;
+    return Math.abs(wallLum(room) - floorL) < .20
+        ? wallLift(room, floorL < .45 ? floorL + .22 : floorL - .24) : room;
+}
+
+/** One partition, standing on the floor.
+
+    ⚠ Height is NOT what sells this, and trying to make it taller is the wrong
+    lever. The camera sits at pitch 1.33 - within 14 degrees of straight down -
+    so raising a face by .58 of a world unit lifts it about FOUR PIXELS on a
+    phone. The first cut used the room's own wall recipe at that height and read
+    as a rug lying on the floor. What does the work is tone: a top clearly apart
+    from the floor, a near face much darker than the top, and a shadow thrown
+    across the tiles beside it.
+
+    ⚠ Only the near face is drawn. The camera has no yaw, so a face whose normal
+    runs along x is seen exactly edge-on and has no width on screen at all -
+    drawing the two ends would be four points on a line. The far face is behind
+    its own top. */
+function drawHoleWalls(g, SKIN, H) {
+    const rects = holeRects(g);
+    if (!rects.length) return;
+    /* ⚠ Built from the room's OWN wall colour, not from a neutral. Lightening
+       the floor toward white was the second failure: it separated cleanly and
+       came out a desaturated grey bar that belonged to no theme - a placeholder
+       laid on the carpet. Taking the wall's hue makes the partition obviously
+       the same stuff the room is built of, which is the fastest way to say
+       "you cannot walk through this" without a label.
+
+       The floor is still consulted, but only to guarantee separation: cinema's
+       wall and carpet are four points of lightness apart, and there the body is
+       pushed away from the floor until it reads. */
+    const body = wallBody(SKIN);
+    const top = body;
+    const crown = wallTone(body, .22);
+    const face = wallTone(body, -.46);
+    const rib = wallTone(body, -.20);
+    // The shadow is the floor's own colour taken down, not black: on a room as
+    // dark as the cinema a black shadow is invisible, and on the station's
+    // cream floor it would be a smear of soot.
+    const cast = wallTone(SKIN.fa, -.42);
+    // Below the room's own walls on purpose. Level with them and the partition
+    // reads as the room being two rooms; under them it reads as one room with
+    // something standing in it, which is what it is.
+    const HW = H * .74;
+    for (const [c0, r0, c1, r1] of rects) {
+        const x0 = cellW(c0) - SX / 2, x1 = cellW(c1) + SX / 2;
+        const z0 = cellZ(r0) - SZ / 2, z1 = cellZ(r1) + SZ / 2;
+
+        /* The shadow, and it earns its place: in a view this close to straight
+           down it is the strongest signal that anything stands up at all.
+           Three offset copies rather than one, because a single hard-edged
+           rectangle beside the block reads as a second, flatter block. */
+        ctx.save();
+        for (let i = 3; i >= 1; i--) {
+            ctx.globalAlpha = .17;
+            const d = i * .17;
+            slab(x0 + d, z0 + d * 1.15, x1 + d, z1 + d * 1.15, .008, cast);
+        }
+        ctx.restore();
+
+        // The face the camera can actually see, floor to top.
+        quad([P(x0, 0, z1), P(x1, 0, z1), P(x1, HW, z1), P(x0, HW, z1)], face);
+
+        slab(x0, z0, x1, z1, HW, top);                      // the top
+
+        /* Panel joints, one per cell across the run's length. Without them a
+           nine-cell partition is one long featureless bar with nothing to read
+           its size against; with them it is masonry, and the joints line up
+           with the grid the seats sit on, so the wall is measured in the same
+           units as everything else on the board. */
+        const along = (r1 - r0) >= (c1 - c0);
+        if (along) for (let r = r0 + 1; r <= r1; r++) {
+            const z = cellZ(r) - SZ / 2;
+            slab(x0 + .12, z - .05, x1 - .12, z + .05, HW + .002, rib);
+        } else for (let c = c0 + 1; c <= c1; c++) {
+            const x = cellW(c) - SX / 2;
+            slab(x - .05, z0 + .12, x + .05, z1 - .12, HW + .002, rib);
+        }
+
+        // The lit edge, on the far side, where the room's own crown is lit too.
+        // Last, so a joint cannot run through it.
+        slab(x0, z0, x1, z0 + .12, HW + .004, crown);
+    }
+}
+
 function drawRoom(g) {
   // A painted plate replaces the ground OUTSIDE the room. The walls, the floor
   // and the doorway stay drawn: they have to line up with the grid to the pixel,
@@ -2022,6 +2227,10 @@ function drawRoom(g) {
     quad(tileQuad(c, r, .006), (r + c) % 2 ? SKIN.fa : SKIN.fb);
   }
   if (TH.dressFloor) TH.dressFloor(E);
+  // ⚠ After dressFloor, before the pieces. A hard wall painted over by the
+  // hard-level floor wash would read as translucent, and a piece is never on a
+  // hole cell, so nothing that draws later needs to sit on top of it.
+  drawHoleWalls(g, SKIN, H);
   // the inner faces of the walls, seen almost edge-on: a dark lip is what sells them
   const L = .17;
   slab(x0 - L, z0 - L, x1 + L, z0, .0, SKIN.lip);
@@ -2613,7 +2822,7 @@ function autoBoard(instant) {
 
     if (total < 1e-6) { hop(); return; }
 
-    const dur = Math.max(MIN_WALK_MS, total * BASE_MS_PER_UNIT) / SPEED;
+    const dur = Math.max(MIN_WALK_MS, total * BASE_MS_PER_UNIT * WALK_PACE) / SPEED;
     const t0 = performance.now();
     const tick2 = now => {
       if (stale()) return;
