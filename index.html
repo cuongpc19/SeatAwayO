@@ -2081,79 +2081,52 @@ function drawBlock(wx, wz, alpha) {
    `kind` only picks the ornament. Nothing in the data says what prop 4 is as
    opposed to prop 5, so the shapes are ours; what is read from the data is
    where they stand and that they block the cell. */
-/* ⚠ The bench is stone in every room; only what stands on it changes. Taking
-   the bench's colours from the theme skin was the first try and it came out as
-   a flat plate: the skin's greys ARE the floor's greys, so the slab had nothing
-   to stand against. Warm stone reads against every one of the five rooms, and
-   the ornament is what says which room this is.
+/* ⚠ Screen space, against the seat sprite's own rectangle - not geometry. The
+   first two tries built a bench out of projected boxes and both came out as a
+   rug, because this projection gives a unit of x 28.7px and a unit of z 27.9
+   but a unit of HEIGHT only 6.9. The seats do not have that problem: they are
+   pre-rendered sprites. So the table is drawn the way they LOOK rather than the
+   way they would be built - a lit top plate over a darker body, rounded, with an
+   ink outline - and sized off the seat frame so it stays in proportion at every
+   board scale.
 
-   Heights are in world units, and they have to be generous - at .30 the front
-   face projected down to a few pixels and the whole thing read as a rug. */
-const BENCH = { top: "#ded6c6", face: "#b3aa96", leg: "#8b8371", ink: "#4b4536" };
-/* ⚠ These are big numbers on purpose. The projection gives a unit of x 28.7px
-   and a unit of z 27.9px, but a unit of HEIGHT only 6.9 - four times flatter -
-   so a slab half a unit thick renders as three pixels and the bench reads as a
-   rug. The seats do not have this problem because they are pre-rendered sprites
-   rather than geometry. A 2.3 slab is about 16px, which is the same order as
-   the 36px seat sprite. */
-let BENCH_LEG = .60, BENCH_SLAB = 1.50, BENCH_DEEP = .11;
-
-/** What stands on the bench, per room. The data numbers its props per vehicle,
-    not per room, and says nothing about what any of them is - so the number is
-    not read here. What a player sees is a bench dressed for the room they are
-    in, which is the thing that was described. */
-const ORNAMENT = { station: "lamp", cinema: "box", stadium: "pot",
-                   concert: "lamp", classroom: "pot" };
+   No theme in it. It is a small table and it is the same table in every room. */
+const TABLE = { top: "#e6dcc6", face: "#c2b294", edge: "#a2957c", ink: "#4b4536" };
+let TABLE_W = .68, TABLE_H = .60, TABLE_LID = .46;
 
 function drawFixture(wx, wz, kind) {
-  const a = SX * .38, d = SZ * BENCH_DEEP;
-  const h1 = BENCH_LEG, h2 = BENCH_LEG + BENCH_SLAB;
+  const f = META.frames["s1_0_grey"];
+  if (!f) return;
+  const [px, py] = P(wx, 0, wz);
+  const k = LAY.s / META.scale;
+  const x0 = px - f[4] * k, y0 = py - f[5] * k, sw = f[2] * k, sh = f[3] * k;
+  const w = sw * TABLE_W, h = sh * TABLE_H;
+  const x = x0 + (sw - w) / 2, y = y0 + sh - h;   // stands on the same line a seat does
+  const r = w * .17;
+
   ctx.save();
   ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.strokeStyle = BENCH.ink;
-  ctx.lineWidth = Math.max(1, LAY.s * .026);
-  const face = (pts, fill) => {
-    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  ctx.lineWidth = Math.max(1, LAY.s * .019);
+  ctx.strokeStyle = TABLE.ink;
+  /* ⚠ A gradient down each face, not a flat fill. The seats are lit renders and
+     what makes them read as moulded is the fall-off from top to bottom; a table
+     in two flat tones beside them reads as a sticker. */
+  const box = (yy, hh, a1, a2) => {
+    const g = ctx.createLinearGradient(0, yy, 0, yy + hh);
+    g.addColorStop(0, a1); g.addColorStop(1, a2);
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, yy, w, hh, r);
+    else ctx.rect(x, yy, w, hh);
+    ctx.fillStyle = g; ctx.fill(); ctx.stroke();
   };
-  // two legs under the front edge, then the slab: front face, then top
-  for (const lx of [-a * .58, a * .58])
-    face([P(wx + lx - a * .18, 0, wz + d), P(wx + lx + a * .18, 0, wz + d),
-          P(wx + lx + a * .18, h1, wz + d), P(wx + lx - a * .18, h1, wz + d)], BENCH.leg);
-  face([P(wx - a, h1, wz + d), P(wx + a, h1, wz + d),
-        P(wx + a, h2, wz + d), P(wx - a, h2, wz + d)], BENCH.face);
-  face([P(wx - a, h2, wz - d), P(wx + a, h2, wz - d),
-        P(wx + a, h2, wz + d), P(wx - a, h2, wz + d)], BENCH.top);
-
-  // the ornament, sitting on the slab towards its back edge
-  const sk = themeNow().skin, orn = ORNAMENT[THEME] || "pot";
-  const u = SX * .17, oz = wz - d * .5;          // across the slab, near its back
-  const UP = 1.1;                                // one "cell" of height, see above
-  if (orn === "pot") {
-    face([P(wx - u * .70, h2, oz), P(wx + u * .70, h2, oz),
-          P(wx + u * .50, h2 + UP * .95, oz), P(wx - u * .50, h2 + UP * .95, oz)],
-         sk.door || "#a2643a");
-    const [gx, gy] = P(wx, h2 + UP * 1.45, oz);
-    const rr = Math.max(4, LAY.s * .10);
-    ctx.beginPath(); ctx.arc(gx, gy, rr, 0, Math.PI * 2);
-    ctx.fillStyle = "#4fae57"; ctx.fill(); ctx.stroke();
-  } else if (orn === "box") {
-    face([P(wx - u * .80, h2, oz), P(wx + u * .80, h2, oz),
-          P(wx + u * .80, h2 + UP * 1.05, oz), P(wx - u * .80, h2 + UP * 1.05, oz)],
-         sk.trim || "#c9483f");
-    face([P(wx - u * .80, h2 + UP * 1.05, oz - SZ * .09), P(wx + u * .80, h2 + UP * 1.05, oz - SZ * .09),
-          P(wx + u * .80, h2 + UP * 1.05, oz), P(wx - u * .80, h2 + UP * 1.05, oz)],
-         sk.top || "#efe3cf");
-  } else {
-    const [ax, ay] = P(wx, h2, oz), [bx, by] = P(wx, h2 + UP * 1.75, oz);
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
-    ctx.lineWidth = Math.max(2, LAY.s * .045); ctx.strokeStyle = BENCH.leg; ctx.stroke();
-    ctx.lineWidth = Math.max(1, LAY.s * .026); ctx.strokeStyle = BENCH.ink;
-    const rr = Math.max(4, LAY.s * .105);
-    ctx.beginPath(); ctx.arc(bx, by, rr, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffd964"; ctx.fill(); ctx.stroke();
-  }
+  box(y + h * TABLE_LID * .62, h * (1 - TABLE_LID * .62), TABLE.face, TABLE.edge);
+  box(y, h * TABLE_LID, "#f4ecdb", TABLE.top);
+  // the sheen the seats carry along their top edge, which is most of what makes
+  // them read as moulded rather than as flat shapes
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + w * .12, y + h * .10, w * .76, h * TABLE_LID * .34, r * .5);
+  else ctx.rect(x + w * .12, y + h * .10, w * .76, h * TABLE_LID * .34);
+  ctx.fillStyle = "rgba(255,255,255,.34)"; ctx.fill();
   ctx.restore();
 }
 
@@ -4933,7 +4906,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "da53c54+";
+const BUILD = "1916df9+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -6500,14 +6473,127 @@ function ambEvery(minS, spanS, fn) {
     one reads as a note. */
 function ambHorn() {
   const chord = [311, 370, 466];        // a minor triad; air horns are chords
-  ambChord(chord, 1.6, .040, 0);
-  ambChord(chord, .60, .030, 2.05);
+  ambChord(chord, 1.6, .033, 0);
+  ambChord(chord, .60, .025, 2.05);
 }
 
-/* One per theme. ⚠ Only the station is written. The other four are silent on
-   purpose until this one is settled - four rooms scored blind is four to redo. */
+/** Two seconds of pink-ish noise, made once and kept.
+
+    ⚠ Noise is back, but only inside events. Nothing here loops under a board:
+    the rejected version was a noise bed running the whole level, and the lesson
+    was about the drone, not about the waveform. A crowd cannot be made any
+    other way - detuned oscillators give a choir, not a stand.
+
+    ⚠ Pink, not white. White through a band-pass is hiss with the ends cut off;
+    rolling the spectrum first is what makes it read as people. */
+let ambNoise = null;
+function ambNoiseBuf() {
+  if (ambNoise) return ambNoise;
+  const n = Math.floor(AC.sampleRate * 2);
+  ambNoise = AC.createBuffer(1, n, AC.sampleRate);
+  const d = ambNoise.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < n; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = .99765 * b0 + w * .0990460;
+    b1 = .96300 * b1 + w * .2965164;
+    b2 = .57000 * b2 + w * 1.0526913;
+    d[i] = (b0 + b1 + b2 + w * .1848) * .22;
+  }
+  return ambNoise;
+}
+
+/** A crowd, rising and falling. The filter opens as it swells: a stand getting
+    louder also gets brighter, and holding the colour still is most of what
+    makes a noise envelope sound like a fade on a tape rather than like people. */
+function ambCheer(secs, peak, f0, f1, delay) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = ambNoiseBuf(); src.loop = true;         // stopped below, never left running
+  f.type = "bandpass"; f.Q.value = .9;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.linearRampToValueAtTime(f1, t + secs * .40);
+  f.frequency.linearRampToValueAtTime(f0, t + secs);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + secs * .40);
+  g.gain.linearRampToValueAtTime(.0001, t + secs);
+  src.connect(f); f.connect(g); g.connect(AMB.master);
+  src.start(t); src.stop(t + secs + .1);
+}
+
+/** The stand finding its voice for a few seconds. */
+function ambRoar() { ambCheer(3.6, .200, 620, 1500); }
+
+/** An electric school bell: a clapper on a metal dome.
+
+    ⚠ Inharmonic partials, and a square LFO on the gain. A harmonic stack is a
+    church bell and a smooth tone is a doorbell; what says "school" is the ratio
+    between the partials being nothing musical, and the hammer buzzing against
+    the dome twenty times a second. */
+function ambBell() {
+  if (!AMB) return;
+  const t = AC.currentTime, dur = 1.9, peak = .036;
+  const env = AC.createGain();
+  env.gain.setValueAtTime(.0001, t);
+  env.gain.exponentialRampToValueAtTime(peak, t + .03);
+  env.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  env.connect(AMB.master);
+  const trem = AC.createGain();
+  trem.gain.value = .55;
+  const lfo = AC.createOscillator(), lg = AC.createGain();
+  lfo.type = "square"; lfo.frequency.value = 19; lg.gain.value = .45;
+  lfo.connect(lg); lg.connect(trem.gain);
+  lfo.start(t); lfo.stop(t + dur + .05);
+  trem.connect(env);
+  for (const r of [1, 2.76, 5.40]) {                 // nothing musical about these
+    const o = AC.createOscillator();
+    o.type = "triangle"; o.frequency.setValueAtTime(620 * r, t);
+    o.connect(trem);
+    o.start(t); o.stop(t + dur + .05);
+  }
+}
+
+/** One muffled beat from beyond the wall: a sine dropped through its own pitch,
+    with everything above the bottom taken off. */
+function ambThump(hz, dur, peak, delay) {
+  if (!AMB) return;
+  const t = AC.currentTime + (delay || 0);
+  const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(hz * 1.5, t);
+  o.frequency.exponentialRampToValueAtTime(hz, t + .06);
+  f.type = "lowpass"; f.frequency.value = 190;
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + .015);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(AMB.master);
+  o.start(t); o.stop(t + dur + .05);
+}
+
+/** A few bars leaking out of the hall, the way they do when a door opens: the
+    bass and the crowd, and nothing of the tune - a wall passes the bottom and
+    stops everything else, which is why this is thuds rather than notes. */
+function ambBars() {
+  const riff = [55, 55, 73.4, 55, 65.4, 55, 73.4, 55];
+  riff.forEach((hz, i) => ambThump(hz, .40, .078, i * .44));
+  ambCheer(3.9, .015, 480, 1200, .2);
+}
+
+/* One per theme.
+
+   ⚠ There is no `cinema`, and that is the design rather than a gap. A cinema's
+   defining sound is that it has none; the honest options were a projector nobody
+   would place or a rumble from the film next door, and both are noise added to
+   the one room whose silence means something. A theme missing from this table
+   is silent - see ambStart(). */
 const AMBIENCE = {
   station() { ambEvery(20, 26, ambHorn); },
+  stadium() { ambEvery(24, 30, ambRoar); },
+  // ⚠ Rare on purpose. A school bell rings at the ends of lessons; one a minute
+  // is a fire drill, and it is the one sound here with a meaning attached.
+  classroom() { ambEvery(55, 70, ambBell); },
+  concert() { ambEvery(26, 28, ambBars); },
 };
 
 function ambStop() {
