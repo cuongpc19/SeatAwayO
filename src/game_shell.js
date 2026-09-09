@@ -1455,13 +1455,14 @@ function blip(freq, dur, type, peak, delay) {
    went from .09 to .015 and then out altogether; the drag has the seat moving
    under the finger and a short buzz, which is feedback enough.
 
-   ⚠ `seated` is a tenth of what it was, halved once more after .018 still read
-   as a chime. It is the sound of the level going right so it stays, but it fires
-   once per passenger and a board seats thirty - at that rate it has to sit under
-   the room rather than on top of it. .009 renders 0.0090 peak and 0.0020 RMS,
-   nineteen dB under the win jingle and level with the station horn, which is the
-   band a sound this frequent belongs in. */
-const SEATED_PEAK = .009;
+   ⚠ `seated` came down from .09 to .018 to .009 while it was still two sine
+   notes, then back up once it became a thud. That is not indecision: the ear
+   hears a 60Hz drop as quieter than a 560Hz note at the same measured level, so
+   a number that was right for a bell is too soft for a body landing. .014 puts
+   the thud back to about where .009 sat by measurement and where the chime sat
+   by ear - a beat under the room rather than on top of it, on a cue that fires
+   thirty times a board. */
+const SEATED_PEAK = .014;
 
 /* A body dropping onto a cushion, not a note. Two things make it that rather
    than a drum:
