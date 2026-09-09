@@ -2681,6 +2681,14 @@ function addLine(g) {
   for (let r = 0; r < g.H; r++)
     for (let c = 0; c < g.W; c++) hole[r * W + c + 1] = g.hole[r * g.W + c];
   for (const b of g.seats) b.c++;
+  /* ⚠ The doorway steps right with everything else. g.doors is fixed when the
+     board loads, as [[W-1, row]] for the near door and [0, row] for the far one,
+     and every seat moves one column right here. A near door left on the old W-1
+     is an interior cell with a seat now standing on it: reachRegion finds the
+     door blocked, nobody can walk in, and the booster the player just paid for
+     is what made the board unwinnable. The far door is already on column 0 and
+     stays there - the new lane becomes the outer edge on that side. */
+  if (g.doors) for (const d of g.doors) if (d[0] === g.W - 1) d[0] = W - 1;
   g.W = W; g.hole = hole; g.lines = 1;
   g.occ = new Int16Array(W * g.H).fill(-1);
   for (const b of g.seats) for (const [c, r] of cellsOf(b)) g.occ[idx(g, c, r)] = b.id;
