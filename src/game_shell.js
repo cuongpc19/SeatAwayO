@@ -1461,8 +1461,10 @@ function blip(freq, dur, type, peak, delay) {
    a number that was right for a bell is too soft for a body landing. .014 puts
    the thud back to about where .009 sat by measurement and where the chime sat
    by ear - a beat under the room rather than on top of it, on a cue that fires
-   thirty times a board. */
-const SEATED_PEAK = .014;
+   thirty times a board. .017 is a fifth over that again, asked for by ear after
+   hearing it on a phone speaker, where the low end this cue lives in is the part
+   a small driver gives away first. */
+const SEATED_PEAK = .017;
 
 /* A body dropping onto a cushion, not a note. Two things make it that rather
    than a drum:
