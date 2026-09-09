@@ -755,19 +755,22 @@ function drawBlock(wx, wz, alpha) {
   ctx.restore();
 }
 
+/* ⚠ How high the padlock hangs and how far back it sits. `let`, because these
+   are the two numbers that decide whether it reads as hanging off the seat or
+   floating over it, and that is a thing to look at rather than reason about.
+   The seat is painted after it, so the lower it hangs the more the cushion
+   covers. */
+let LOCK_Y = .70, LOCK_BACK = .26, LOCK_K = .115;
+
 /* The padlock on the back of a chained seat. Drawn rather than an atlas frame:
    it has to sit on nine seat colours at four rotations and three footprints, and
    a sprite for each is 108 frames for one small piece of metal. Sat behind the
    seat and a little above it, so it reads as hanging off the back rather than
    as something a passenger is holding. */
 function drawPadlock(b, wx, wz, alpha) {
-  const k = LAY.s * .115;                            // a padlock is about a quarter of a cell
-  /* ⚠ High enough that the body clears the seat back. Hung at seat height the
-     cushion covered everything but the shackle, which on its own reads as a
-     scratch rather than as a lock. Behind and above: the seat still overlaps its
-     foot, so it hangs off the back rather than floating over the cushion. */
-  const back = b.dir & 1 ? [0, -SZ * .34] : [0, -SZ * .38];
-  const [px, py] = P(wx + back[0], 1.02, wz + back[1]);
+  const k = LAY.s * LOCK_K;
+  const back = b.dir & 1 ? [0, -SZ * LOCK_BACK] : [0, -SZ * (LOCK_BACK + .04)];
+  const [px, py] = P(wx + back[0], LOCK_Y, wz + back[1]);
   ctx.save();
   ctx.globalAlpha = alpha == null ? 1 : alpha;
   ctx.lineCap = "round"; ctx.lineJoin = "round";
