@@ -1,0 +1,1232 @@
+<!--HEAD:START-->
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!--HEAD:END-->
+<title>Seat Match 3D</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Spline+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@500;600&display=swap">
+<style>
+  /* Sibling to the honey prototype and dressed by the same hand: same type, same
+     furniture, a cabin palette instead of a hive one. Single committed look; every
+     colour painted explicitly so the page holds on either host ground. */
+  :root{
+    --ground:#12151d; --panel:#1b2029; --panel-2:#242b37; --line:#39424f;
+    --gold:#ffc53d; --gold-dk:#d99a12; --ink:#e8ecf4; --muted:#97a2b4;
+    --good:#7fd18a; --warn:#f08a5d;
+    --disp:"Saira Condensed","Arial Narrow",Arial,sans-serif;
+    --body:"Spline Sans","Segoe UI",system-ui,sans-serif;
+    --mono:"Spline Sans Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+       font-family:var(--body);font-size:15px;line-height:1.6;padding:22px 18px 48px}
+  .wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  header{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.18em;
+           text-transform:uppercase;color:var(--gold)}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(34px,7vw,54px);line-height:.96;
+     margin:0;letter-spacing:.01em;text-wrap:balance}
+  .sub{margin:0;color:var(--muted);max-width:62ch}
+
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+         padding:14px;display:flex;flex-direction:column;gap:12px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .readout{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}
+  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+        padding:5px 11px;display:flex;gap:7px;align-items:baseline}
+  .stat span{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.14em;
+             text-transform:uppercase;color:var(--muted)}
+  .stat b{font-family:var(--mono);font-weight:600;font-size:14px;color:var(--gold);
+          font-variant-numeric:tabular-nums}
+  .btn,.lv{font-family:var(--disp);font-weight:700;letter-spacing:.08em;cursor:pointer;
+           border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+           border-radius:10px}
+  .btn{font-size:13px;text-transform:uppercase;padding:7px 13px}
+  .lv{font-size:13px;padding:5px 10px;color:var(--muted);display:flex;gap:6px;align-items:baseline}
+  .btn:hover,.lv:hover{border-color:var(--gold);color:var(--ink)}
+  .btn:focus-visible,.lv:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .btn.on,.lv.on{background:var(--gold);border-color:var(--gold);color:#241a02}
+  .levels{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .lv i{font-style:normal;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--warn);opacity:.9}
+  .lv.on i{color:#5c3f04}
+  #msg{min-height:1.5em;font-family:var(--disp);font-weight:700;font-size:15px;
+       letter-spacing:.04em;color:var(--muted)}
+  #view{position:relative;border-radius:12px;overflow:hidden;background:#0c0f15}
+  #view canvas{display:block;width:100%;height:auto}
+  #boot{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);
+        font-family:var(--disp);font-size:15px;letter-spacing:.1em;text-transform:uppercase}
+
+  .find{display:grid;gap:18px;grid-template-columns:1fr}
+  @media(min-width:760px){ .find{grid-template-columns:1fr 1fr} }
+  .find > div{min-width:0}
+  h2{font-family:var(--disp);font-weight:800;font-size:21px;letter-spacing:.04em;
+     text-transform:uppercase;margin:0 0 10px;color:var(--gold)}
+  .find p{margin:0 0 11px;color:var(--muted)}
+  .find p b{color:var(--ink);font-weight:600}
+  .find ul{margin:0 0 11px;padding-left:18px;color:var(--muted)}
+  .find li{margin-bottom:6px}
+  .find li b{color:var(--ink);font-weight:600}
+  .caveat{border-left:3px solid var(--warn);padding:2px 0 2px 13px;color:var(--muted)}
+  footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Prototype &middot; the original game, rebuilt in real 3D</div>
+  <h1>Seat Match 3D</h1>
+  <p class="sub">Same boards, same rules, same campaign data &mdash; but the seats are geometry
+  instead of pre-baked sprites, lit by one rig, and rounded on every edge. Built to find out what
+  that actually buys.</p>
+</header>
+
+<section class="stage">
+  <div class="toolbar">
+    <div class="readout">
+      <div class="stat"><span>Level</span><b id="h-lvl">3</b></div>
+      <div class="stat"><span>Grade</span><b id="h-diff">&mdash;</b></div>
+      <div class="stat"><span>Time</span><b id="h-time">--</b></div>
+      <div class="stat"><span>Waiting</span><b id="h-left">--</b></div>
+    </div>
+    <button class="btn" id="b-again" type="button">Restart</button>
+    <button class="btn" id="b-land" type="button">View: portrait</button>
+    <button class="btn" id="b-spin" type="button">Camera: fixed</button>
+  </div>
+  <div class="levels" id="l-row"></div>
+  <div id="msg">Press and hold a seat, drag it where you want it, then let go.</div>
+  <div id="view"><div id="boot">Loading the cabin&hellip;</div></div>
+</section>
+
+<section class="find">
+  <div>
+    <h2>What 3D actually fixes</h2>
+    <p>The shipped game is 3D <b>pretending</b> on a 2D canvas: every seat is a sprite baked ahead of
+    time by <b>art/seat_atlas.py</b>, one per colour per facing. Three bugs came straight out of that,
+    and none of them can happen here:</p>
+    <ul>
+      <li><b>Seats faced the wall.</b> Facings 1 and 3 were swapped in the bake table, so side-on
+      seats had their backs to the aisle and passengers hopped in over the backrest. Here a facing is
+      <b>a rotation</b> &mdash; there is nothing to get backwards.</li>
+      <li><b>Height was crushed four to one.</b> In the flat projection one unit across drew 28.7px
+      but one unit of height drew 6.9px, so anything modelled with sane numbers came out squashed.
+      Here height is height.</li>
+      <li><b>New furniture never matched.</b> The obstacle table took three attempts because it had to
+      be judged against lit sprites it was not baked with. Here everything sits under one light.</li>
+      <li><b>Landscape is free.</b> Try <b>View: landscape</b>. Nothing about the board changes
+      &mdash; the room turns. The 2D prototype had to <b>transpose the data</b> to escape portrait,
+      which mirrors every level so a board you know stops looking like itself. Here it is a camera
+      move, and the puzzle is untouched.</li>
+    </ul>
+    <p>The art pass that followed: every solid is a rounded rectangle extruded with a bevel rather
+    than a box, each colour carries <b>three tones</b> instead of one flat fill, and passengers wear
+    the deep tone so they do not vanish into the seat they match. The room got a plinth, walls with
+    lit windows, a handrail and a door frame &mdash; the details that make it a place rather than a
+    tray.</p>
+    <p class="caveat">A full seat <b>stays on the floor</b> here, because that is what the shipped
+    engine does &mdash; it stops taking passengers and goes on being furniture. An earlier build of
+    this prototype flew them away, copied from <b>bench_rush.html</b>, an abandoned prototype that
+    the solver script still points at. Nothing in the real engine removes a seat.</p>
+  </div>
+  <div>
+    <h2>What it costs</h2>
+    <ul>
+      <li><b>Payload.</b> Three.js is about 600KB from the CDN &mdash; the bundle goes from 4.6MB to
+      roughly 5.2MB, still far under the 20MB that keeps the mobile front page.</li>
+      <li><b>Time to gameplay.</b> CrazyGames grades this, and it is measured to the
+      <b>gameplayStart</b> call. A 600KB library must not sit on the boot path &mdash; it loads when a
+      level opens, the same trick already used for the analytics script.</li>
+      <li><b>Art direction.</b> Rough 3D looks worse than careful 2D. One light rig and one palette,
+      fixed early and not touched.</li>
+    </ul>
+    <p class="caveat">Measured on level 19, the biggest board here: <b>438 draw calls</b> and
+    <b>142k triangles</b>. The triangles are fine; the draw calls are not, because this prototype
+    builds every seat from eight separate meshes. Shipping it means one instanced call per colour,
+    which takes 438 down to about a dozen. Boot to first frame is <b>1.0s</b> off local disk.</p>
+  </div>
+</section>
+
+<footer>
+  Boards are the real campaign, in their original orientation &mdash; not transposed the way the
+  honey prototype does it. The rules come from the same shared file both prototypes read, so what
+  is legal here is what is legal in the shipped game.
+</footer>
+</div>
+
+<!-- ⚠ "three.js" on cdnjs, not "three" - and pinned to 0.150.1 because the UMD
+     build that defines a THREE global was dropped after r159; the current
+     releases ship ES modules only, which a plain <script src> cannot load. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.150.1/three.min.js"></script>
+<script>
+const BOARDS = {"3":{"id":"Level_00003","w":3,"h":6,"time":240,"diff":0,"queue":[2,2,2,2,2,2,2],"door":[2,0],"seats":[[2,0,1,2,0],[0,1,2,2,0],[2,2,1,2,0],[2,3,1,2,0],[0,3,1,2,0],[1,4,1,2,0]],"holes":[]},"10":{"id":"Level_00010","w":4,"h":6,"time":240,"diff":0,"queue":[2,2,2,2,2,2,2,2,2,2,2,2,2,2],"door":[3,0],"seats":[[2,0,1,2,0],[0,0,1,2,0],[3,1,1,2,0],[1,1,1,2,0],[0,1,1,2,0],[1,2,2,2,0],[2,3,1,2,0],[0,3,1,2,0],[3,4,1,2,0],[0,4,2,2,0],[2,5,1,2,0],[0,5,1,2,0]],"holes":[]},"12":{"id":"Level_00012","w":4,"h":6,"time":240,"diff":0,"queue":[4,5,5,2,2,4,5,2,5,2,2,2,5,2,5,2],"door":[3,0],"seats":[[2,0,1,5,0],[0,0,1,5,0],[2,1,1,2,0],[1,1,1,0,0],[0,1,1,2,0],[2,2,1,5,0],[0,2,1,5,0],[3,3,1,0,0],[2,3,1,2,0],[1,3,1,0,0],[0,3,1,2,0],[2,4,1,5,0],[0,4,1,5,0],[2,5,2,4,0],[0,5,1,2,0]],"holes":[]},"19":{"id":"Level_00019","w":6,"h":10,"time":225,"diff":2,"queue":[4,4,4,4,2,2,2,2,2,2,2,2,3,3,3,3,2,2,2,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2],"door":[5,0],"seats":[[2,0,2,1,0],[2,1,2,1,0],[0,1,2,1,0],[4,2,2,0,0],[3,2,1,2,0],[2,2,1,0,0],[1,2,1,2,0],[0,2,1,0,0],[3,3,1,2,0],[2,3,1,2,0],[4,4,2,3,0],[2,4,2,0,0],[0,4,2,3,0],[5,5,1,0,0],[3,5,2,4,0],[1,5,2,0,0],[5,6,1,2,0],[3,6,1,2,0],[1,6,1,2,0],[4,7,1,2,0],[3,7,1,2,0],[1,7,2,4,0],[5,8,1,2,0],[3,8,1,2,0],[0,8,1,0,0],[3,9,1,0,0],[2,9,1,2,0],[1,9,1,2,0]],"holes":[]},"30":{"id":"Level_00030","w":5,"h":8,"time":100,"diff":0,"queue":[3,2,2,2,2,2,1,2,2,2,2,2,4,2,2,2,2,2,4,3,1,2,2,2,2,2],"door":[4,0],"seats":[[1,0,2,4,0],[3,1,1,2,0],[2,1,1,2,0],[0,1,2,0,0],[3,2,2,0,0],[2,2,1,2,0],[1,2,1,2,0],[3,3,1,2,0],[1,3,2,2,0],[4,4,1,2,0],[3,4,1,0,0],[1,4,2,1,0],[4,5,1,2,0],[2,5,1,0,0],[0,5,1,0,0],[1,6,2,3,0],[3,7,2,2,0],[1,7,2,2,0]],"holes":[]}};
+
+/* The board rules, shared by both prototypes.
+
+   Lifted from src/engine.js so a prototype answers to the same laws the real
+   boards were designed against: what a piece covers, which side you may enter
+   from, what counts as reachable floor.
+
+   ⚠ ONE copy, inlined into both templates by build_proto.py. It started as a
+   block inside the honey template and was pulled out the moment a second
+   prototype needed it: two copies of a rule set means every fix has to be made
+   twice, and the second one is the one that gets forgotten.
+
+   RULE_FREEZE and RULE_FULL are the honey prototype's experiments. The 3D
+   remake leaves them at false / "leave", which is the original game. */
+
+/* ---------------------------------------------------------------- rules
+   Lifted from src/engine.js so the prototype answers to the same laws the real
+   boards were designed against: what a comb covers, which side you may enter
+   from, what counts as reachable floor. The one new law is SETTING, below. */
+const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
+const FACING = DIRS;                 // 0 up, 1 right, 2 down, 3 left
+const GREY_TAKES = 2;                // a plain wax comb only ever takes the common pollen
+
+let S = null, RULE_FREEZE = true, CUR = 0;
+/* What happens to a piece the moment it fills.
+
+   ⚠ "leave" IS NOT THE ORIGINAL GAME, whatever an earlier version of this
+   comment said. Nothing in src/engine.js or src/game_shell.js ever removes a
+   seat - grep them for it. The `gone` flag I took it from lives only in
+   src/bench_rush.html, an abandoned August prototype that src/solvecheck.py
+   still points at; reading that file and assuming it was the engine put a rule
+   into two prototypes that the shipped game has never had.
+
+     "stay"   it stays and can still be dragged   <- THE SHIPPED GAME
+     "leave"  it lifts off the floor              (bench_rush only; an experiment here)
+     "capped" it stays, sealed, and never moves again (an experiment; kills every board tried)
+
+   A full piece is already refused by accepts(), which tests freeSlots. Staying
+   put is not a special case - it is what happens when nothing removes it. */
+let RULE_FULL = "stay";
+
+const idx = (g,c,r) => r*g.W + c;
+const inBoard = (g,c,r) => c>=0 && c<g.W && r>=0 && r<g.H && !g.hole[idx(g,c,r)];
+const isFree  = (g,c,r) => inBoard(g,c,r) && g.occ[idx(g,c,r)] < 0;
+
+function cellsOf(b){
+  const a=[];
+  for(let k=0;k<b.len;k++) a.push(b.dir&1 ? [b.c,b.r+k] : [b.c+k,b.r]);
+  return a;
+}
+const placeCell = (b,k) => cellsOf(b)[k];            // len === cap in this data
+
+/** Never in over the back wall of the comb. */
+function entryDirs(b){
+  const f=FACING[b.dir];
+  return DIRS.filter(d => !(d[0]===-f[0] && d[1]===-f[1]));
+}
+function cellEntries(g,b,k){
+  const own=new Set(cellsOf(b).map(p=>p[0]+","+p[1]));
+  const pc=placeCell(b,k), out=[];
+  for(const d of entryDirs(b)){
+    const nc=pc[0]+d[0], nr=pc[1]+d[1];
+    if(!inBoard(g,nc,nr) || own.has(nc+","+nr)) continue;
+    out.push([nc,nr]);
+  }
+  return out;
+}
+function place(g,b,c,r){
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=-1;
+  b.c=c; b.r=r;
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=b.id;
+  b.smoked=false;                 // one puff buys one drag, then the honey sets again
+}
+function lift(g,b){                                  // a full comb leaves the board
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=-1;
+  b.gone=true;
+}
+const walkerAt = (g,c,r) => g.walkers.some(a=>a.cell && a.cell[0]===c && a.cell[1]===r);
+
+function fits(g,b,c,r){
+  const hc=b.c, hr=b.r;
+  b.c=c; b.r=r; const cs=cellsOf(b); b.c=hc; b.r=hr;
+  for(const p of cs){
+    if(!inBoard(g,p[0],p[1])) return false;
+    const id=g.occ[idx(g,p[0],p[1])];
+    if(id>=0 && id!==b.id) return false;
+    if(walkerAt(g,p[0],p[1])) return false;
+  }
+  return true;
+}
+function reachRegion(g){
+  const seen=new Uint8Array(g.W*g.H), DC=g.door[0], DR=g.door[1];
+  if(!isFree(g,DC,DR)) return seen;
+  seen[idx(g,DC,DR)]=1;
+  const st=[[DC,DR]];
+  while(st.length){
+    const p=st.pop();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1];
+      if(isFree(g,nc,nr) && !seen[idx(g,nc,nr)]){ seen[idx(g,nc,nr)]=1; st.push([nc,nr]); }
+    }
+  }
+  return seen;
+}
+function floorDist(g){
+  const dist=new Int32Array(g.W*g.H).fill(-1), DC=g.door[0], DR=g.door[1];
+  if(!isFree(g,DC,DR)) return dist;
+  dist[idx(g,DC,DR)]=0;
+  const q=[[DC,DR]];
+  while(q.length){
+    const p=q.shift();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1];
+      if(!isFree(g,nc,nr) || dist[idx(g,nc,nr)]>=0) continue;
+      dist[idx(g,nc,nr)]=dist[idx(g,p[0],p[1])]+1;
+      q.push([nc,nr]);
+    }
+  }
+  return dist;
+}
+const freeSlots = b => b.occ.reduce((n,v)=>n+(v==null?1:0),0);
+const accepts = (b,ci) => !b.gone && freeSlots(b) > (b.pending||0)
+                       && (b.colour===0 ? ci===GREY_TAKES : b.colour===ci);
+const FIXED = b => b.colour===0;
+
+/* ---- THE NEW LAW ------------------------------------------------------
+   A comb holding honey but not yet full is SETTING: stuck where it stands.
+
+   ⚠ Full combs still lift away, and that is not a detail - it is what keeps the
+   board from clogging. Measured over all 2085 boards: capacity equals queue
+   length on every single one, zero spare slots anywhere. Freeze a comb for good
+   once it fills and the floor runs out on EVERY level. The commitment has to
+   land on the half-filled comb, not the finished one. */
+const isSetting = b => RULE_FREEZE && !b.gone && !b.smoked && b.cap>1
+                    && b.occ.some(v=>v!=null) && freeSlots(b)>0;
+
+/* ---- CAPPED ------------------------------------------------------------
+   With RULE_LIFT off nothing ever leaves the floor: a comb that fills is capped
+   with wax and becomes part of the hive. ⚠ This is the opposite of what I first
+   argued. "A full comb has to lift away or the floor runs out" was reasoning,
+   not measurement, and it was wrong: a comb that stays occupies exactly the
+   cells it already occupied, so the free floor is unchanged. What shrinks is the
+   number of pieces you can still move - which is a difficulty curve that rises
+   instead of falling away, and is the whole point of the change. */
+const canDrag = b => !b.gone && !b.capped && !FIXED(b) && !isSetting(b);
+
+function placements(g,b){
+  if(!canDrag(b)) return [];
+  const seen=new Set([b.c+","+b.r]), out=[], q=[[b.c,b.r]];
+  while(q.length){
+    const p=q.shift();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1], key=nc+","+nr;
+      if(seen.has(key)) continue;
+      const hc=b.c, hr=b.r;
+      b.c=p[0]; b.r=p[1];
+      const ok=fits(g,b,nc,nr);
+      b.c=hc; b.r=hr;
+      if(!ok) continue;
+      seen.add(key); out.push([nc,nr]); q.push([nc,nr]);
+    }
+  }
+  return out;
+}
+/** The nearest cell this pollen colour can actually reach. */
+function pickCell(g,ci){
+  const DC=g.door[0], DR=g.door[1];
+  const plug=g.occ[idx(g,DC,DR)];
+  if(plug>=0){                                   // a comb standing in the hatch
+    const b=g.combs[plug];
+    if(b && accepts(b,ci)) for(let k=0;k<b.cap;k++){
+      if(b.occ[k]!=null || b.claim.has(k)) continue;
+      const pc=placeCell(b,k);
+      if(pc[0]===DC && pc[1]===DR) return {b:b,k:k,entry:null};
+    }
+    return null;                                 // hatch blocked: nothing behind it is reachable
+  }
+  const dist=floorDist(g);
+  let best=null, bd=Infinity;
+  for(const b of g.combs){
+    if(!accepts(b,ci)) continue;
+    for(let k=0;k<b.cap;k++){
+      if(b.occ[k]!=null || b.claim.has(k)) continue;
+      for(const e of cellEntries(g,b,k)){
+        const dd=dist[idx(g,e[0],e[1])];
+        if(dd>=0 && dd<bd){ bd=dd; best={b:b,k:k,entry:e}; }
+      }
+    }
+  }
+  return best;
+}
+function walkPath(g,b,k,entry){
+  if(!entry) return [];
+  const dist=floorDist(g);
+  let c=entry[0], r=entry[1];
+  const path=[[c,r]];
+  let guard=0;
+  while(dist[idx(g,c,r)]>0 && guard++<400){
+    for(const d of DIRS){
+      const nc=c+d[0], nr=r+d[1];
+      if(inBoard(g,nc,nr) && dist[idx(g,nc,nr)]===dist[idx(g,c,r)]-1){ c=nc; r=nr; break; }
+    }
+    path.push([c,r]);
+  }
+  path.reverse();
+  path.push(placeCell(b,k));
+  return path;
+}
+
+
+/* The original game, exactly: nothing sets, and ⚠ a full seat STAYS ON THE
+   FLOOR. It stops taking passengers - accepts() sees no free place - but it is
+   still furniture, still in the way, and still draggable. The shipped engine has
+   no code that removes a seat; the version of this prototype that made them fly
+   away was copying an abandoned prototype, not the game. */
+RULE_FREEZE = false;
+RULE_FULL = "stay";
+
+function load(n){
+  const raw=BOARDS[String(n)];
+  const W=raw.w, H=raw.h;
+  const hole=new Uint8Array(W*H);
+  for(const i of raw.holes) hole[i]=1;
+  const occ=new Int16Array(W*H).fill(-1);
+  const seats=raw.seats.map(function(s,i){
+    return { id:i, c:s[0], r:s[1], cap:s[2], len:s[2], colour:s[3], dir:s[4]|0,
+             occ:new Array(s[2]).fill(null), claim:new Set(), pending:0,
+             gone:false, lifted:0, smoked:false, capped:false };
+  });
+  const g={W:W,H:H,hole:hole,occ:occ,combs:seats,door:raw.door.slice(),
+           queue:raw.queue.slice(),total:raw.queue.length,seated:0,walkers:[],
+           left:raw.time,phase:"play",level:n,cool:0,smoke:0};
+  for(const b of seats) for(const p of cellsOf(b)) occ[idx(g,p[0],p[1])]=b.id;
+  return g;
+}
+
+/* ------------------------------------------------------------ the scene
+   A toy diorama, not a technical drawing. Three decisions carry the look:
+
+   1. Nothing has a hard edge. Every solid is a rounded rectangle extruded with
+      a bevel, so the key light catches a soft line down each corner.
+      Flat-shaded boxes were most of what made the first build read as
+      programmer art.
+   2. Every coloured object wears THREE tones of its colour - a light pad, a mid
+      body, a deep base. One flat fill per object is the other half of that tell:
+      it reads as a swatch rather than as a lit thing.
+   3. One warm key with soft shadows, one cool sky fill, one cold rim from
+      behind. The rim is what separates a dark seat from a dark floor, and
+      without it the far end of the cabin turns to mush. */
+
+/* Three tones per colour. `md` is the seat, `lt` its pads and the passenger's
+   collar, `dk` the base and the passenger's body. */
+const TONE=[
+  {lt:0xd3d9e2,md:0xaeb7c4,dk:0x77818f},   // 0  plain - the bolted-down seats
+  {lt:0xff9d90,md:0xe9685b,dk:0xa93c33},   // 1  coral
+  {lt:0xffd484,md:0xefa63c,dk:0xa96c18},   // 2  amber
+  {lt:0xc6a8f0,md:0x9a72d8,dk:0x63429c},   // 3  violet
+  {lt:0x86ddd0,md:0x41b3a5,dk:0x1b7a70},   // 4  teal
+  {lt:0xffabca,md:0xef7aa8,dk:0xb04a76},   // 5  pink
+  {lt:0xaae08a,md:0x74bf52,dk:0x46852d},   // 6  green
+  {lt:0xdcdcdc,md:0xb4b4b4,dk:0x808080},   // 7  spare
+  {lt:0xffb87f,md:0xf08a45,dk:0xac541c}    // 8  orange
+];
+/* ⚠ The tiles need real separation from the slab under them, not a polite one,
+   and this is the third set of values it took. The grid is what a player reads
+   distance against - and now that the gold placement tiles are gone it is the
+   ONLY thing left doing that job, so it has to be plainly visible rather than
+   tasteful.
+
+   ⚠ And the two checker tones need a WIDE split, not a tasteful one. Sampled off
+   a render, the first pair came back a single value apart once lit - 424753 next
+   to 424854 - so the chequer existed in the source and nowhere on screen. Three
+   passes of judging this by eye got it wrong; reading the pixels settled it. */
+const ROOM={plinth:0x1d2430,slab:0x232a36,tileA:0x93a2b8,tileB:0x63708a,
+            wall:0x39424f,cap:0x505b6b,frame:0x2b333d,
+            glass:0x9ec9ff,rail:0x9aa5b5,step:0x38404c,hi:0xffc53d};
+const ROT=[0,-Math.PI/2,Math.PI,Math.PI/2];      // FACING[dir] as a spin about Y
+
+const view=document.getElementById("view");
+let renderer,scene,camera,rootG,tileG,seatG,peepG;
+let TILES=[],SEATMESH={},SPIN=false,SPINT=0,CLOCK=0;
+/* ⚠ Landscape is a CAMERA move here, not a data change. The honey prototype had
+   to transpose every board to get out of portrait - which mirrors it, so a board
+   you know well stops looking like itself. In 3D the room simply turns: the data,
+   the coordinates and the puzzle are untouched, and the drag still works because
+   pointerGrid() goes through rootG's inverse. This is the clearest thing real 3D
+   buys that the baked-sprite build could never have. */
+let LAND=false;
+// no CUR here - rules.js already declares it, and a second `let` for the same
+// name in the same scope is a parse error that kills the whole file.
+let SEL=null,SPOTS=[],LAST=0;
+
+/* ⚠ How far apart cells are DRAWN, which is not the same as how far apart they
+   are. The grid stays exactly what it was - one cell, one integer - and only the
+   world positions spread out, so collisions, paths and every stored placement are
+   untouched. Packed at 1.0 the seats butted into each other and the board read as
+   one upholstered mass; the gap is what lets you count them.
+   ⚠ pointerGrid() divides this back out. Change it here and nowhere else. */
+const GAP=1.16;
+const CELLW=0.86;                              // a one-cell seat, inside its cell
+const wx=(g,c)=>(c-(g.W-1)/2)*GAP, wz=(g,r)=>(r-(g.H-1)/2)*GAP;
+
+function three(){
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  // the same ground the stage panel around it is painted, so the diorama sits
+  // in its frame instead of floating on a lighter rectangle
+  renderer.setClearColor(0x141922,1);
+  /* ⚠ Colour management ON, and it must be on BEFORE any material is built.
+     outputEncoding alone encodes the frame to sRGB while the material colours
+     are still being read as linear - so every hex is brightened twice and the
+     whole cabin comes back bleached near-white. This pair has to travel
+     together; neither is right on its own. */
+  if(THREE.ColorManagement) THREE.ColorManagement.enabled=true;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  view.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x141922,34,78);
+  camera=new THREE.PerspectiveCamera(40,16/10,0.1,140);
+
+  /* Five lights was two too many. With colour management on they compound
+     properly and the scene only needs a key, a sky and a rim. */
+  scene.add(new THREE.HemisphereLight(0xcfe0ff,0x2c3340,0.60));
+  scene.add(new THREE.AmbientLight(0xffffff,0.14));
+
+  /* ⚠ Nearly overhead, not over the shoulder. At (7,13,7.5) the key raked across
+     the room and the tall walls threw a shadow over most of the floor, so the
+     grid - the thing a player reads distance and legal moves against - went
+     black. Steeper gives short shadows that sit under the seats where they
+     belong, and the sky light above fills what is left. */
+  const key=new THREE.DirectionalLight(0xfff0d6,1.22);
+  key.position.set(4,16,5);
+  key.castShadow=true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.radius=3;
+  /* Both biases, not just the first. Without `bias` the floor stripes itself
+     with shadow acne; without `normalBias` the rounded solids detach from their
+     own contact shadow and appear to hover. */
+  key.shadow.bias=-0.0006;
+  key.shadow.normalBias=0.022;
+  const d=17;
+  key.shadow.camera.left=-d; key.shadow.camera.right=d;
+  key.shadow.camera.top=d;   key.shadow.camera.bottom=-d;
+  key.shadow.camera.near=1;  key.shadow.camera.far=50;
+  scene.add(key);
+
+  const fill=new THREE.DirectionalLight(0x9fc0ff,0.22);
+  fill.position.set(-8,6,5); scene.add(fill);
+  const rim=new THREE.DirectionalLight(0xbcd6ff,0.34);
+  rim.position.set(-4,3.5,-9); scene.add(rim);
+
+  backdrop();
+  rootG=new THREE.Group(); scene.add(rootG);
+  document.getElementById("boot").remove();
+}
+
+/* ------------------------------------------------------------ backdrop
+   A diorama needs a room of its own, or it reads as parts floating in a void.
+   Two pieces, both unlit and both cheap:
+
+   a sky - a vertical wash from a cool indigo down to near black, chosen to be
+   the complement of the warm seats so the saturated colours come forward;
+   a floor - a wide disc with a pool of light under the cabin, fading out into
+   the sky so no edge ever shows.
+
+   ⚠ Both drawn with MeshBasicMaterial and the sky with `fog:false`. Lit
+   materials here would take the key light and blow out into a grey card, and fog
+   applied to the sky tints the thing the fog is supposed to fade INTO. */
+function gradTex(stops,vertical){
+  const c=document.createElement("canvas");
+  c.width=vertical?8:256; c.height=vertical?256:8;
+  const x=c.getContext("2d");
+  const g=vertical?x.createLinearGradient(0,0,0,256):x.createLinearGradient(0,0,256,0);
+  for(const st of stops) g.addColorStop(st[0],st[1]);
+  x.fillStyle=g; x.fillRect(0,0,c.width,c.height);
+  const t=new THREE.CanvasTexture(c);
+  /* ⚠ A CanvasTexture is sRGB and has to say so. Left at the default it is read
+     as linear, and with colour management on the whole backdrop comes back
+     washed out - the same double-encoding that bleached the cabin earlier. */
+  t.encoding=THREE.sRGBEncoding;
+  return t;
+}
+function poolTex(){
+  const n=512, c=document.createElement("canvas");
+  c.width=c.height=n;
+  const x=c.getContext("2d");
+  const g=x.createRadialGradient(n/2,n/2,0,n/2,n/2,n/2);
+  g.addColorStop(0,"#46506a"); g.addColorStop(0.36,"#333c52");
+  g.addColorStop(0.68,"#212838"); g.addColorStop(1,"#161b26");
+  x.fillStyle=g; x.fillRect(0,0,n,n);
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding;
+  return t;
+}
+function backdrop(){
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(80,32,20),
+    new THREE.MeshBasicMaterial({
+      map:gradTex([[0,"#3a4569"],[0.42,"#232c42"],[0.76,"#161c28"],[1,"#0d1118"]],true),
+      side:THREE.BackSide,fog:false,depthWrite:false}));
+  scene.add(sky);
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(34,56),
+    new THREE.MeshBasicMaterial({map:poolTex(),fog:true}));
+  ground.rotation.x=-Math.PI/2;
+  ground.position.y=-1.06;
+  scene.add(ground);
+}
+
+/* ---------------------------------------------------------- geometry */
+const GEO=new Map();
+/** A rounded box: a rounded rectangle in XY, extruded along Z with a bevel, so
+    all twelve edges are soft.
+
+    Cached by size. ExtrudeGeometry costs far more than BoxGeometry and a board
+    builds dozens of seats, so the same dimensions must never be tessellated
+    twice - without the cache a big level stutters as it loads. */
+function rbox(w,h,d,r){
+  const k=w.toFixed(3)+"_"+h.toFixed(3)+"_"+d.toFixed(3)+"_"+r.toFixed(3);
+  let g=GEO.get(k);
+  if(g) return g;
+  r=Math.max(0.004,Math.min(r,w/2-0.002,h/2-0.002,d/2-0.002));
+  const sh=new THREE.Shape();
+  const x0=-w/2+r, y0=-h/2+r, x1=w/2-r, y1=h/2-r;
+  sh.moveTo(x0,-h/2); sh.lineTo(x1,-h/2);
+  sh.absarc(x1,y0,r,-Math.PI/2,0);
+  sh.lineTo(w/2,y1);  sh.absarc(x1,y1,r,0,Math.PI/2);
+  sh.lineTo(x0,h/2);  sh.absarc(x0,y1,r,Math.PI/2,Math.PI);
+  sh.lineTo(-w/2,y0); sh.absarc(x0,y0,r,Math.PI,Math.PI*1.5);
+  const depth=Math.max(0.002,d-2*r);
+  g=new THREE.ExtrudeGeometry(sh,{depth:depth,bevelEnabled:true,bevelThickness:r,
+      bevelSize:r,bevelSegments:2,curveSegments:3,steps:1});
+  g.translate(0,0,-depth/2);
+  g.computeVertexNormals();
+  GEO.set(k,g);
+  return g;
+}
+const MAT=new Map();
+/** Standard, not Lambert. Lambert has no specular term at all, so every surface
+    came back the same dead matte and the rounded edges did nothing. */
+function mat(hex,opt){
+  const k=hex+"|"+JSON.stringify(opt||{});
+  if(!MAT.has(k)) MAT.set(k,new THREE.MeshStandardMaterial(
+      Object.assign({color:hex,roughness:0.76,metalness:0.0},opt||{})));
+  return MAT.get(k);
+}
+function solid(w,h,d,r,m,shadow){
+  const o=new THREE.Mesh(rbox(w,h,d,r),m);
+  if(shadow!==false){ o.castShadow=true; o.receiveShadow=true; }
+  return o;
+}
+const tube=(rad,len,m)=>new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,12),m);
+
+/* -------------------------------------------------------------- the room */
+function buildRoom(g){
+  if(tileG) rootG.remove(tileG);
+  tileG=new THREE.Group(); rootG.add(tileG);
+  TILES=[];
+  const W=g.W, H=g.H, SX=W*GAP, SZ=H*GAP, HW=SX/2, HH=SZ/2;
+
+  /* A plinth under everything. The diorama needs something to stand ON, or the
+     cabin floats in the fog with nothing holding it up. */
+  const plinth=solid(SX+1.6,0.5,SZ+1.3,0.20,mat(ROOM.plinth),false);
+  plinth.receiveShadow=true;
+  plinth.position.set(0.40,-0.72,0);
+  /* ⚠ Marked as decoration, so the camera fit ignores it. It is the widest thing
+     in the scene and it is the least important: counting it pushed the camera
+     back until the cabin sat small in the middle of an empty frame. Letting it
+     bleed off the edges reads as a deliberate crop. */
+  plinth.userData.deco=true;
+  tileG.add(plinth);
+
+  const slab=solid(SX+0.8,0.44,SZ+0.8,0.15,mat(ROOM.slab),false);
+  slab.receiveShadow=true;
+  slab.position.y=-0.26; tileG.add(slab);
+
+  for(let r=0;r<H;r++) for(let c=0;c<W;c++){
+    if(g.hole[idx(g,c,r)]) continue;
+    const base=((c+r)&1)?ROOM.tileA:ROOM.tileB;
+    const t=solid(1.0,0.09,1.0,0.05,mat(base),false);   // GAP is 1.16, so a real seam remains
+    t.receiveShadow=true;
+    t.position.set(wx(g,c),0,wz(g,r));
+    t.userData={cell:[c,r],base:base,on:false};
+    tileG.add(t); TILES.push(t);
+  }
+
+  const WALLH=1.34, TH=0.22;
+  /* ⚠ The door wall drops when the room turns. In portrait it is the right-hand
+     edge of the picture and can stand full height; turned on its side it becomes
+     the wall nearest the camera, and at full height it hid the whole front row.
+     Which wall is in the way is a property of the VIEW, so it is read here
+     rather than baked into the board. */
+  const DOORH=LAND?0.66:WALLH;
+  /** One wall, with a lighter cap along its top and lit windows down its face. */
+  function wall(len,vertical,x,z,glass,height){
+    const hh=height||WALLH;
+    const w=vertical?TH:len, d=vertical?len:TH;
+    const m=solid(w,hh,d,0.06,mat(ROOM.wall));
+    m.position.set(x,hh/2-0.07,z);
+    tileG.add(m);
+    const cap=solid(vertical?TH+0.07:len+0.07,0.10,vertical?len+0.07:TH+0.07,0.045,mat(ROOM.cap));
+    cap.position.set(x,hh-0.07,z);
+    tileG.add(cap);
+    if(!glass) return;
+    const gm=mat(0x33455c,{emissive:ROOM.glass,emissiveIntensity:0.22,roughness:0.22});
+    for(const at of glass){
+      const win=solid(vertical?0.05:0.58,0.38,vertical?0.58:0.05,0.03,gm,false);
+      const off=(TH/2)+0.012;
+      win.position.set(vertical?x+(x<0?off:-off):at, hh*0.60, vertical?at:z+(z<0?off:-off));
+      tileG.add(win);
+    }
+  }
+  const colsAt=[], rowsAt=[];
+  for(let c=0;c<W;c++) if(c%2===0) colsAt.push(wx(g,c));
+  for(let r=0;r<H;r++) if(r%2===0) rowsAt.push(wz(g,r));
+
+  wall(SX+0.8,false,0,-HH-0.25,colsAt);                  // the far end
+  wall(SZ+0.8,true,-HW-0.25,0,rowsAt);                   // the long side
+  wall(SX+0.8,false,0,HH+0.25,null,0.62);                // the near end, kept low
+  for(let r=0;r<H;r++){                                  // the door side, in segments
+    if(r===g.door[1]) continue;
+    wall(GAP,true,HW+0.25,wz(g,r),(!LAND&&r%2===0)?[wz(g,r)]:null,DOORH);
+  }
+
+  // a handrail down the long side - the one detail that says "vehicle"
+  const railM=mat(ROOM.rail,{roughness:0.42});
+  const rail=tube(0.035,SZ+0.5,railM);
+  rail.rotation.x=Math.PI/2;
+  rail.position.set(-HW+0.16,1.42,0);
+  rail.castShadow=true; tileG.add(rail);
+  for(const zz of [-HH+0.6,0,HH-0.6]){
+    const post=tube(0.028,0.58,railM);
+    post.position.set(-HW+0.16,1.14,zz); tileG.add(post);
+  }
+
+  // the doorway: a frame, a lit threshold, and a platform to wait on
+  const dz=wz(g,g.door[1]);
+  for(const s of [-1,1]){
+    const post=solid(0.20,DOORH+0.16,0.16,0.05,mat(ROOM.frame));
+    post.position.set(HW+0.25,(DOORH+0.16)/2-0.07,dz+s*GAP*0.54);
+    tileG.add(post);
+  }
+  if(!LAND){                                     // a lintel across a low wall is a trip hazard
+    const lintel=solid(0.20,0.16,GAP*1.18,0.05,mat(ROOM.frame));
+    lintel.position.set(HW+0.25,WALLH+0.01,dz);
+    tileG.add(lintel);
+  }
+  /* ⚠ A threshold strip, not a gold tile. A whole cell lit up in the accent
+     colour reads as "you may move a seat here" - the exact meaning the glowing
+     placement tiles used to carry, and confusing now that those are gone. The
+     doorway is a place, so it gets a doorstep: an ordinary floor tile with a warm
+     line across the opening. */
+  const mat3=solid(0.94,0.09,0.94,0.05,mat(ROOM.tileA),false);
+  mat3.receiveShadow=true;
+  mat3.position.set(wx(g,g.door[0]),0.005,dz);
+  tileG.add(mat3);
+  const strip=solid(0.12,0.06,GAP*0.96,0.02,
+                    mat(0xe0a33a,{emissive:0xe0a33a,emissiveIntensity:0.25}),false);
+  strip.position.set(HW-0.06,0.075,dz);
+  tileG.add(strip);
+
+  /* The platform is decoration too. What has to stay in frame is the LINE, and
+     the people standing on it live in peepG, which the fit reads separately. */
+  const step=solid(3.6,0.30,1.9,0.12,mat(ROOM.step),false);
+  step.receiveShadow=true; step.userData.deco=true;
+  step.position.set(HW+2.0,-0.19,dz+0.1); tileG.add(step);
+  const edge=solid(3.6,0.07,0.10,0.03,mat(ROOM.cap),false);
+  edge.userData.deco=true;
+  edge.position.set(HW+2.0,-0.02,dz+GAP*0.95); tileG.add(edge);
+}
+
+/* ------------------------------------------------------------- the seat */
+function buildSeat(b){
+  const grp=new THREE.Group();
+  const t=TONE[b.colour]||TONE[7];
+  /* ⚠ (L-1) gaps plus one cell, not L cells. A two-seater has to straddle the
+     same two cell CENTRES the model put it on, so its places line up with the
+     tiles under them - scaling the old width by GAP would have drifted them. */
+  const L=b.len, w=(L-1)*GAP+CELLW;
+
+  const plinth=solid(w*0.80,0.11,0.60,0.04,mat(t.dk));
+  plinth.position.set(0,0.065,0.02); grp.add(plinth);
+
+  const seat=solid(w,0.20,0.84,0.085,mat(t.md));
+  seat.position.set(0,0.225,-0.01); grp.add(seat);
+  const pad=solid(w*0.88,0.10,0.70,0.05,mat(t.lt));
+  pad.position.set(0,0.335,-0.035); grp.add(pad);
+
+  const back=solid(w,0.58,0.20,0.085,mat(t.md));
+  back.position.set(0,0.51,0.32); grp.add(back);
+  const backPad=solid(w*0.86,0.40,0.11,0.05,mat(t.lt));
+  backPad.position.set(0,0.51,0.225); grp.add(backPad);
+  const crown=solid(w*0.95,0.10,0.25,0.045,mat(t.dk));
+  crown.position.set(0,0.82,0.32); grp.add(crown);
+
+  // a divider per place, so a two-seater reads as two seats and not one slab
+  for(let k=1;k<b.cap;k++){                      // one divider between each pair of places
+    const dv=solid(0.055,0.17,0.76,0.022,mat(t.dk));
+    dv.position.set((k-b.cap/2)*GAP,0.305,-0.02); grp.add(dv);
+  }
+  for(const sx of [-1,1]){
+    const arm=solid(0.11,0.13,0.64,0.05,mat(t.dk));
+    arm.position.set(sx*(w/2+0.015),0.385,0.015); grp.add(arm);
+  }
+  if(FIXED(b)){                                  // bolted down, and it should look it
+    const plate=solid(w+0.08,0.05,0.94,0.03,mat(0x626b79),false);
+    plate.position.set(0,0.025,0); grp.add(plate);
+    for(const sx of [-1,1]) for(const sz of [-1,1]){
+      const bolt=tube(0.05,0.07,mat(0x99a3b2,{roughness:0.38}));
+      bolt.position.set(sx*(w/2-0.10),0.065,sz*0.38); grp.add(bolt);
+    }
+  }
+  for(const m of grp.children) m.userData.seatId=b.id;
+  grp.userData.seatId=b.id;
+  return grp;
+}
+
+/* -------------------------------------------------------- the passenger */
+/** The DEEP tone for the body, not the bright one the seat wears. A passenger
+    only ever sits in a seat of their own colour, so a body painted the cushion's
+    own shade vanishes into it the moment they land - an earlier build left
+    nothing but a floating head. The collar is the light tone, which is what
+    keeps the silhouette off the backrest behind it. */
+function buildPeep(ci){
+  const grp=new THREE.Group();
+  const t=TONE[ci]||TONE[7];
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.185,0.21,5,14),mat(t.dk));
+  body.position.y=0.35; body.castShadow=true; grp.add(body);
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.152,0.176,0.07,16),mat(t.lt));
+  collar.position.y=0.495; grp.add(collar);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.152,20,14),mat(0xf0d3b4));
+  head.position.y=0.62; head.castShadow=true; grp.add(head);
+  /* hair: a neutral cap. Never the seat colour - a third band of the same hue
+     turned the whole figure into a stack of stripes at phone size. */
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.159,20,10,0,Math.PI*2,0,1.16),
+                            mat(0x4a3a33));
+  hair.position.y=0.635; grp.add(hair);
+  const arms=[];
+  for(const sx of [-1,1]){
+    const pivot=new THREE.Group();
+    pivot.position.set(sx*0.19,0.45,0);
+    const a=new THREE.Mesh(new THREE.CapsuleGeometry(0.05,0.15,4,8),mat(t.dk));
+    a.position.y=-0.11; a.castShadow=true;
+    pivot.add(a); grp.add(pivot); arms.push(pivot);
+  }
+  // a bag in the mid tone, on the BACK (local +z), so the colour reads from behind
+  const bag=solid(0.21,0.24,0.12,0.05,mat(t.md));
+  bag.position.set(0,0.40,0.195); grp.add(bag);
+  grp.userData.arms=arms;
+  return grp;
+}
+
+function buildBoard(g){
+  buildRoom(g);
+  if(seatG) rootG.remove(seatG);
+  if(peepG) rootG.remove(peepG);
+  seatG=new THREE.Group(); rootG.add(seatG);
+  peepG=new THREE.Group(); rootG.add(peepG);
+  SEATMESH={};
+  for(const b of g.combs){
+    const m=buildSeat(b);
+    seatG.add(m); SEATMESH[b.id]=m;
+    placeMesh(g,b,true);
+  }
+}
+
+/** The mesh follows the model: centred on the footprint, spun by its facing. */
+function placeMesh(g,b,snap){
+  const m=SEATMESH[b.id]; if(!m) return;
+  const cs=cellsOf(b);
+  let sx=0,sz=0;
+  for(const p of cs){ sx+=wx(g,p[0]); sz+=wz(g,p[1]); }
+  m.userData.to=[sx/cs.length,sz/cs.length];
+  m.rotation.y=ROT[b.dir];
+  if(snap){ m.position.set(m.userData.to[0],0,m.userData.to[1]); }
+}
+
+/* ⚠ x = 0. Offsetting the camera sideways skewed the cabin into a diamond -
+   it read as a board sitting at a crooked angle rather than a vehicle seen down
+   its length. Height and distance give the tilt; the sideways offset only cost
+   the symmetry. The +1.4 on z leaves room for the queue outside the door. */
+const BOX=new THREE.Box3();
+/** Fit the camera to what is actually on screen.
+
+    ⚠ Measured off the room's real bounding box rather than off W and H. Once the
+    board can turn, the plinth, the door step and the waiting platform all swap
+    which axis they stick out along, and a formula written for one orientation
+    clipped them in the other. Asking the scene how big it is works for both and
+    for whatever gets added next.
+
+    ⚠ Three.js `fov` is the VERTICAL angle, so depth and width need different
+    divisors: a board tilted towards the camera still projects about depth*0.86
+    tall, while width gets the aspect ratio to spend. */
+function frame(g){
+  resize();                                    // the aspect has to be current first
+  const keep=rootG.rotation.y;
+  rootG.rotation.y=LAND?-Math.PI/2:0;          // measure it where it is going
+  rootG.updateMatrixWorld(true);
+  BOX.makeEmpty();
+  for(const ch of tileG.children) if(!ch.userData.deco) BOX.expandByObject(ch);
+  if(peepG && peepG.children.length) BOX.expandByObject(peepG);
+  rootG.rotation.y=keep;
+  rootG.updateMatrixWorld(true);
+  const sx=BOX.max.x-BOX.min.x, sz=BOX.max.z-BOX.min.z;
+  const cx=(BOX.max.x+BOX.min.x)/2, cz=(BOX.max.z+BOX.min.z)/2;
+  /* ⚠ Swung round the board on an ARC, not shoved sideways. Moving the camera's
+     x while it still looks at the centre skews the cabin into a lopsided
+     diamond - that was the first attempt and it read as a broken projection. */
+  /* ⚠ Less swing when the board is wide. The diagonal is what gives a portrait
+     board its depth, but on a board that is already ten cells across it just
+     spends the frame's width on empty corners. */
+  const AZ=LAND?0.17:0.30;
+  let d=(Math.max(sx/1.72,sz*0.86)+1.1)*1.12;   // start tight; the loop only ever backs off
+  /* ⚠ Then back off until the corners actually land inside the frame. The
+     formula above is a starting guess and it was wrong the moment the room could
+     turn: perspective drops a near corner far lower than its distance from the
+     centre suggests, and the waiting platform - which sticks out towards the
+     camera in landscape - hung off the bottom edge. Asking the projection is the
+     only answer that holds for an orientation nobody has tried yet. */
+  for(let i=0;i<26;i++){
+    camera.position.set(cx+d*0.65*Math.sin(AZ),d*0.76,cz+d*0.65*Math.cos(AZ));
+    camera.lookAt(cx,0.2,cz);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld(true);
+    if(inFrame()) break;
+    d*=1.028;                                  // fine steps, or it overshoots and sits too far out
+  }
+}
+const CORNER=new THREE.Vector3();
+function inFrame(){
+  for(let i=0;i<8;i++){
+    CORNER.set(i&1?BOX.max.x:BOX.min.x, i&2?BOX.max.y:BOX.min.y, i&4?BOX.max.z:BOX.min.z);
+    CORNER.project(camera);
+    if(Math.abs(CORNER.x)>0.97||Math.abs(CORNER.y)>0.965) return false;
+  }
+  return true;
+}
+
+function resize(){
+  const w=Math.max(260,Math.floor(view.getBoundingClientRect().width));
+  const h=Math.round(Math.max(260,Math.min(620,w*0.62)));
+  if(renderer.domElement.width===w&&renderer.domElement.height===h) return;
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+  renderer.setSize(w,h,false);
+  renderer.domElement.style.width="100%";
+  renderer.domElement.style.height=h+"px";
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+
+/* ------------------------------------------------------------- the loop */
+function step(dt){
+  const g=S;
+  if(g.phase!=="play") return;
+  g.left-=dt/1000;
+  if(g.left<=0){ g.left=0; g.phase="lose"; say("Out of time.","warn"); return; }
+
+  for(let i=g.walkers.length-1;i>=0;i--){
+    const a=g.walkers[i];
+    a.t+=dt/a.dur;
+    if(a.t>=1){
+      const b=a.b;
+      b.occ[a.k]=a.ci; b.claim.delete(a.k); b.pending--;
+      g.seated++;
+      const pc=placeCell(b,a.k);
+      a.mesh.position.set(wx(g,pc[0]),0.44,wz(g,pc[1]));   // on the cushion, not in it
+      a.mesh.rotation.y=ROT[b.dir];
+      a.mesh.userData.seatId=b.id;
+      a.mesh.userData.sat=performance.now();               // for the landing squash
+      const ar=a.mesh.userData.arms;
+      if(ar){ ar[0].rotation.x=0; ar[1].rotation.x=0; }
+      g.walkers.splice(i,1);
+      // nothing here: a full seat simply stops being offered
+      if(g.seated>=g.total){ g.phase="win"; say("Everyone has a seat.","good"); }
+      continue;
+    }
+    const n=a.path.length-1, f=a.t*n, i0=Math.min(n,Math.floor(f)), m=f-i0;
+    const p0=a.path[i0], p1=a.path[Math.min(n,i0+1)];
+    const cx0=p0[0]+(p1[0]-p0[0])*m, cz0=p0[1]+(p1[1]-p0[1])*m;
+    a.cell=[Math.round(cx0),Math.round(cz0)];
+    const ph=a.t*n*Math.PI*2;
+    a.mesh.position.set(wx(g,cx0),0.02+Math.abs(Math.sin(ph))*0.045,wz(g,cz0));
+    /* ⚠ Local -z is forward, not +z. ROT[] was built so a seat's -z points the
+       way it faces, and the passenger has to use the same convention or they
+       walk backwards and the bag on their back ends up on their chest. */
+    if(p1[0]!==p0[0]||p1[1]!==p0[1])
+      a.mesh.rotation.y=Math.atan2(-(p1[0]-p0[0]),-(p1[1]-p0[1]));
+    const arms=a.mesh.userData.arms;
+    if(arms){ arms[0].rotation.x=Math.sin(ph)*0.72; arms[1].rotation.x=-Math.sin(ph)*0.72; }
+  }
+
+  g.cool-=dt;
+  if(g.cool<=0 && g.queue.length && g.walkers.length<2){
+    const ci=g.queue[0], got=pickCell(g,ci);
+    if(got){
+      g.queue.shift();
+      got.b.claim.add(got.k); got.b.pending++;
+      const path=walkPath(g,got.b,got.k,got.entry);
+      const start=path.length?path[0]:placeCell(got.b,got.k);
+      const mesh=buildPeep(ci); peepG.add(mesh);
+      mesh.position.set(wx(g,start[0]),0.02,wz(g,start[1]));
+      g.walkers.push({b:got.b,k:got.k,ci:ci,path:path.length?path:[start],
+                      t:0,dur:Math.max(280,(path.length||1)*150),mesh:mesh,cell:null});
+      g.cool=190;
+      layQueue(g);
+    }
+  }
+
+  /* Seats sliding to where the model already put them - and the passengers
+     sitting in them coming along for the ride, because a seat you drag with
+     somebody in it takes them with it. */
+  for(const b of g.combs){
+    const m=SEATMESH[b.id]; if(!m) continue;
+    const to=m.userData.to;
+    if(!to) continue;
+    const dx=(to[0]-m.position.x)*Math.min(1,dt/90);
+    const dz=(to[1]-m.position.z)*Math.min(1,dt/90);
+    m.position.x+=dx; m.position.z+=dz;
+    if(dx||dz) for(const p of peepG.children)
+      if(p.userData.seatId===b.id){ p.position.x+=dx; p.position.z+=dz; }
+  }
+}
+
+/** The line outside the door. Only the head of it can board, so the rest is a
+    picture - eight of them, and the HUD carries the real number. */
+function layQueue(g){
+  let q=peepG.userData.q;
+  if(!q){ q=peepG.userData.q=[]; }
+  while(q.length<8){
+    const m=new THREE.Group(); peepG.add(m); q.push(m);
+  }
+  for(let i=0;i<q.length;i++){
+    const slot=q[i];
+    while(slot.children.length) slot.remove(slot.children[0]);
+    if(i>=g.queue.length){ slot.visible=false; continue; }
+    slot.visible=true;
+    const p=buildPeep(g.queue[i]);
+    slot.add(p);
+    slot.position.set((g.W*GAP/2)+0.95+Math.floor(i/2)*0.70, 0.02,
+                      wz(g,g.door[1])+((i%2)?0.40:-0.22));
+    slot.rotation.y=-Math.PI/2;                    // facing the door they are queuing for
+  }
+}
+
+/* ------------------------------------------------------------ highlight
+   ⚠ The floor says nothing. Lighting every legal cell gold was carried over from
+   the 2D build, where the seat could not be picked up and carried so the tiles
+   were the only way to show where it would go. Here the seat itself is the
+   answer: it lifts, it follows the pointer and it SNAPS to the nearest legal
+   cell, so a spread of gold under it is a second, louder answer to a question
+   already settled - and on a full board it lit half the room.
+
+   SPOTS is still computed and still does all the work; it is only not painted. */
+function paintSpots(){
+  for(const t of TILES){
+    t.userData.on=false;
+    t.material=mat(t.userData.base);
+    t.position.y=0;
+  }
+  /* The seat you are holding lifts and grows a little. ⚠ Scale as well as
+     height: lifted alone it just slides up the screen in a top-down view and
+     reads as nothing at all. */
+  for(const id in SEATMESH){
+    const m=SEATMESH[id], up=!!SEL&&SEL.id===+id;
+    m.position.y=up?0.20:0;
+    m.scale.setScalar(up?1.06:1);
+  }
+}
+
+/** Everything that moves on its own: the line shifting its weight, the glowing
+    tiles breathing, and the little squash of somebody landing in a seat. */
+function idle(dt){
+  CLOCK+=dt/1000;
+  const q=peepG&&peepG.userData.q;
+  if(q) for(let i=0;i<q.length;i++){
+    const sl=q[i];
+    if(!sl.visible) continue;
+    sl.position.y=0.02+Math.sin(CLOCK*1.5+i*0.85)*0.016;
+    sl.rotation.z=Math.sin(CLOCK*1.1+i*1.7)*0.022;
+  }
+  if(peepG) for(const m of peepG.children){
+    const at=m.userData.sat;
+    if(!at) continue;
+    const k=(performance.now()-at)/260;
+    if(k>=1){ m.userData.sat=0; m.scale.set(1,1,1); continue; }
+    const e=Math.sin(k*Math.PI)*(1-k);
+    m.scale.set(1+e*0.10,1-e*0.16,1+e*0.10);
+  }
+}
+
+/* ---------------------------------------------------------------- input
+   Press and hold a seat, drag it onto a glowing tile, let go - which is what the
+   shipped game's own walkthrough tells a player to do. This prototype used to be
+   click-then-click, and carried a bug on top of it: a placement is stored as the
+   seat's ORIGIN cell, the highlight lit every cell the seat would COVER, and the
+   click test compared the tapped cell against the origin. So on every two-cell
+   seat half the glowing tiles did nothing at all. Both are fixed here: the drag
+   snaps to the nearest legal placement, and a tap anywhere inside a footprint
+   drops the seat there. */
+const ray=new THREE.Raycaster(), pt=new THREE.Vector2();
+const FLOOR=new THREE.Plane(new THREE.Vector3(0,1,0),0), HIT=new THREE.Vector3();
+let DRAG=null;
+
+function aim(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  pt.x=((e.clientX-r.left)/r.width)*2-1;
+  pt.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(pt,camera);
+}
+/** Where on the floor the pointer is, in fractional grid coordinates.
+    ⚠ Through rootG's inverse, not raw world x/z: the drifting camera turns that
+    group, and without this the grab would slide off by the drift angle. */
+function pointerGrid(e){
+  aim(e);
+  if(!ray.ray.intersectPlane(FLOOR,HIT)) return null;
+  const p=rootG.worldToLocal(HIT.clone());
+  return [p.x/GAP+(S.W-1)/2,p.z/GAP+(S.H-1)/2];
+}
+function seatUnder(e){
+  aim(e);
+  for(const h of ray.intersectObjects([seatG],true)){
+    let o=h.object;
+    while(o){ if(o.userData&&o.userData.seatId!=null) return S.combs[o.userData.seatId]; o=o.parent; }
+  }
+  return null;
+}
+const footCentre=(b,c,r)=> (b.dir&1) ? [c,r+(b.len-1)/2] : [c+(b.len-1)/2,r];
+/** The legal placement whose footprint sits nearest the pointer. Home counts, so
+    a drag that wanders off the board puts the seat back rather than losing it. */
+function snapTo(b,spots,g){
+  let best=[b.c,b.r], bd=Infinity;
+  for(const sp of spots.concat([[b.c,b.r]])){
+    const fc=footCentre(b,sp[0],sp[1]);
+    const d=(fc[0]-g[0])*(fc[0]-g[0])+(fc[1]-g[1])*(fc[1]-g[1]);
+    if(d<bd){ bd=d; best=sp; }
+  }
+  return best;
+}
+/** Move only the MESH, so a drag can be abandoned without touching the model. */
+function preview(g,b,at){
+  const m=SEATMESH[b.id]; if(!m) return;
+  const hc=b.c,hr=b.r; b.c=at[0]; b.r=at[1];
+  const cs=cellsOf(b); let sx=0,sz=0;
+  for(const p of cs){ sx+=wx(g,p[0]); sz+=wz(g,p[1]); }
+  b.c=hc; b.r=hr;
+  m.userData.to=[sx/cs.length,sz/cs.length];
+}
+function drop(b,at){
+  if(!fits(S,b,at[0],at[1])){ preview(S,b,[b.c,b.r]); say("Somebody is standing there.","warn"); return; }
+  place(S,b,at[0],at[1]); placeMesh(S,b,false);
+  SEL=null; SPOTS=[]; paintSpots(); say("");
+}
+
+view.addEventListener("pointerdown",function(e){
+  if(!S||S.phase!=="play") return;
+  const b=seatUnder(e);
+  if(!b){
+    // a tap on the floor with a seat already picked up: drop it there
+    const g=pointerGrid(e);
+    if(SEL&&SPOTS.length&&g){
+      const at=snapTo(SEL,SPOTS,g);
+      if(at[0]!==SEL.c||at[1]!==SEL.r){ drop(SEL,at); return; }
+    }
+    SEL=null; SPOTS=[]; paintSpots(); return;
+  }
+  if(FIXED(b)){ SEL=null; SPOTS=[]; paintSpots();
+    say("Grey seats are bolted to the floor. They never move.","warn"); return; }
+  SEL=b; SPOTS=placements(S,b); paintSpots();
+  if(!SPOTS.length){ say("Nowhere for that seat to slide.","warn"); return; }
+  say("");
+  DRAG={b:b,home:[b.c,b.r],at:[b.c,b.r]};
+  try{ renderer.domElement.setPointerCapture(e.pointerId); }catch(_){}
+});
+view.addEventListener("pointermove",function(e){
+  if(!DRAG) return;
+  const g=pointerGrid(e); if(!g) return;
+  const at=snapTo(DRAG.b,SPOTS,g);
+  if(at[0]!==DRAG.at[0]||at[1]!==DRAG.at[1]){ DRAG.at=at; preview(S,DRAG.b,at); }
+});
+function endDrag(e){
+  if(!DRAG) return;
+  const d=DRAG; DRAG=null;
+  try{ renderer.domElement.releasePointerCapture(e.pointerId); }catch(_){}
+  if(d.at[0]===d.home[0]&&d.at[1]===d.home[1]){
+    preview(S,d.b,d.home);        // a tap, not a drag: leave it picked up
+    return;
+  }
+  drop(d.b,d.at);
+}
+view.addEventListener("pointerup",endDrag);
+view.addEventListener("pointercancel",endDrag);
+
+/* ------------------------------------------------------------------ hud */
+/* ⚠ MSG_TONE, not TONE. The palette above owns that name, and a second
+   top-level `const TONE` in the same scope is a parse error that kills the
+   whole file - the third name collision this pair of prototypes has produced,
+   which is why build_proto.py now checks for them. */
+const MSG_TONE={good:"#7fd18a",warn:"#f08a5d",gold:"#ffc53d",muted:"#97a2b4"};
+function say(t,tone){
+  const el=document.getElementById("msg");
+  el.textContent=t||""; el.style.color=MSG_TONE[tone]||MSG_TONE.muted;
+}
+function hud(){
+  const g=S;
+  const m=Math.floor(g.left/60), s=Math.floor(g.left%60);
+  document.getElementById("h-time").textContent=m+":"+String(s).padStart(2,"0");
+  document.getElementById("h-left").textContent=(g.total-g.seated)+"/"+g.total;
+  document.getElementById("h-lvl").textContent=g.level;
+}
+const GRADE=["Plain","Hard","Very hard"];
+const LEVELS=Object.keys(BOARDS).map(Number).sort(
+  (a,b)=>((BOARDS[a].diff|0)-(BOARDS[b].diff|0))||(a-b));
+function buildLevels(){
+  const row=document.getElementById("l-row");
+  row.innerHTML="";
+  for(const n of LEVELS){
+    const d=BOARDS[String(n)].diff|0;
+    const b=document.createElement("button");
+    b.type="button"; b.className="lv"+(n===CUR?" on":"");
+    b.innerHTML="Level "+n+(d?' <i>'+GRADE[d]+"</i>":"");
+    b.onclick=function(){ start(n); };
+    row.appendChild(b);
+  }
+}
+function start(n){
+  CUR=n; S=load(n); SEL=null; SPOTS=[];
+  buildBoard(S); layQueue(S); frame(S); buildLevels(); paintSpots();
+  document.getElementById("h-diff").textContent=GRADE[BOARDS[String(n)].diff|0];
+  say("Press and hold a seat, drag it where you want it, then let go.");
+}
+document.getElementById("b-again").onclick=function(){ start(CUR); };
+document.getElementById("b-land").onclick=function(e){
+  LAND=!LAND;
+  e.target.textContent="View: "+(LAND?"landscape":"portrait");
+  e.target.className="btn"+(LAND?" on":"");
+  /* ⚠ The room, not the level. Wall heights depend on the view, so the shell has
+     to be rebuilt - but the seats live in their own group and the model is never
+     touched, so a turn mid-level keeps the game exactly where it was. */
+  buildRoom(S); paintSpots(); frame(S);
+  say(LAND ? "Turned on its side. The board itself has not changed - this is the camera."
+           : "Back to the way the board ships.", LAND?"gold":"muted");
+};
+document.getElementById("b-spin").onclick=function(e){
+  SPIN=!SPIN;
+  e.target.textContent="Camera: "+(SPIN?"drifting":"fixed");
+  e.target.className="btn"+(SPIN?" on":"");
+};
+
+function tick(t){
+  const dt=Math.min(60,t-(LAST||t)); LAST=t;
+  resize();
+  step(dt);
+  idle(dt);
+  /* ⚠ One target, eased. Orientation and the camera drift both want to own
+     rootG.rotation.y; written separately the second one silently cancelled the
+     first and landscape snapped back to portrait the moment drift was on. */
+  if(SPIN) SPINT+=dt/1000;
+  const aim=(LAND?-Math.PI/2:0)+(SPIN?Math.sin(SPINT*0.28)*0.20:0);
+  rootG.rotation.y+=(aim-rootG.rotation.y)*Math.min(1,dt/110);
+  hud();
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+
+if(typeof THREE==="undefined"){
+  document.getElementById("boot").textContent="Three.js did not load";
+}else{
+  three();
+  start(LEVELS[0]);
+  requestAnimationFrame(tick);
+  window.ready=true;
+}
+</script>

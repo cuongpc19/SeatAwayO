@@ -1,0 +1,822 @@
+<title>Honey Set</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Spline+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@500;600&display=swap">
+<style>
+  /* A committed single look: a lit hive seen in a dark workshop. No light theme -
+     the board reads by colour against a dark ground, and a pale version of it
+     would need a different palette for the combs, not an inverted one. Every
+     colour is painted explicitly so the page holds on either host ground. */
+  :root{
+    --ground:#17100a; --panel:#241a0e; --panel-2:#2e2112; --line:#43301a;
+    --wax:#e8b23c; --honey:#ffd166; --ink:#efe2ca; --muted:#b09a79;
+    --good:#8fc866; --warn:#ef8f5a;
+    --disp:"Saira Condensed","Arial Narrow",Arial,sans-serif;
+    --body:"Spline Sans","Segoe UI",system-ui,sans-serif;
+    --mono:"Spline Sans Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.6;
+    padding:22px 18px 48px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+  header{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{
+    font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--wax);
+  }
+  h1{
+    font-family:var(--disp);font-weight:800;font-size:clamp(34px,7vw,54px);
+    line-height:.96;margin:0;letter-spacing:.01em;text-wrap:balance;
+  }
+  .sub{margin:0;color:var(--muted);max-width:62ch}
+
+  /* ---- the play surface, which is the point of the page ---- */
+  .stage{
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    padding:14px;display:flex;flex-direction:column;gap:12px;
+  }
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  /* The ladder, easiest first. ⚠ Difficulty is on the button, not in a legend:
+     board 19 is one of only two VERY HARD boards in the first sixty, and picking
+     it as a first try is what makes the prototype feel broken rather than hard. */
+  .levels{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .lv{
+    font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.06em;
+    cursor:pointer;border:1px solid var(--line);background:var(--panel-2);
+    color:var(--muted);border-radius:9px;padding:5px 10px;display:flex;gap:6px;align-items:baseline;
+  }
+  .lv:hover{border-color:var(--wax);color:var(--ink)}
+  .lv:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
+  .lv.on{background:var(--wax);border-color:var(--wax);color:#221604}
+  .lv i{font-style:normal;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.85}
+  .lv.d1 i{color:var(--warn)} .lv.d2 i{color:#ff7b6b}
+  .lv.on i{color:#5c3a04}
+  .lv-note{font-size:12.5px;color:var(--muted);width:100%;margin-top:2px}
+  .readout{
+    display:flex;gap:8px;flex-wrap:wrap;margin-right:auto;
+  }
+  .stat{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+    padding:5px 11px;display:flex;gap:7px;align-items:baseline;
+  }
+  .stat span{
+    font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .stat b{font-family:var(--mono);font-weight:600;font-size:14px;color:var(--honey);
+          font-variant-numeric:tabular-nums}
+  .btn{
+    font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.1em;
+    text-transform:uppercase;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);border-radius:10px;padding:7px 13px;
+  }
+  .btn:hover{border-color:var(--wax)}
+  .btn:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
+  .btn.on{background:var(--wax);border-color:var(--wax);color:#221604}
+  .btn.smoke.on{background:var(--honey);border-color:var(--honey)}
+  #msg{
+    min-height:1.5em;font-family:var(--disp);font-weight:700;font-size:15px;
+    letter-spacing:.04em;color:var(--muted);
+  }
+  canvas{display:block;width:100%;border-radius:12px;background:#120c06;touch-action:none}
+
+  /* ---- what the prototype was built to answer ---- */
+  .find{display:grid;gap:18px;grid-template-columns:1fr}
+  @media(min-width:760px){ .find{grid-template-columns:1.15fr .85fr} }
+  h2{
+    font-family:var(--disp);font-weight:800;font-size:21px;letter-spacing:.04em;
+    text-transform:uppercase;margin:0 0 10px;color:var(--wax);
+  }
+  /* ⚠ min-width:0 on the grid child, not just overflow on the wrapper. A grid
+     item's min-width defaults to auto, so the 420px table set the column's floor
+     and pushed the whole page 38px wider than a 400px phone. */
+  .find > div{min-width:0}
+  .tablewrap{overflow-x:auto;min-width:0}
+  table{border-collapse:collapse;width:100%;min-width:420px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{
+    font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  td{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+  td.lab{font-family:var(--body);font-size:14px}
+  .tag{
+    font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;padding:2px 8px;border-radius:999px;display:inline-block;
+  }
+  .tag.win{background:rgba(143,200,102,.16);color:var(--good);border:1px solid rgba(143,200,102,.4)}
+  .tag.dead{background:rgba(239,143,90,.16);color:var(--warn);border:1px solid rgba(239,143,90,.45)}
+  .find p{margin:0 0 11px;color:var(--muted)}
+  .find p b,.find li b{color:var(--ink);font-weight:600}
+  .find ul{margin:0;padding-left:18px;color:var(--muted)}
+  .find li{margin-bottom:7px}
+  .caveat{
+    border-left:3px solid var(--warn);padding:2px 0 2px 13px;color:var(--muted);
+  }
+  footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Prototype &middot; seven campaign boards, transposed</div>
+  <h1>Honey Set</h1>
+  <p class="sub">The seating puzzle&rsquo;s own board data, asking what happens to a comb once it
+  fills. In the game these boards come from, a full seat vanishes and the floor empties out as you
+  play &mdash; so the last bees are the easiest. Here nothing vanishes.</p>
+</header>
+
+<section class="stage">
+  <div class="toolbar">
+    <div class="readout">
+      <div class="stat"><span>Board</span><b id="h-lvl">3</b></div>
+      <div class="stat"><span>Grade</span><b id="h-diff">&mdash;</b></div>
+      <div class="stat"><span>Time</span><b id="h-time">--</b></div>
+      <div class="stat"><span>Bees</span><b id="h-left">--</b></div>
+      <div class="stat"><span>Setting</span><b id="h-set">0</b></div>
+    </div>
+    <button class="btn smoke" id="b-smoke" type="button">Smoke &times;3</button>
+    <button class="btn" id="b-again" type="button">Restart</button>
+    <button class="btn on" id="b-rule" type="button">Setting: on</button>
+    <button class="btn" id="b-full" type="button">When full: stays</button>
+  </div>
+  <div class="levels" id="l-row"></div>
+  <div id="msg">Click a comb, then a glowing tile.</div>
+  <canvas id="cv" width="1000" height="600" aria-label="The hive floor: combs to slide, bees walking in from the hatch"></canvas>
+</section>
+
+<section class="find">
+  <div>
+    <h2>What a full comb should do</h2>
+    <p>One greedy auto-player, seven boards. The number is how many drags it took;
+    <b>dead</b> means it ran out of legal moves with bees still queuing.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Board</th><th>Stays &mdash; the game&rsquo;s own rule</th><th>Stays + honey sets</th><th>Sealed when full</th></tr></thead>
+        <tbody>
+          <tr><td class="lab">3</td><td><span class="tag win">5</span></td><td><span class="tag win">5</span></td><td><span class="tag dead">dead 1/7</span></td></tr>
+          <tr><td class="lab">10</td><td><span class="tag win">8</span></td><td><span class="tag win">11</span></td><td><span class="tag dead">dead 2/14</span></td></tr>
+          <tr><td class="lab">12</td><td><span class="tag win">17</span></td><td><span class="tag win">17</span></td><td><span class="tag dead">dead 6/16</span></td></tr>
+          <tr><td class="lab">42</td><td><span class="tag win">249</span></td><td><span class="tag win">196</span></td><td><span class="tag dead">dead 8/20</span></td></tr>
+          <tr><td class="lab">19</td><td><span class="tag win">89</span></td><td><span class="tag win">153</span></td><td><span class="tag dead">dead 14/38</span></td></tr>
+          <tr><td class="lab">59</td><td><span class="tag dead">dead 27/44</span></td><td><span class="tag dead">dead 27/44</span></td><td><span class="tag dead">dead 4/44</span></td></tr>
+          <tr><td class="lab">30</td><td><span class="tag dead">dead</span></td><td><span class="tag dead">dead</span></td><td><span class="tag dead">dead</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caveat" style="margin-top:12px"><b>Boards 30 and 59 measure the player, not the
+    board.</b> They fail in the first column, which is the shipped game&rsquo;s own rule on boards
+    the shipped game sells &mdash; so the auto-player is what ran out. It looks two drags ahead and
+    then falls back to opening floor; every number here is an upper bound.</p>
+  </div>
+  <div>
+    <h2>A rule this game never had</h2>
+    <p>An earlier version of this page compared all of the above against a fourth column called
+    <b>&ldquo;leaves&rdquo;</b> &mdash; a full comb lifting off the floor &mdash; and labelled it
+    the original. It is not. Nothing in <b>src/engine.js</b> removes a seat. The flag I took it from
+    lives only in <b>src/bench_rush.html</b>, an abandoned August prototype that the solver script
+    still points at.</p>
+    <p>So the column is gone, and the first column above is the real baseline: <b>a full piece stays
+    on the floor</b>, stops taking anyone, and goes on being an obstacle you can shove aside.</p>
+    <h2 style="margin-top:18px">What is actually new here</h2>
+    <p><b>Sealing</b> a piece when it fills kills every board tried &mdash; board 3 has seven bees
+    and dies after one. Every board has capacity equal to its queue exactly, so every piece must
+    fill; seal each one as it fills and the movable pieces drain away while the slots still to reach
+    get deeper.</p>
+    <p><b>Honey that sets</b> &mdash; a piece holding one bee but not yet full cannot be moved, and
+    <b>Smoke</b> softens one for one drag &mdash; is the rule worth keeping. On board 19 it takes
+    the puzzle from 89 drags to 153.</p>
+  </div>
+</section>
+
+<footer>
+  Every board is <b>transposed</b>: 6&times;10 portrait becomes 10&times;6 landscape. Swapping the
+  axes relabels every coordinate, so paths, gaps and collisions map one to one and a solvable board
+  stays exactly as solvable. It is a reflection across the diagonal rather than a rotation, which is
+  why a board you know well does not look like itself.
+</footer>
+</div>
+
+<script>
+const BOARDS = {"3":{"id":"Level_00003","w":6,"h":3,"time":240,"diff":0,"queue":[2,2,2,2,2,2,2],"door":[0,2],"seats":[[0,2,1,2,3],[1,0,2,2,3],[2,2,1,2,3],[3,2,1,2,3],[3,0,1,2,3],[4,1,1,2,3]],"holes":[],"locked":[],"level":3},"10":{"id":"Level_00010","w":6,"h":4,"time":240,"diff":0,"queue":[2,2,2,2,2,2,2,2,2,2,2,2,2,2],"door":[0,3],"seats":[[0,2,1,2,3],[0,0,1,2,3],[1,3,1,2,3],[1,1,1,2,3],[1,0,1,2,3],[2,1,2,2,3],[3,2,1,2,3],[3,0,1,2,3],[4,3,1,2,3],[4,0,2,2,3],[5,2,1,2,3],[5,0,1,2,3]],"holes":[],"locked":[],"level":10},"12":{"id":"Level_00012","w":6,"h":4,"time":240,"diff":0,"queue":[4,5,5,2,2,4,5,2,5,2,2,2,5,2,5,2],"door":[0,3],"seats":[[0,2,1,5,3],[0,0,1,5,3],[1,2,1,2,3],[1,1,1,0,3],[1,0,1,2,3],[2,2,1,5,3],[2,0,1,5,3],[3,3,1,0,3],[3,2,1,2,3],[3,1,1,0,3],[3,0,1,2,3],[4,2,1,5,3],[4,0,1,5,3],[5,2,2,4,3],[5,0,1,2,3]],"holes":[],"locked":[],"level":12},"30":{"id":"Level_00030","w":8,"h":5,"time":100,"diff":0,"queue":[3,2,2,2,2,2,1,2,2,2,2,2,4,2,2,2,2,2,4,3,1,2,2,2,2,2],"door":[0,4],"seats":[[0,1,2,4,3],[1,3,1,2,3],[1,2,1,2,3],[1,0,2,0,3],[2,3,2,0,3],[2,2,1,2,3],[2,1,1,2,3],[3,3,1,2,3],[3,1,2,2,3],[4,4,1,2,3],[4,3,1,0,3],[4,1,2,1,3],[5,4,1,2,3],[5,2,1,0,3],[5,0,1,0,3],[6,1,2,3,3],[7,3,2,2,3],[7,1,2,2,3]],"holes":[],"locked":[],"level":30},"42":{"id":"Level_00042","w":8,"h":4,"time":110,"diff":0,"queue":[3,2,3,2,4,2,4,2,3,2,4,2,3,2,4,2,2,2,2,2],"door":[0,3],"seats":[[0,2,2,4,3],[0,1,1,0,3],[1,2,1,2,3],[1,1,1,2,3],[2,3,1,0,3],[2,2,1,2,3],[2,1,1,2,3],[2,0,1,2,3],[3,2,2,3,3],[3,1,1,0,3],[3,0,1,2,3],[4,2,2,4,3],[4,0,2,3,3],[5,2,1,0,3],[5,0,1,2,3],[7,1,1,0,3]],"holes":[],"locked":[],"level":42},"19":{"id":"Level_00019","w":10,"h":6,"time":225,"diff":2,"queue":[4,4,4,4,2,2,2,2,2,2,2,2,3,3,3,3,2,2,2,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2],"door":[0,5],"seats":[[0,2,2,1,3],[1,2,2,1,3],[1,0,2,1,3],[2,4,2,0,3],[2,3,1,2,3],[2,2,1,0,3],[2,1,1,2,3],[2,0,1,0,3],[3,3,1,2,3],[3,2,1,2,3],[4,4,2,3,3],[4,2,2,0,3],[4,0,2,3,3],[5,5,1,0,3],[5,3,2,4,3],[5,1,2,0,3],[6,5,1,2,3],[6,3,1,2,3],[6,1,1,2,3],[7,4,1,2,3],[7,3,1,2,3],[7,1,2,4,3],[8,5,1,2,3],[8,3,1,2,3],[8,0,1,0,3],[9,3,1,0,3],[9,2,1,2,3],[9,1,1,2,3]],"holes":[],"locked":[],"level":19},"59":{"id":"Level_00059","w":10,"h":6,"time":160,"diff":2,"queue":[2,2,2,2,4,4,1,8,1,1,8,2,2,2,2,2,2,4,4,3,2,2,4,3,4,2,2,1,8,2,2,2,1,2,2,2,8,3,2,2,2,2,3,2],"door":[0,5],"seats":[[0,4,2,3,3],[0,0,2,1,3],[1,4,1,2,3],[1,1,2,4,3],[2,4,1,2,3],[2,2,2,0,3],[2,0,1,2,3],[3,5,1,0,3],[3,4,1,2,3],[3,2,1,2,3],[3,1,1,2,3],[3,0,1,0,3],[4,2,2,4,3],[4,1,1,2,3],[5,5,1,1,3],[5,3,2,8,3],[5,2,1,0,3],[5,0,2,4,3],[6,5,1,0,3],[6,3,1,2,3],[6,2,1,2,3],[6,1,1,3,3],[7,5,1,0,3],[7,3,1,3,3],[7,2,1,0,3],[7,1,1,2,3],[7,0,1,0,3],[8,5,1,2,3],[8,2,2,2,3],[8,1,1,2,3],[9,4,2,8,3],[9,3,1,1,3],[9,1,2,2,3],[9,0,1,1,3]],"holes":[],"locked":[],"level":59}};
+
+/* The board rules, shared by both prototypes.
+
+   Lifted from src/engine.js so a prototype answers to the same laws the real
+   boards were designed against: what a piece covers, which side you may enter
+   from, what counts as reachable floor.
+
+   ⚠ ONE copy, inlined into both templates by build_proto.py. It started as a
+   block inside the honey template and was pulled out the moment a second
+   prototype needed it: two copies of a rule set means every fix has to be made
+   twice, and the second one is the one that gets forgotten.
+
+   RULE_FREEZE and RULE_FULL are the honey prototype's experiments. The 3D
+   remake leaves them at false / "leave", which is the original game. */
+
+/* ---------------------------------------------------------------- rules
+   Lifted from src/engine.js so the prototype answers to the same laws the real
+   boards were designed against: what a comb covers, which side you may enter
+   from, what counts as reachable floor. The one new law is SETTING, below. */
+const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
+const FACING = DIRS;                 // 0 up, 1 right, 2 down, 3 left
+const GREY_TAKES = 2;                // a plain wax comb only ever takes the common pollen
+
+let S = null, RULE_FREEZE = true, CUR = 0;
+/* What happens to a piece the moment it fills.
+
+   ⚠ "leave" IS NOT THE ORIGINAL GAME, whatever an earlier version of this
+   comment said. Nothing in src/engine.js or src/game_shell.js ever removes a
+   seat - grep them for it. The `gone` flag I took it from lives only in
+   src/bench_rush.html, an abandoned August prototype that src/solvecheck.py
+   still points at; reading that file and assuming it was the engine put a rule
+   into two prototypes that the shipped game has never had.
+
+     "stay"   it stays and can still be dragged   <- THE SHIPPED GAME
+     "leave"  it lifts off the floor              (bench_rush only; an experiment here)
+     "capped" it stays, sealed, and never moves again (an experiment; kills every board tried)
+
+   A full piece is already refused by accepts(), which tests freeSlots. Staying
+   put is not a special case - it is what happens when nothing removes it. */
+let RULE_FULL = "stay";
+
+const idx = (g,c,r) => r*g.W + c;
+const inBoard = (g,c,r) => c>=0 && c<g.W && r>=0 && r<g.H && !g.hole[idx(g,c,r)];
+const isFree  = (g,c,r) => inBoard(g,c,r) && g.occ[idx(g,c,r)] < 0;
+
+function cellsOf(b){
+  const a=[];
+  for(let k=0;k<b.len;k++) a.push(b.dir&1 ? [b.c,b.r+k] : [b.c+k,b.r]);
+  return a;
+}
+const placeCell = (b,k) => cellsOf(b)[k];            // len === cap in this data
+
+/** Never in over the back wall of the comb. */
+function entryDirs(b){
+  const f=FACING[b.dir];
+  return DIRS.filter(d => !(d[0]===-f[0] && d[1]===-f[1]));
+}
+function cellEntries(g,b,k){
+  const own=new Set(cellsOf(b).map(p=>p[0]+","+p[1]));
+  const pc=placeCell(b,k), out=[];
+  for(const d of entryDirs(b)){
+    const nc=pc[0]+d[0], nr=pc[1]+d[1];
+    if(!inBoard(g,nc,nr) || own.has(nc+","+nr)) continue;
+    out.push([nc,nr]);
+  }
+  return out;
+}
+function place(g,b,c,r){
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=-1;
+  b.c=c; b.r=r;
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=b.id;
+  b.smoked=false;                 // one puff buys one drag, then the honey sets again
+}
+function lift(g,b){                                  // a full comb leaves the board
+  for(const p of cellsOf(b)) g.occ[idx(g,p[0],p[1])]=-1;
+  b.gone=true;
+}
+const walkerAt = (g,c,r) => g.walkers.some(a=>a.cell && a.cell[0]===c && a.cell[1]===r);
+
+function fits(g,b,c,r){
+  const hc=b.c, hr=b.r;
+  b.c=c; b.r=r; const cs=cellsOf(b); b.c=hc; b.r=hr;
+  for(const p of cs){
+    if(!inBoard(g,p[0],p[1])) return false;
+    const id=g.occ[idx(g,p[0],p[1])];
+    if(id>=0 && id!==b.id) return false;
+    if(walkerAt(g,p[0],p[1])) return false;
+  }
+  return true;
+}
+function reachRegion(g){
+  const seen=new Uint8Array(g.W*g.H), DC=g.door[0], DR=g.door[1];
+  if(!isFree(g,DC,DR)) return seen;
+  seen[idx(g,DC,DR)]=1;
+  const st=[[DC,DR]];
+  while(st.length){
+    const p=st.pop();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1];
+      if(isFree(g,nc,nr) && !seen[idx(g,nc,nr)]){ seen[idx(g,nc,nr)]=1; st.push([nc,nr]); }
+    }
+  }
+  return seen;
+}
+function floorDist(g){
+  const dist=new Int32Array(g.W*g.H).fill(-1), DC=g.door[0], DR=g.door[1];
+  if(!isFree(g,DC,DR)) return dist;
+  dist[idx(g,DC,DR)]=0;
+  const q=[[DC,DR]];
+  while(q.length){
+    const p=q.shift();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1];
+      if(!isFree(g,nc,nr) || dist[idx(g,nc,nr)]>=0) continue;
+      dist[idx(g,nc,nr)]=dist[idx(g,p[0],p[1])]+1;
+      q.push([nc,nr]);
+    }
+  }
+  return dist;
+}
+const freeSlots = b => b.occ.reduce((n,v)=>n+(v==null?1:0),0);
+const accepts = (b,ci) => !b.gone && freeSlots(b) > (b.pending||0)
+                       && (b.colour===0 ? ci===GREY_TAKES : b.colour===ci);
+const FIXED = b => b.colour===0;
+
+/* ---- THE NEW LAW ------------------------------------------------------
+   A comb holding honey but not yet full is SETTING: stuck where it stands.
+
+   ⚠ Full combs still lift away, and that is not a detail - it is what keeps the
+   board from clogging. Measured over all 2085 boards: capacity equals queue
+   length on every single one, zero spare slots anywhere. Freeze a comb for good
+   once it fills and the floor runs out on EVERY level. The commitment has to
+   land on the half-filled comb, not the finished one. */
+const isSetting = b => RULE_FREEZE && !b.gone && !b.smoked && b.cap>1
+                    && b.occ.some(v=>v!=null) && freeSlots(b)>0;
+
+/* ---- CAPPED ------------------------------------------------------------
+   With RULE_LIFT off nothing ever leaves the floor: a comb that fills is capped
+   with wax and becomes part of the hive. ⚠ This is the opposite of what I first
+   argued. "A full comb has to lift away or the floor runs out" was reasoning,
+   not measurement, and it was wrong: a comb that stays occupies exactly the
+   cells it already occupied, so the free floor is unchanged. What shrinks is the
+   number of pieces you can still move - which is a difficulty curve that rises
+   instead of falling away, and is the whole point of the change. */
+const canDrag = b => !b.gone && !b.capped && !FIXED(b) && !isSetting(b);
+
+function placements(g,b){
+  if(!canDrag(b)) return [];
+  const seen=new Set([b.c+","+b.r]), out=[], q=[[b.c,b.r]];
+  while(q.length){
+    const p=q.shift();
+    for(const d of DIRS){
+      const nc=p[0]+d[0], nr=p[1]+d[1], key=nc+","+nr;
+      if(seen.has(key)) continue;
+      const hc=b.c, hr=b.r;
+      b.c=p[0]; b.r=p[1];
+      const ok=fits(g,b,nc,nr);
+      b.c=hc; b.r=hr;
+      if(!ok) continue;
+      seen.add(key); out.push([nc,nr]); q.push([nc,nr]);
+    }
+  }
+  return out;
+}
+/** The nearest cell this pollen colour can actually reach. */
+function pickCell(g,ci){
+  const DC=g.door[0], DR=g.door[1];
+  const plug=g.occ[idx(g,DC,DR)];
+  if(plug>=0){                                   // a comb standing in the hatch
+    const b=g.combs[plug];
+    if(b && accepts(b,ci)) for(let k=0;k<b.cap;k++){
+      if(b.occ[k]!=null || b.claim.has(k)) continue;
+      const pc=placeCell(b,k);
+      if(pc[0]===DC && pc[1]===DR) return {b:b,k:k,entry:null};
+    }
+    return null;                                 // hatch blocked: nothing behind it is reachable
+  }
+  const dist=floorDist(g);
+  let best=null, bd=Infinity;
+  for(const b of g.combs){
+    if(!accepts(b,ci)) continue;
+    for(let k=0;k<b.cap;k++){
+      if(b.occ[k]!=null || b.claim.has(k)) continue;
+      for(const e of cellEntries(g,b,k)){
+        const dd=dist[idx(g,e[0],e[1])];
+        if(dd>=0 && dd<bd){ bd=dd; best={b:b,k:k,entry:e}; }
+      }
+    }
+  }
+  return best;
+}
+function walkPath(g,b,k,entry){
+  if(!entry) return [];
+  const dist=floorDist(g);
+  let c=entry[0], r=entry[1];
+  const path=[[c,r]];
+  let guard=0;
+  while(dist[idx(g,c,r)]>0 && guard++<400){
+    for(const d of DIRS){
+      const nc=c+d[0], nr=r+d[1];
+      if(inBoard(g,nc,nr) && dist[idx(g,nc,nr)]===dist[idx(g,c,r)]-1){ c=nc; r=nr; break; }
+    }
+    path.push([c,r]);
+  }
+  path.reverse();
+  path.push(placeCell(b,k));
+  return path;
+}
+
+
+/* ---------------------------------------------------------------- load */
+function load(n){
+  const raw=BOARDS[String(n)];
+  const W=raw.w, H=raw.h;
+  const hole=new Uint8Array(W*H);
+  for(const i of raw.holes) hole[i]=1;
+  const occ=new Int16Array(W*H).fill(-1);
+  const combs=raw.seats.map(function(s,i){
+    return { id:i, c:s[0], r:s[1], cap:s[2], len:s[2], colour:s[3], dir:s[4]|0,
+             occ:new Array(s[2]).fill(null), claim:new Set(), pending:0,
+             gone:false, lifted:0, smoked:false, capped:false };
+  });
+  const g={W:W,H:H,hole:hole,occ:occ,combs:combs,door:raw.door.slice(),
+           queue:raw.queue.slice(),total:raw.queue.length,seated:0,walkers:[],
+           left:raw.time,phase:"play",level:n,cool:0,smoke:3};
+  for(const b of combs) for(const p of cellsOf(b)) occ[idx(g,p[0],p[1])]=b.id;
+  return g;
+}
+
+/* ------------------------------------------------------------- the loop */
+let SEL=null, SPOTS=[], LAST=0, ARMED=false;
+
+function step(dt){
+  const g=S;
+  if(g.phase!=="play") return;
+  g.left-=dt/1000;
+  if(g.left<=0){ g.left=0; g.phase="lose"; say("Out of time.","warn"); return; }
+
+  for(let i=g.walkers.length-1;i>=0;i--){
+    const a=g.walkers[i];
+    a.t+=dt/a.dur;
+    if(a.t>=1){
+      const b=a.b;
+      b.occ[a.k]=a.ci; b.claim.delete(a.k); b.pending--;
+      g.seated++;
+      g.walkers.splice(i,1);
+      if(freeSlots(b)===0){
+        if(RULE_FULL==="leave"){ lift(g,b); b.lifted=performance.now(); }
+        else if(RULE_FULL==="capped") b.capped=true;
+        // "stay": nothing to do - accepts() already refuses a full comb, and it
+        // stays on the floor as an obstacle you can still shove out of the way
+      }
+      if(g.seated>=g.total){ g.phase="win"; say("Every bee is home.","good"); }
+      continue;
+    }
+    const n=a.path.length-1, f=a.t*n, i0=Math.min(n,Math.floor(f)), m=f-i0;
+    const p0=a.path[i0], p1=a.path[Math.min(n,i0+1)];
+    a.x=p0[0]+(p1[0]-p0[0])*m; a.y=p0[1]+(p1[1]-p0[1])*m;
+    a.cell=[Math.round(a.x),Math.round(a.y)];
+  }
+
+  g.cool-=dt;
+  if(g.cool<=0 && g.queue.length && g.walkers.length<2){
+    const ci=g.queue[0], got=pickCell(g,ci);
+    if(got){
+      g.queue.shift();
+      got.b.claim.add(got.k); got.b.pending++;
+      const path=walkPath(g,got.b,got.k,got.entry);
+      const start=path.length?path[0]:placeCell(got.b,got.k);
+      g.walkers.push({b:got.b,k:got.k,ci:ci,path:path.length?path:[start],
+                   t:0,dur:Math.max(260,(path.length||1)*135),
+                   x:start[0],y:start[1],cell:null});
+      g.cool=170;
+    }
+  }
+}
+
+/* ------------------------------------------------------------ rendering */
+const cv=document.getElementById("cv"), cx=cv.getContext("2d");
+const POLLEN   =["#d9cdb4","#e8584f","#f5b324","#9b6cd6","#2fb3a6","#ef7fae","#6fc14b","#cccccc","#f07d28"];
+const POLLEN_DK=["#a8987a","#a83a33","#bb8210","#6f45a3","#1d7d74","#b95583","#4d8c32","#999999","#b2560f"];
+const FONT = '"Saira Condensed","Arial Narrow",Arial,sans-serif';
+let LAY={ox:0,oy:0,cell:80}, VW=1000, VH=600;
+
+/** ⚠ Drawn in CSS pixels with the device ratio pushed into the transform, so
+    the same numbers work on a phone and on a 2x desktop panel. The pointer
+    handler scales through getBoundingClientRect, which agrees with this. */
+function resize(){
+  const box=cv.parentElement.getBoundingClientRect();
+  const w=Math.max(260,Math.floor(box.width-28));
+  const h=Math.round(Math.min(620,Math.max(240,w*0.60)));
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  if(cv.width===Math.round(w*dpr) && cv.height===Math.round(h*dpr)) return;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  cv.style.height=h+"px";
+  VW=w; VH=h;
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+function layout(){
+  const g=S, pad=14;
+  const lane=Math.max(52,Math.min(80,VH*0.13));
+  const cell=Math.floor(Math.min((VW-pad*2)/g.W,(VH-pad*2-lane)/g.H));
+  LAY.cell=cell;
+  LAY.ox=Math.floor((VW-cell*g.W)/2);
+  LAY.oy=Math.floor((VH-lane-cell*g.H)/2);
+  LAY.lane=lane;
+}
+const px=c=>LAY.ox+c*LAY.cell, py=r=>LAY.oy+r*LAY.cell;
+
+function roundRect(x,y,w,h,r){
+  cx.beginPath();
+  cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r);
+  cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath();
+}
+function hexAt(x,y,rad){
+  cx.beginPath();
+  for(let i=0;i<6;i++){
+    const a=Math.PI/180*(60*i-30), vx=x+rad*Math.cos(a), vy=y+rad*Math.sin(a);
+    if(i) cx.lineTo(vx,vy); else cx.moveTo(vx,vy);
+  }
+  cx.closePath();
+}
+
+function drawFloor(){
+  const g=S, cell=LAY.cell;
+  roundRect(LAY.ox-10,LAY.oy-10,cell*g.W+20,cell*g.H+20,16);
+  cx.fillStyle="#2e2112"; cx.fill();
+  cx.strokeStyle="#43301a"; cx.lineWidth=3; cx.stroke();
+  for(let r=0;r<g.H;r++) for(let c=0;c<g.W;c++){
+    if(g.hole[idx(g,c,r)]) continue;
+    hexAt(px(c)+cell/2,py(r)+cell/2,cell*0.46);
+    cx.fillStyle=((c+r)&1)?"#241a0e":"#1e150a"; cx.fill();
+    cx.strokeStyle="rgba(232,178,60,.13)"; cx.lineWidth=1.5; cx.stroke();
+  }
+  const dc=g.door[0], dr=g.door[1];
+  hexAt(px(dc)+cell/2,py(dr)+cell/2,cell*0.46);
+  cx.fillStyle="rgba(232,178,60,.15)"; cx.fill();
+  cx.strokeStyle="#e8b23c"; cx.lineWidth=2.5; cx.stroke();
+  /* ⚠ Inside the hex, not under it. The hatch sits on the bottom row and the
+     waiting line is drawn just below the board, so a label hung beneath it
+     landed straight on the word WAITING. */
+  cx.fillStyle="#e8b23c";
+  cx.font="700 "+Math.max(8,Math.round(cell*0.17))+"px "+FONT;
+  cx.textAlign="center";
+  cx.fillText("HATCH",px(dc)+cell/2,py(dr)+cell/2+Math.round(cell*0.07));
+}
+
+function drawBeeAt(x,y,rad,ci){
+  cx.save(); cx.translate(x,y);
+  cx.fillStyle="rgba(255,255,255,.55)";
+  cx.beginPath(); cx.ellipse(-rad*.5,-rad*.8,rad*.75,rad*.45,-0.5,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(rad*.5,-rad*.8,rad*.75,rad*.45,0.5,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(0,0,rad,rad*0.86,0,0,7);
+  cx.fillStyle=POLLEN[ci]||"#f5b324"; cx.fill();
+  cx.strokeStyle="rgba(0,0,0,.45)"; cx.lineWidth=Math.max(1,rad*0.22);
+  cx.beginPath(); cx.moveTo(-rad*.55,-rad*.5); cx.lineTo(-rad*.55,rad*.5); cx.stroke();
+  cx.beginPath(); cx.moveTo(rad*.1,-rad*.66); cx.lineTo(rad*.1,rad*.66); cx.stroke();
+  cx.restore();
+}
+
+function drawComb(b,now){
+  const cell=LAY.cell, cs=cellsOf(b);
+  let minc=cs[0][0], minr=cs[0][1];
+  for(const p of cs){ if(p[0]<minc) minc=p[0]; if(p[1]<minr) minr=p[1]; }
+  const x=px(minc), y=py(minr);
+  const w=(b.dir&1?1:b.len)*cell, h=(b.dir&1?b.len:1)*cell;
+  const inset=Math.max(3,cell*0.08);
+  let alpha=1, scale=1;
+  if(b.gone){
+    const t=Math.min(1,(now-b.lifted)/420);
+    if(t>=1) return;
+    alpha=1-t; scale=1+t*0.5;
+  }
+  cx.save();
+  cx.globalAlpha=alpha;
+  cx.translate(x+w/2,y+h/2); cx.scale(scale,scale); cx.translate(-(x+w/2),-(y+h/2));
+
+  const setting=isSetting(b), rad=Math.max(6,cell*0.18);
+  roundRect(x+inset,y+inset+3,w-inset*2,h-inset*2,rad);
+  cx.fillStyle=POLLEN_DK[b.colour]||"#888"; cx.fill();
+  roundRect(x+inset,y+inset,w-inset*2,h-inset*2,rad);
+  const grd=cx.createLinearGradient(0,y,0,y+h);
+  grd.addColorStop(0,POLLEN[b.colour]||"#aaa");
+  grd.addColorStop(1,POLLEN_DK[b.colour]||"#777");
+  cx.fillStyle=grd; cx.fill();
+
+  cx.save(); cx.clip();                          // the open face, so the turn is visible
+  cx.fillStyle="rgba(0,0,0,.22)";
+  const f=FACING[b.dir], lip=Math.max(4,cell*0.11);
+  if(f[1]===-1) cx.fillRect(x,y+h-lip,w,lip);
+  else if(f[1]===1) cx.fillRect(x,y,w,lip);
+  else if(f[0]===1) cx.fillRect(x,y,lip,h);
+  else cx.fillRect(x+w-lip,y,lip,h);
+  cx.restore();
+
+  for(let k=0;k<b.cap;k++){
+    const pc=placeCell(b,k);
+    const hx=px(pc[0])+cell/2, hy=py(pc[1])+cell/2;
+    hexAt(hx,hy,cell*0.26);
+    cx.fillStyle=b.occ[k]!=null?"#ffd166":"rgba(0,0,0,.26)"; cx.fill();
+    if(b.occ[k]!=null){
+      cx.strokeStyle="#b47a09"; cx.lineWidth=2; cx.stroke();
+      drawBeeAt(hx,hy,cell*0.17,b.occ[k]);
+    }
+  }
+  if(FIXED(b)){
+    cx.fillStyle="rgba(0,0,0,.42)";
+    cx.font="700 "+Math.max(7,Math.round(cell*0.15))+"px "+FONT;
+    cx.textAlign="center";
+    cx.fillText("WAX",x+w/2,y+h-inset-Math.round(cell*0.05));
+  }
+  if(b.capped){                                  // sealed: part of the hive now
+    roundRect(x+inset,y+inset,w-inset*2,h-inset*2,rad);
+    cx.fillStyle="rgba(232,201,140,.52)"; cx.fill();
+    cx.strokeStyle="rgba(255,232,184,.75)"; cx.lineWidth=2; cx.stroke();
+    for(let k=0;k<b.cap;k++){
+      const pc=placeCell(b,k);
+      hexAt(px(pc[0])+cell/2,py(pc[1])+cell/2,cell*0.27);
+      cx.fillStyle="rgba(244,226,184,.88)"; cx.fill();
+      cx.strokeStyle="rgba(160,124,52,.7)"; cx.lineWidth=1.5; cx.stroke();
+    }
+    cx.fillStyle="rgba(92,64,18,.75)";
+    cx.font="700 "+Math.max(7,Math.round(cell*0.15))+"px "+FONT;
+    cx.textAlign="center";
+    cx.fillText("CAPPED",x+w/2,y+h/2+Math.round(cell*0.30));
+  }
+  if(setting){
+    roundRect(x+inset,y+inset,w-inset*2,h-inset*2,rad);
+    cx.fillStyle="rgba(255,196,60,.34)"; cx.fill();
+    cx.strokeStyle="#ffd166"; cx.lineWidth=2.5; cx.stroke();
+    const drips=Math.max(2,Math.round(w/34));
+    for(let i=0;i<drips;i++){
+      const dx=x+inset+8+i*((w-inset*2-16)/Math.max(1,drips-1));
+      const dh=Math.max(4,cell*0.09)+((i*37)%7);
+      cx.beginPath();
+      cx.moveTo(dx,y+h-inset-2);
+      cx.quadraticCurveTo(dx+3,y+h-inset+dh,dx,y+h-inset+dh+3);
+      cx.quadraticCurveTo(dx-3,y+h-inset+dh,dx,y+h-inset-2);
+      cx.fillStyle="rgba(255,209,102,.85)"; cx.fill();
+    }
+  }
+  if(SEL===b){
+    roundRect(x+2,y+2,w-4,h-4,rad+2);
+    cx.strokeStyle="#fff"; cx.lineWidth=2.5; cx.setLineDash([6,4]); cx.stroke(); cx.setLineDash([]);
+  }
+  cx.restore();
+}
+
+function drawQueue(){
+  const g=S, cell=LAY.cell;
+  const y=LAY.oy+cell*g.H+Math.round(LAY.lane*0.62), x=LAY.ox+4;
+  cx.fillStyle="#b09a79";
+  cx.font="700 "+Math.max(9,Math.round(LAY.lane*0.20))+"px "+FONT;
+  cx.textAlign="left";
+  cx.fillText("WAITING",x,y-Math.round(LAY.lane*0.30));
+  const rad=Math.max(7,Math.min(13,LAY.lane*0.22)), gap=rad*2.4;
+  const room=Math.max(1,Math.floor((VW-LAY.ox*2-60)/gap));
+  const show=Math.min(room,g.queue.length);
+  for(let i=0;i<show;i++) drawBeeAt(x+rad+i*gap,y,rad,g.queue[i]);
+  if(g.queue.length>show){
+    cx.fillStyle="#e8b23c";
+    cx.font="600 "+Math.max(11,Math.round(rad*1.15))+"px "+FONT;
+    cx.textAlign="left";
+    cx.fillText("+"+(g.queue.length-show),x+rad+show*gap,y+rad*0.4);
+  }
+}
+
+function drawSpots(){
+  if(!SEL) return;
+  const cell=LAY.cell;
+  for(const s of SPOTS){
+    for(let k=0;k<SEL.len;k++){
+      const cc=SEL.dir&1?s[0]:s[0]+k, rr=SEL.dir&1?s[1]+k:s[1];
+      hexAt(px(cc)+cell/2,py(rr)+cell/2,cell*0.30);
+      cx.fillStyle="rgba(255,255,255,.20)"; cx.fill();
+      cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=1.5; cx.stroke();
+    }
+  }
+}
+
+function draw(){
+  const now=performance.now();
+  resize();
+  cx.clearRect(0,0,VW,VH);
+  layout();
+  drawFloor();
+  drawSpots();
+  for(const b of S.combs) drawComb(b,now);
+  for(const a of S.walkers) drawBeeAt(px(a.x)+LAY.cell/2,py(a.y)+LAY.cell/2,LAY.cell*0.21,a.ci);
+  drawQueue();
+  hud();
+}
+
+function hud(){
+  const g=S;
+  const m=Math.floor(g.left/60), s=Math.floor(g.left%60);
+  document.getElementById("h-time").textContent=m+":"+String(s).padStart(2,"0");
+  document.getElementById("h-left").textContent=(g.total-g.seated)+"/"+g.total;
+  document.getElementById("h-lvl").textContent=g.level;
+  document.getElementById("h-set").textContent=g.combs.filter(isSetting).length;
+}
+const TONE={good:"#8fc866",warn:"#ef8f5a",wax:"#e8b23c",muted:"#b09a79"};
+function say(t,tone){
+  const el=document.getElementById("msg");
+  el.textContent=t||"";
+  el.style.color=TONE[tone]||TONE.muted;
+}
+
+/* ---------------------------------------------------------------- input */
+function combAt(c,r){
+  const id=S.occ[idx(S,c,r)];
+  return id>=0?S.combs[id]:null;
+}
+cv.addEventListener("pointerdown",function(e){
+  if(S.phase!=="play") return;
+  const rect=cv.getBoundingClientRect();
+  const c=Math.floor(((e.clientX-rect.left)*(VW/rect.width)-LAY.ox)/LAY.cell);
+  const r=Math.floor(((e.clientY-rect.top)*(VH/rect.height)-LAY.oy)/LAY.cell);
+  if(c<0||c>=S.W||r<0||r>=S.H){ SEL=null; SPOTS=[]; return; }
+  if(SEL && SPOTS.some(s=>s[0]===c&&s[1]===r)){
+    place(S,SEL,c,r); SEL=null; SPOTS=[]; say(""); return;
+  }
+  const hit=combAt(c,r);
+  if(!hit){ SEL=null; SPOTS=[]; return; }
+  if(FIXED(hit)){ SEL=null; SPOTS=[]; say("Wax combs are part of the hive. They never move.","wax"); return; }
+  if(ARMED && isSetting(hit) && S.smoke>0){
+    S.smoke--; hit.smoked=true; ARMED=false; smokeBtn();
+    SEL=hit; SPOTS=placements(S,hit);
+    say("Softened. One drag before it sets again.","good");
+    return;
+  }
+  if(isSetting(hit)){
+    SEL=null; SPOTS=[]; ARMED=false; smokeBtn();
+    say(S.smoke>0 ? "That honey has set. Use Smoke to soften it for one drag."
+                  : "That honey has set, and the smoke is gone.","wax");
+    return;
+  }
+  SEL=hit; SPOTS=placements(S,hit);
+  say(SPOTS.length?"":"Nowhere for that comb to slide.","wax");
+});
+
+/* ----------------------------------------------------------------- boot */
+function smokeBtn(){
+  const el=document.getElementById("b-smoke");
+  el.innerHTML="Smoke &times;"+S.smoke;
+  el.className="btn smoke"+(ARMED?" on":"");
+}
+const GRADE=["","Hard","Very hard"];
+/* ⚠ Sorted by GRADE first, then by level. The campaign's own order is not
+   easiest-first: board 19 is one of the two very-hard boards here and by number
+   it lands in the middle of the plain ones, under a row that says the boards
+   climb left to right. The buttons are built from the data rather than written
+   out, so adding a board to boards.json is the only edit a new level needs. */
+const LEVELS=Object.keys(BOARDS).map(Number).sort(
+  (a,b)=>((BOARDS[a].diff|0)-(BOARDS[b].diff|0)) || (a-b));
+
+function buildLevels(){
+  const row=document.getElementById("l-row");
+  row.innerHTML="";
+  for(const n of LEVELS){
+    const d=BOARDS[String(n)].diff|0;
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="lv d"+d+(n===CUR?" on":"");
+    b.dataset.lv=n;
+    b.innerHTML="Board "+n+(d?' <i>'+GRADE[d]+"</i>":"");
+    b.onclick=function(){ start(n); };
+    row.appendChild(b);
+  }
+  const note=document.createElement("div");
+  note.className="lv-note";
+  note.textContent="Ordered by the campaign's own grade, gentlest first. Board 19 - the one that "
+                 + "felt impossible - is VERY HARD, one of only two in the first sixty levels.";
+  row.appendChild(note);
+}
+function start(n){
+  CUR=n; S=load(n); SEL=null; SPOTS=[]; ARMED=false; smokeBtn(); buildLevels();
+  const d=BOARDS[String(n)].diff|0;
+  document.getElementById("h-diff").textContent=d?GRADE[d]:"Plain";
+  say(RULE_FREEZE
+      ? "Setting is ON - a comb that takes one bee is stuck. Turn it off to compare."
+      : "Original rules. Turn Setting on to feel the new law.", RULE_FREEZE?"wax":"muted");
+}
+document.getElementById("b-again").onclick=function(){ start(CUR); };
+document.getElementById("b-smoke").onclick=function(){
+  if(!S.smoke){ say("No smoke left.","warn"); return; }
+  ARMED=!ARMED; SEL=null; SPOTS=[]; smokeBtn();
+  say(ARMED?"Pick a comb whose honey has set.":"");
+};
+const FULL_MODES=["leave","stay","capped"];
+const FULL_SAYS={
+  leave:"Full combs lift away, and the floor opens up as you go. The original rule.",
+  stay:"Nothing vanishes. A full comb stays on the floor, and you can still shove it aside.",
+  capped:"Nothing vanishes, and a full comb is sealed where it stands. Measured: this kills every board tried.",
+};
+document.getElementById("b-full").onclick=function(e){
+  RULE_FULL=FULL_MODES[(FULL_MODES.indexOf(RULE_FULL)+1)%FULL_MODES.length];
+  e.target.textContent="When full: "+(RULE_FULL==="leave"?"leaves":RULE_FULL==="stay"?"stays":"capped");
+  e.target.className="btn"+(RULE_FULL==="leave"?" on":"");
+  say(FULL_SAYS[RULE_FULL],RULE_FULL==="capped"?"warn":RULE_FULL==="stay"?"wax":"muted");
+  start(CUR);
+};
+document.getElementById("b-rule").onclick=function(e){
+  RULE_FREEZE=!RULE_FREEZE;
+  e.target.textContent="Setting: "+(RULE_FREEZE?"on":"off");
+  e.target.className="btn"+(RULE_FREEZE?" on":"");
+  say(RULE_FREEZE ? "Setting is ON - a comb that takes one bee is stuck."
+                  : "Setting is OFF - these are the original rules.",
+      RULE_FREEZE?"wax":"muted");
+};
+function frame(t){
+  const dt=Math.min(60,t-(LAST||t)); LAST=t;
+  step(dt); draw();
+  requestAnimationFrame(frame);
+}
+start(LEVELS[0]);
+requestAnimationFrame(frame);
+window.ready=true;
+</script>
