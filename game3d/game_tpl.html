@@ -1,0 +1,1987 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Seat Fit</title>
+<style>
+  :root{
+    --ground:#12151d; --panel:#1b2029; --panel-2:#242b37; --line:#39424f;
+    --gold:#ffc53d; --gold-dk:#c8890c; --ink:#e8ecf4; --muted:#97a2b4;
+    --good:#7fd18a; --warn:#f08a5d;
+    --disp:"Saira Condensed","Arial Narrow",Arial,sans-serif;
+    --body:"Spline Sans","Segoe UI",system-ui,sans-serif;
+    --mono:"Spline Sans Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);
+       overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column}
+  .screen.on{display:flex}
+
+  /* ---- home ---- */
+  #home{align-items:center;justify-content:center;gap:26px;padding:24px;
+        background:radial-gradient(120% 80% at 50% 18%,#27324a,#12151d 72%)}
+  .brand{font-family:var(--disp);font-weight:800;font-size:clamp(44px,12vw,88px);
+         line-height:.9;letter-spacing:.01em;text-align:center;margin:0;
+         color:var(--gold);text-shadow:0 6px 0 rgba(0,0,0,.35)}
+  .brand small{display:block;font-size:clamp(12px,3.2vw,17px);letter-spacing:.3em;
+               color:var(--muted);font-weight:700;margin-top:10px}
+  .play{font-family:var(--disp);font-weight:800;font-size:clamp(22px,5vw,30px);
+        letter-spacing:.1em;text-transform:uppercase;border:0;border-radius:18px;
+        padding:18px 54px;cursor:pointer;color:#241a02;
+        background:linear-gradient(180deg,#ffd463,var(--gold-dk));
+        box-shadow:0 6px 0 #7a5406,0 14px 26px rgba(0,0,0,.4)}
+  .play:active{transform:translateY(4px);box-shadow:0 2px 0 #7a5406}
+  .hline{font-family:var(--disp);font-weight:700;letter-spacing:.07em;color:var(--muted);
+         text-align:center;font-size:15px;line-height:1.7}
+  .hline b{color:var(--ink)} .hline i{font-style:normal;color:var(--warn)}
+  .hline.wallet{display:flex;align-items:center;justify-content:center;gap:7px;font-size:19px}
+  .hline.wallet b{color:var(--gold);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .hline.wallet .gap{width:16px}
+  .hline.sub{font-size:13px;opacity:.8}
+  .hline.ver{font-size:11px;opacity:.45;letter-spacing:.12em}
+  .starw{width:17px;height:17px;display:inline-block;background:var(--gold);
+         clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+  /* ⚠ Scoped to #home so it outranks the redesign layer. That layer is appended
+     AFTER this style block and sets .icon-btn{position:relative}, which at equal
+     specificity wins on order alone - and the corner button dropped to the foot
+     of the home column, off the bottom of the screen. An id beats it. */
+  #home .icon-btn.corner{position:absolute;top:calc(16px + env(safe-area-inset-top));
+                   right:calc(16px + env(safe-area-inset-right));width:46px;height:46px;z-index:2}
+  .icon-btn .ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9}
+  .btn{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.09em;
+       text-transform:uppercase;cursor:pointer;border:1px solid var(--line);
+       background:var(--panel-2);color:var(--ink);border-radius:10px;padding:8px 14px}
+  .btn:hover{border-color:var(--gold)}
+  .btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  /* ---- play ----
+     The shipped HUD, in shape: a row across the top carrying the level on the
+     left, the clock in the middle and the purse on the right, with the boosters
+     on their own row along the foot of the board. */
+  #play{background:var(--ground)}
+  #view{flex:1;position:relative;min-height:0;background:#141922}
+  /* ⚠ `none`, and on the CANVAS - the same line the shipped 2D build carries at
+     game_head.html:298, which is why that one has always worked on a phone.
+     body has touch-action:manipulation, which still offers a finger to the
+     browser as a pan.
+
+     ⚠ The symptom is NOT a frozen game, whatever an earlier note here claimed.
+     Nothing on this page scrolls - body is overflow:hidden and every screen is
+     position:fixed - so there is no scrolling to steal the gesture. What happens
+     is that the browser keeps deciding whether the finger is a pan, and fires
+     pointercancel partway through: the drag dies mid-move and the seat drops on
+     whatever cell it had snapped to. Plus pull-to-refresh on Chrome Android and
+     rubber-banding on iOS. Intermittent and wrong, rather than dead. */
+  #view canvas{display:block;width:100%;height:100%;touch-action:none}
+  /* ⚠ Safe areas, because the page asks for viewport-fit=cover. Without these
+     the level pill sits under the notch and the purse under the rounded corner
+     on every recent phone held in landscape. */
+  .topbar{position:absolute;left:0;right:0;top:0;z-index:3;
+          display:flex;align-items:center;gap:8px;pointer-events:none;
+          padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
+                  10px calc(12px + env(safe-area-inset-left))}
+  .topbar > *{pointer-events:auto}
+  .side{display:flex;align-items:center;gap:8px;flex:1 1 0;min-width:0}
+  .side.end{justify-content:flex-end}
+  .pill{background:linear-gradient(180deg,#3f6fd8,#2d55ad);border:2px solid #6d9bf0;
+        border-radius:999px;padding:5px 14px;display:flex;align-items:center;gap:8px;
+        box-shadow:0 4px 0 rgba(0,0,0,.35)}
+  .pill-lab{font-family:var(--disp);font-weight:700;font-size:10px;letter-spacing:.15em;
+            text-transform:uppercase;color:#bcd3ff}
+  .pill-val{font-family:var(--disp);font-weight:800;font-size:19px;color:#fff;
+            font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .pill-time{padding:7px 20px;flex:0 0 auto}
+  .pill-time .pill-val{font-size:24px}
+  .pill-time.low{background:linear-gradient(180deg,#d8543f,#a5311f);border-color:#f0866d}
+  .disc{width:17px;height:17px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe58a,#e0a018);
+        border:2px solid #8a5c06;display:inline-block}
+  .icon-btn{width:38px;height:38px;border-radius:12px;border:2px solid #6d9bf0;cursor:pointer;
+            background:linear-gradient(180deg,#3f6fd8,#2d55ad);color:#fff;
+            display:grid;place-items:center;box-shadow:0 4px 0 rgba(0,0,0,.35);
+            font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.08em}
+  .icon-btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+  .grade{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.12em;
+         text-transform:uppercase;border:0;border-radius:8px;padding:5px 9px;color:#2a1402;
+         background:linear-gradient(180deg,#ffcf5c,#e08e18);box-shadow:0 3px 0 rgba(0,0,0,.3)}
+  .grade.g2{background:linear-gradient(180deg,#ff8d7a,#d8412a);color:#fff}
+  .grade[hidden]{display:none}
+
+  /* ---- boosters ---- */
+  .boosters{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));
+            z-index:3;display:flex;gap:14px;justify-content:center;pointer-events:none}
+  .boost{pointer-events:auto;position:relative;width:62px;height:62px;border-radius:18px;
+         border:2px solid rgba(255,255,255,.34);cursor:pointer;display:grid;place-items:center;
+         box-shadow:0 5px 0 rgba(0,0,0,.4);background:linear-gradient(180deg,#7b8598,#59606f)}
+  .boost:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.4)}
+  .boost.time{background:linear-gradient(180deg,#ffa63c,#e06a12)}
+  .boost.jump{background:linear-gradient(180deg,#b07ae8,#7844bb)}
+  .boost.area{background:linear-gradient(180deg,#5fc07a,#2f8b4c)}
+  .boost.locked{background:linear-gradient(180deg,#555d6c,#3a414d);cursor:not-allowed}
+  .boost.armed{outline:3px solid var(--gold);outline-offset:3px}
+  .boost .ico{width:30px;height:30px;fill:none;stroke:#fff;stroke-width:2.1;
+              stroke-linecap:round;stroke-linejoin:round}
+  .boost.locked .ico{stroke:rgba(255,255,255,.4)}
+  .cost{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);
+        display:flex;align-items:center;gap:3px;white-space:nowrap;
+        font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.04em;
+        padding:2px 8px;border-radius:999px;color:#12280f;
+        background:linear-gradient(180deg,#8fe07a,#4aa055)}
+  .cost i{width:9px;height:9px;border-radius:50%;background:#e0a018;border:1px solid #8a5c06}
+  .cost.lv{background:linear-gradient(180deg,#8b93a4,#5c6474);color:#fff}
+  .cost.poor{background:linear-gradient(180deg,#e08a6f,#b04a2c);color:#fff}
+
+  /* ⚠ The HUD is capped and centred, not stretched edge to edge. The redesign
+     lays the bar out as `1fr auto 1fr`, so on a wide window the two 1fr columns
+     shove the gear into one corner and the purse into the other with half a
+     metre of nothing between them. The shipped game never had this because it
+     draws into a fixed 540px design box - the controls are close together there
+     because the box IS narrow. This is that box, as a width cap.
+     ⚠ Scoped to #play so it outranks the redesign layer, which is appended
+     after this block and wins on order at equal specificity. */
+  #play .topbar{
+    /* ⚠ Content-sized columns, packed and centred - not `1fr auto 1fr`.
+       Measured: the left group is 239px (gear, level, grade) and the right is
+       106px (the purse). With 1fr sides the two columns are forced equal, so
+       keeping the clock at the exact centre of the screen means 133px of dead
+       air on the right of it no matter how narrow the bar is capped. Packing
+       them instead gives one even gap and moves the clock a little right of
+       centre, which is the cheaper of the two prices. */
+    grid-template-columns:minmax(0,auto) auto minmax(0,auto);
+    justify-content:center;
+    gap:clamp(8px,2.6vw,24px);
+  }
+
+  #tip{position:absolute;left:0;right:0;bottom:92px;text-align:center;pointer-events:none;
+       font-family:var(--disp);font-weight:700;letter-spacing:.05em;font-size:14px;
+       color:var(--muted);text-shadow:0 2px 6px rgba(0,0,0,.8)}
+
+  /* ---- the card ---- */
+  #card{position:fixed;inset:0;display:none;place-items:center;padding:22px;
+        background:rgba(8,10,15,.72);backdrop-filter:blur(3px);z-index:9}
+  #card.on{display:grid}
+  .cbox{background:var(--panel);border:1px solid var(--line);border-radius:22px;
+        padding:26px 30px;text-align:center;max-width:400px;width:100%;
+        box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .ctitle{font-family:var(--disp);font-weight:800;font-size:34px;letter-spacing:.05em;
+          text-transform:uppercase;margin:0 0 6px}
+  .ctitle.win{color:var(--good)} .ctitle.lose{color:var(--warn)}
+  .cstars{font-size:30px;letter-spacing:.14em;margin:4px 0 10px;color:var(--gold)}
+  .cstars i{font-style:normal;color:#3c4553}
+  .csub{color:var(--muted);margin:0 0 14px;font-size:14px}
+  /* the meter that says what the next level unlocks */
+  .feat{position:relative;height:34px;margin:0 6px 14px}
+  .feat .track{position:absolute;left:0;right:0;top:11px;height:12px;border-radius:99px;
+               background:#2b323e;border:1px solid var(--line)}
+  .feat .fill{position:absolute;left:1px;top:12px;height:10px;border-radius:99px;
+              background:linear-gradient(90deg,#ffcf5c,var(--gold-dk));transition:width .5s ease}
+  .feat .badge{position:absolute;right:-4px;top:0;width:34px;height:34px;border-radius:11px;
+               display:grid;place-items:center;font-family:var(--disp);font-weight:800;
+               font-size:12px;color:#2a1402;background:linear-gradient(180deg,#ffcf5c,#e08e18);
+               box-shadow:0 3px 0 rgba(0,0,0,.3)}
+  .feat .lab{position:absolute;left:0;top:-3px;font-family:var(--disp);font-weight:700;
+             font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .feat[hidden]{display:none}
+  .coins{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 8px;
+         font-family:var(--disp);font-weight:800;font-size:26px;color:var(--gold)}
+  .coins i{width:22px;height:22px;border-radius:50%;
+           background:radial-gradient(circle at 35% 30%,#ffe58a,#e0a018);border:2px solid #8a5c06}
+  .streak{font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.12em;
+          text-transform:uppercase;color:var(--good);margin:0 0 12px}
+  .streak[hidden]{display:none}
+  .crow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .cbtn{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.09em;
+        text-transform:uppercase;border:0;border-radius:14px;padding:13px 26px;cursor:pointer;
+        color:#241a02;background:linear-gradient(180deg,#ffd463,var(--gold-dk));
+        box-shadow:0 4px 0 #7a5406}
+  .cbtn:active{transform:translateY(3px);box-shadow:0 1px 0 #7a5406}
+  .cbtn.ghost{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+              box-shadow:none}
+  /* ---- the progress board ---- */
+  #levels{background:radial-gradient(120% 80% at 50% 10%,#27324a,#12151d 70%);
+          padding:18px;gap:14px;overflow:hidden}
+  .lv-head{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .lv-title{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:.1em;
+            text-transform:uppercase;color:var(--gold);margin:0}
+  .lv-sum{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.05em;
+          color:var(--muted);text-align:center;margin:0;flex:0 0 auto}
+  .lv-sum b{color:var(--gold);font-size:16px}
+  .lv-grid{flex:1 1 auto;min-height:0;overflow-y:auto;display:grid;gap:9px;
+           grid-template-columns:repeat(auto-fill,minmax(58px,1fr));align-content:start;padding:2px}
+  .cell{aspect-ratio:1;border-radius:13px;display:grid;place-items:center;position:relative;
+        font-family:var(--disp);font-weight:800;font-size:15px;color:rgba(255,255,255,.72);
+        background:rgba(20,28,44,.42);box-shadow:0 3px 0 rgba(0,0,0,.26);padding-top:5px}
+  .cell.here{background:linear-gradient(180deg,#ffd964,var(--gold-dk));color:#241a02;
+             box-shadow:0 0 0 3px #fff,0 4px 0 rgba(0,0,0,.32);transform:scale(1.06);z-index:1}
+  .cell.d1{background:linear-gradient(180deg,#e8a13c,#b06c12);color:#2a1402}
+  .cell.d2{background:linear-gradient(180deg,#e0705c,#a8331f);color:#fff}
+  .cell.here.d1,.cell.here.d2{background:linear-gradient(180deg,#ffd964,var(--gold-dk));color:#241a02}
+  .cell .d{position:absolute;inset:3px 0 auto 0;font-size:7.5px;letter-spacing:.07em;
+           color:rgba(255,255,255,.95);text-shadow:0 1px 0 rgba(0,0,0,.3)}
+  .cell.here .d{color:#241a02;text-shadow:none}
+  /* ⚠ Spans the row and stops one short, which puts the far end in the corner:
+     a grid item told to start at column 1 has to begin a fresh row, so the dots
+     always get their own line and the last level lands in the last column. */
+  .cell.dots{grid-column:1/-2;aspect-ratio:auto;min-height:2rem;background:none;box-shadow:none;
+             color:rgba(255,255,255,.5);font-size:1.2rem;letter-spacing:.4em}
+
+  /* ---- the revive offer ----
+     Its own dialog, not the loss card recoloured: this is an offer, and it has
+     to read as one before the player has decided anything. */
+  #revive{position:fixed;inset:0;display:none;place-items:center;padding:22px;z-index:12;
+          background:rgba(8,10,15,.74);backdrop-filter:blur(3px)}
+  #revive.on{display:grid}
+  .rv{position:relative;background:var(--panel);
+      border:2px solid var(--line);border-radius:24px;padding:52px 28px 26px;
+      width:100%;max-width:360px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .rv-banner{position:absolute;left:50%;top:-20px;transform:translateX(-50%);
+             font-family:var(--disp);font-weight:800;font-size:23px;letter-spacing:.08em;
+             text-transform:uppercase;color:#fff;white-space:nowrap;
+             background:linear-gradient(180deg,#e8573f,#b02a18);border:3px solid #ff9b7f;
+             border-radius:999px;padding:7px 30px;box-shadow:0 5px 0 rgba(0,0,0,.35)}
+  .rv-x{position:absolute;right:-10px;top:-10px;width:36px;height:36px;border-radius:50%;
+        border:3px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer;
+        display:grid;place-items:center;font-family:var(--disp);font-weight:800;font-size:17px}
+  .rv-art{position:relative;display:grid;place-items:center;margin:4px 0 10px}
+  .rv-art svg{width:130px;height:130px}
+  .rv-plus{position:absolute;right:34px;top:6px;font-family:var(--disp);font-weight:800;
+           font-size:30px;color:var(--gold);text-shadow:0 3px 0 rgba(0,0,0,.4)}
+  .rv-say{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:.03em;
+          color:var(--ink);margin-bottom:16px}
+  .rv-say b{color:var(--gold)}
+  .rv-go{font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:.08em;
+         text-transform:uppercase;border:0;border-radius:15px;padding:14px 20px;width:100%;
+         cursor:pointer;color:#12280f;display:flex;align-items:center;justify-content:center;gap:12px;
+         background:linear-gradient(180deg,#8fe07a,#3f9455);box-shadow:0 5px 0 #256b34}
+  .rv-go:active{transform:translateY(3px);box-shadow:0 2px 0 #256b34}
+  /* ⚠ rv-cost, not cost. `.cost` is the booster badge and it is position:absolute
+     - reusing the name here positioned the price against the card instead of the
+     button, and flung it into the top-right corner on top of the close button.
+     Third name collision in this build; the first two killed the whole script. */
+  .rv-go .rv-cost{display:flex;align-items:center;gap:5px;font-size:16px}
+  .rv-go .rv-cost i{width:15px;height:15px;border-radius:50%;
+                    background:radial-gradient(circle at 35% 30%,#ffe58a,#e0a018);border:2px solid #8a5c06}
+  .rv-go.poor{background:linear-gradient(180deg,#8b93a4,#5c6474);color:#fff;box-shadow:0 5px 0 #3a414d}
+
+  /* ---- settings and privacy ---- */
+  #settings,#privacy{position:fixed;inset:0;display:none;place-items:center;padding:22px;z-index:13;
+                     background:rgba(8,10,15,.72)}
+  #settings.on,#privacy.on{display:grid}
+  .set-rows{display:flex;flex-direction:column;gap:9px;margin:0 0 14px}
+  .set-tog{width:100%}
+  .crow.set-col{flex-direction:column;gap:9px}
+  .crow.set-col .cbtn{width:100%}
+  .set-link{background:none;border:0;cursor:pointer;margin-top:14px;
+            font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--muted);text-decoration:underline}
+  .priv{max-width:440px;text-align:left}
+  .priv .ctitle{text-align:center}
+  .priv-body{max-height:min(52vh,380px);overflow-y:auto;margin:0 0 16px}
+  .priv-body p{margin:0 0 11px;font-size:13.5px;line-height:1.6;color:var(--muted)}
+  .priv-body b{color:var(--ink)}
+  .priv-body code{font-family:var(--mono);font-size:12px;color:var(--gold)}
+
+  /* ---- the walkthrough ---- */
+  /* ⚠ The overlay does not take clicks, and the wash never does. A booster
+     lesson says "tap the clock button" - and the first build laid a full-screen
+     dimmer over exactly that button, so the only way out of the lesson was the
+     one thing the lesson blocked. Lifting the button with z-index was the first
+     fix and it did not hold: the row sits inside two positioned ancestors, so
+     which stacking context wins is not something to rely on. Letting the wash
+     be scenery is. */
+  #coach{position:fixed;inset:0;display:none;z-index:14;pointer-events:none}
+  #coach.on{display:block}
+  #coach .wash{position:absolute;inset:0;background:rgba(8,10,15,.62);pointer-events:none}
+  .bub{pointer-events:auto;position:absolute;left:50%;transform:translateX(-50%);width:min(340px,calc(100vw - 36px));
+       background:#f1f3f8;color:#232a35;border-radius:18px;padding:17px 19px 15px;text-align:center;
+       box-shadow:0 16px 40px rgba(0,0,0,.5)}
+  .bub.mid{top:50%;transform:translate(-50%,-50%)}
+  .bub.high{top:16%}
+  .bub h5{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.1em;
+          text-transform:uppercase;margin:0 0 6px;color:#b0790a}
+  .bub p{margin:0 0 12px;font-size:14px;line-height:1.55;color:#3a4353}
+  .bub button{font-family:var(--disp);font-weight:800;font-size:14px;letter-spacing:.09em;
+              text-transform:uppercase;border:0;border-radius:12px;padding:10px 22px;cursor:pointer;
+              color:#241a02;background:linear-gradient(180deg,#ffd463,var(--gold-dk));
+              box-shadow:0 4px 0 #7a5406}
+  .bub button:active{transform:translateY(3px);box-shadow:0 1px 0 #7a5406}
+  .bub .waitlab{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.13em;
+                text-transform:uppercase;color:#8b93a4}
+  /* what the lesson points at is lifted out of the wash */
+  .boosters.spot,.topbar.spot{z-index:15}
+  .boosters.spot .boost:not(.lit){opacity:.22;filter:saturate(.25)}
+
+  #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--ground);
+        color:var(--muted);font-family:var(--disp);letter-spacing:.14em;text-transform:uppercase;z-index:20}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="boot">Loading&hellip;</div>
+
+<section class="screen" id="home">
+  <h1 class="brand">Seat Fit<small>Find your happy place</small></h1>
+  <button class="play" id="h-play" type="button">Play</button>
+  <!-- The purse and the road ahead, in the shipped order: what you have, then
+       what is coming, then how much of it there is. -->
+  <div class="hline wallet"><i class="starw"></i><b id="h-stars">0</b>
+       <span class="gap"></span><i class="disc"></i><b id="h-coins">0</b></div>
+  <div class="hline" id="h-nexthard"></div>
+  <div class="hline sub" id="h-waiting"></div>
+  <div class="hline ver" id="h-ver"></div>
+  <!-- Top right, on its own: the progress board is navigation, not a resource.
+       ⚠ No lives button opposite it. The shipped game has one and it is dead -
+       lives are switched off, so it shows a 5 that never changes and gates
+       nothing. Reproducing a dead control is not matching the original. -->
+  <button class="icon-btn corner" id="h-levels" type="button" aria-label="Your progress">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.6"></rect>
+    </svg>
+  </button>
+</section>
+
+<section class="screen" id="levels">
+  <div class="lv-head">
+    <button class="icon-btn" id="l-back" type="button" aria-label="Back">&#9664;</button>
+    <h2 class="lv-title">Your progress</h2>
+  </div>
+  <p class="lv-sum" id="l-sum"></p>
+  <div class="lv-grid" id="l-grid"></div>
+</section>
+
+<section class="screen" id="play">
+  <div id="view">
+    <div class="topbar">
+      <!-- ⚠ A gear, not a back arrow, and no restart beside it. The shipped HUD
+           carries exactly four things - settings, level, grade, clock - plus the
+           purse on the far side. Home and Restart live INSIDE settings, because
+           the one control on the board that is not the clock should not take a
+           player off the board in a single tap. -->
+      <div class="side">
+        <button class="icon-btn" id="g-menu" type="button" aria-label="Settings">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1"></circle>
+            <path d="M12 2.6l1.5 2.3 2.7-.5.5 2.7 2.3 1.5-1.4 2.4 1.4 2.4-2.3 1.5-.5 2.7-2.7-.5L12 21.4
+                     l-1.5-2.3-2.7.5-.5-2.7-2.3-1.5L4.4 13 3 10.6l2.3-1.5.5-2.7 2.7.5z"></path>
+          </svg>
+        </button>
+        <div class="pill"><span class="pill-lab">Level</span><span class="pill-val" id="g-level">1</span></div>
+        <button class="grade" id="g-grade" type="button" hidden></button>
+      </div>
+      <div class="pill pill-time" id="g-timepill">
+        <span class="pill-lab">Time</span><span class="pill-val" id="g-clock">0:00</span>
+      </div>
+      <div class="side end">
+        <div class="pill"><span class="pill-val" id="g-coins">0</span><i class="disc"></i></div>
+      </div>
+    </div>
+    <!-- drawn, not typed: an entity glyph is whatever font the phone happens to
+         have, and the three of them came out at different sizes on every device -->
+    <div class="boosters" id="boosters">
+      <button class="boost time" id="b-time" type="button" aria-label="Add time">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="13" r="8"></circle>
+          <path d="M12 9v4l2.6 2.1M9 2.6h6M18.6 6.4l1.7-1.7"></path>
+        </svg>
+        <span class="cost" id="b-time-cost"><i></i>150</span>
+      </button>
+      <button class="boost jump" id="b-jump" type="button" aria-label="Jump a seat">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3.4v11M12 3.4 7.6 8M12 3.4 16.4 8M4.6 18.6h14.8"></path>
+        </svg>
+        <span class="cost" id="b-jump-cost"><i></i>300</span>
+      </button>
+      <button class="boost area" id="b-area" type="button" aria-label="Add a lane">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.5 4.5h8v15h-8zM16.5 4.5v15"></path>
+          <path d="M6 9.5v8M2 13.5h8"></path>
+        </svg>
+        <span class="cost" id="b-area-cost"><i></i>500</span>
+      </button>
+    </div>
+    <div id="tip"></div>
+  </div>
+</section>
+
+<!-- Settings, built on the win card's own panel so the two read as one family -
+     and so the redesign layer paints it without being asked. -->
+<div id="settings"><div class="cbox">
+  <h2 class="ctitle" id="set-head">Paused</h2>
+  <div class="set-rows">
+    <button class="cbtn ghost set-tog" id="set-sound" type="button">Sound: on</button>
+    <button class="cbtn ghost set-tog" id="set-vibe" type="button">Vibration: on</button>
+  </div>
+  <div class="crow set-col">
+    <button class="cbtn" id="set-resume" type="button">Resume</button>
+    <button class="cbtn ghost" id="set-retry" type="button">Restart level</button>
+    <button class="cbtn ghost" id="set-home" type="button">Home</button>
+  </div>
+  <button class="set-link" id="set-privacy" type="button">Privacy</button>
+</div></div>
+
+<div id="privacy"><div class="cbox priv">
+  <h2 class="ctitle">Privacy</h2>
+  <div class="priv-body">
+    <p>This game is free, has no accounts, and never asks for your name, e-mail
+    address or any other personal detail.</p>
+    <p><b>On your device.</b> Your progress is kept in your browser under
+    <code>seatmatch3d.save.v1</code>: the level you have reached, your stars,
+    your gold, and the sound and vibration switches. Clearing your browser's site
+    data deletes it.</p>
+    <p><b>Sent when a level ends.</b> One row per finished level: the level
+    number, a fingerprint of the board, its difficulty, whether you won, how long
+    it took, how many moves, how many stars, which boosters you spent, the build
+    number and the site it was played on. No identifier for you, and no way to
+    join two rows into one player.</p>
+    <p><b>Nothing else.</b> No advertising, no third-party analytics, no
+    profiling. The rows are used to see which levels are too hard.</p>
+  </div>
+  <button class="cbtn" id="priv-close" type="button">Close</button>
+</div></div>
+
+<div id="revive"><div class="rv">
+  <div class="rv-banner">Time Out!</div>
+  <button class="rv-x" id="rv-x" type="button" aria-label="No thanks">&#10005;</button>
+  <div class="rv-art">
+    <!-- drawn, not an image: the file would be the one asset in the build that
+         is not either geometry or a stroked icon -->
+    <svg viewBox="0 0 140 140" aria-hidden="true">
+      <g stroke="#a8281c" stroke-width="5" stroke-linejoin="round">
+        <path d="M34 116 24 133M106 116l10 17" stroke-width="13" stroke-linecap="round" fill="none"></path>
+        <ellipse cx="30" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(-32 30 33)"></ellipse>
+        <ellipse cx="110" cy="33" rx="21" ry="16" fill="#ffc63a" transform="rotate(32 110 33)"></ellipse>
+        <rect x="63" y="16" width="14" height="16" rx="5" fill="#ffc63a"></rect>
+        <circle cx="70" cy="82" r="47" fill="#e23b30"></circle>
+        <circle cx="70" cy="82" r="35" fill="#fff8ec" stroke-width="4"></circle>
+      </g>
+      <g fill="#d8cfc0">
+        <circle cx="70" cy="55" r="3"></circle><circle cx="97" cy="82" r="3"></circle>
+        <circle cx="70" cy="109" r="3"></circle><circle cx="43" cy="82" r="3"></circle>
+      </g>
+      <path d="M70 82 62 60M70 82l19 11" stroke="#f5a01e" stroke-width="8"
+        stroke-linecap="round" fill="none"></path>
+      <circle cx="70" cy="82" r="6" fill="#e23b30"></circle>
+    </svg>
+    <div class="rv-plus">+60</div>
+  </div>
+  <div class="rv-say">Add <b>60</b> seconds to keep playing!</div>
+  <button class="rv-go" id="rv-go" type="button">
+    <span>Continue</span><span class="rv-cost"><i></i>500</span>
+  </button>
+</div></div>
+
+<div id="coach">
+  <div class="wash" id="coach-wash"></div>
+  <div class="bub mid" id="coach-bub">
+    <h5 id="coach-title"></h5>
+    <p id="coach-text"></p>
+    <button id="coach-go" type="button">Got it</button>
+    <div class="waitlab" id="coach-wait" hidden>Your turn</div>
+  </div>
+</div>
+
+<div id="card"><div class="cbox">
+  <h2 class="ctitle" id="c-title">Level complete!</h2>
+  <div class="cstars" id="c-stars"></div>
+  <p class="csub" id="c-sub"></p>
+  <div class="feat" id="c-feat" hidden>
+    <div class="lab" id="c-feat-lab"></div>
+    <div class="track"></div>
+    <div class="fill" id="c-feat-fill"></div>
+    <div class="badge" id="c-feat-badge"></div>
+  </div>
+  <div class="coins" id="c-coins"><i></i><span>+0</span></div>
+  <div class="streak" id="c-streak" hidden></div>
+  <div class="crow">
+    <button class="cbtn" id="c-go" type="button">Next level</button>
+    <button class="cbtn ghost" id="c-home" type="button">Home</button>
+  </div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.150.1/three.min.js"></script>
+<script>
+const LEVELS = /*__LEVELS__*/;
+
+/*__RULES__*/
+
+/*__PLATFORM__*/
+
+/* ================================================================ the link
+   One read of the query string, at load, for the whole page - the same four
+   flags the shipped game answers, and read the same way.
+
+     ?level=N     open board N straight away, past the home screen AND past the
+                  unlock gate. The picker only lists what has been earned,
+                  which is no help when the board you want is number 300.
+     ?reset=1     wipe the save before it is read. ?reset=1&level=1 is a clean
+                  run from the very top.
+     ?win=1       hand every board a win the moment it opens, so the result
+                  card can be read on any level without solving one.
+     ?intro=NAME  count every other lesson as already met, so NAME's is the one
+                  this level owes: grey | time | jump | area | lock
+
+   None of them is a way round the campaign: a level still has to be won to
+   unlock the next, and a reset is just the blank save.
+
+   ⚠ A bare flag counts, and `=0` is the only way to write one off - people
+   type `?reset` before they type `?reset=1`.
+
+   ⚠ This block sits ABOVE the save read, because ?reset has to wipe before
+   anything is read back, and the flag is dropped from the address bar once
+   read - or every later refresh throws away the progress made since. ?win is
+   deliberately kept: it is a way of LOOKING at something, and refreshing to
+   see it again is the whole use of it. */
+const LINK=new URLSearchParams(location.search);
+const linkFlag=k=>LINK.has(k)&&LINK.get(k)!=="0";
+const RESET_ASKED=linkFlag("reset");
+const WIN_ASKED=linkFlag("win");
+const INTRO_ONLY=LINK.get("intro");
+const LEVEL_ASKED=parseInt(LINK.get("level"),10);
+const DBG_ASKED=linkFlag("dbg");
+if(RESET_ASKED){
+  /* ⚠ Only the address bar here. The save itself is wiped in boot(), AFTER
+     PLATFORM.init() - the host copy has to go too, and it does not exist yet. */
+  LINK.delete("reset");
+  const rest=LINK.toString();
+  history.replaceState(null,"",location.pathname+(rest?"?"+rest:""));
+}
+
+/* ===================================================================== save */
+const SAVE_KEY="seatmatch3d.save.v1";
+let save={unlocked:1,stars:{},coins:0,streak:0,sound:true,vibe:true,seen:[]};
+/** ⚠ Deferred to boot(), not run here. The host preloads the player's cloud
+    save during PLATFORM.init(); reading before that resolves gets the local
+    copy, and the next persist() then pushes that stale copy over their real
+    progress. Reading early is not "a bit out of date" - it is data loss. */
+function loadSave(){
+  try{ const raw=PLATFORM.storage.getItem(SAVE_KEY);
+       if(raw) save=Object.assign(save,JSON.parse(raw)); }
+  catch(e){ /* private window, blocked storage - play on, just do not remember */ }
+}
+function persist(){ PLATFORM.storage.setItem(SAVE_KEY,JSON.stringify(save)); }
+const totalStars=()=>Object.values(save.stars).reduce((n,v)=>n+v,0);
+/** Difficulty of a level, from the data. 0 plain, 1 hard, 2 very hard. */
+const GRADE=["","Hard","Very hard"];
+function nextHardFrom(n){
+  for(let i=n;i<=LEVELS.length;i++) if(LEVELS[i-1].d) return i;
+  return 0;
+}
+
+/* ============================================================== economy
+   The numbers are the shipped game's own, read out of its CF block rather than
+   chosen here: 100 gold a win, a streak bonus that only starts once the streak
+   itself unlocks at level 5, and the three boosters at 8, 14 and 16. */
+const CF={
+  goldWin:100,
+  streakGold:[[3,10],[5,15],[7,20],[10,25]],
+  unlock:{winstreak:5,booster_time:8,booster_jump:14,booster_area:16},
+  boosterTime:{price:150,value:30},
+  boosterJump:{price:300},
+  boosterArea:{price:500}
+};
+const unlockedAt=k=>CF.unlock[k]||0;
+const has=k=>Math.min(save.unlocked,LEVELS.length)>=unlockedAt(k);
+/** What a win pays: a flat purse, plus the streak bonus once it is unlocked. */
+function purse(){
+  let bonus=0;
+  if(has("winstreak")) for(const row of CF.streakGold) if(save.streak+1>=row[0]) bonus=row[1];
+  return {gold:CF.goldWin,bonus:bonus,total:CF.goldWin+bonus};
+}
+
+/* ---- what the next level brings ---------------------------------------
+   The seat features are read off the BOARDS rather than written down. The
+   padlock and the double seat arrive on whatever level first carries one, so
+   the meter follows the ladder if it ever moves again - which it has, twice. */
+let FEATAT=null;
+function firstBoard(pred){
+  for(let i=0;i<LEVELS.length;i++) if(pred(LEVELS[i])) return i+1;
+  return Infinity;
+}
+function featureLevels(){
+  if(!FEATAT) FEATAT=[
+    {id:"grey",label:"Fixed seat",   at:firstBoard(b=>b.s.some(x=>x[3]===0))},
+    {id:"twin",label:"Double seat",  at:firstBoard(b=>b.s.some(x=>x[2]>1))},
+    {id:"lock",label:"Locked seat",  at:firstBoard(b=>!!b.lk)},
+    {id:"door",label:"Second door",  at:firstBoard(b=>!!b.q2)},
+    {id:"time",label:"Time booster", at:unlockedAt("booster_time")},
+    {id:"jump",label:"Jump booster", at:unlockedAt("booster_jump")},
+    {id:"area",label:"Add line",     at:unlockedAt("booster_area")}
+  ].filter(f=>isFinite(f.at)&&f.at>0).sort((a,b)=>a.at-b.at);
+  return FEATAT;
+}
+function featureProgress(cleared){
+  let from=1;
+  for(const f of featureLevels()){
+    if(f.at>cleared){
+      /* `cleared + 1` on top, not `cleared`. The bar has to read full on the
+         card that hands over the level carrying the piece; the other form tops
+         out one level short, which reads as the reward receding. */
+      const span=Math.max(1,f.at-from);
+      return {label:f.label,at:f.at,pct:Math.min(1,(cleared+1-from)/span)};
+    }
+    from=f.at;
+  }
+  return null;
+}
+
+/* ================================================================== the look
+   A toy diorama. Rounded solids, three tones per colour, one warm key with soft
+   shadows plus a cool sky and a cold rim. */
+/* The seat colours, taken from the shipped game - src/engine.js NAMES and CSS.
+
+   ⚠ These are not a palette choice, they are what the colour INDEX in the level
+   data means. Index 2 is sky blue: it is the colour level 1 opens with, it is
+   what a grey seat accepts, and it appears on 490 of the first 600 boards. An
+   invented palette put amber there and every board in the campaign came out
+   wearing the wrong colours.
+
+   ⚠ Index 5 and 6 look out of order on purpose. When sky blue moved to 2, the
+   orange and purple moved with it rather than being re-chosen, because 2 shares
+   a board with 5 on 490 levels - leaving a blue at 5 would have put two blues on
+   those boards that a player has to tell apart at a glance.
+
+   The light and deep tones are the mid colour scaled 1.26 and 0.58, which is the
+   same trick the sprite bake used: one colour per slot, tinted per part, so the
+   family always reads as one colour. */
+const TONE=[
+  {lt:0xbdc5d4,md:0x969ca8,dk:0x575a61},   // 0  grey    - bolted down, takes sky
+  {lt:0xff4e5b,md:0xe83e48,dk:0x87242a},   // 1  red
+  {lt:0x2cc3ff,md:0x239be1,dk:0x145a82},   // 2  sky     - the first colour the game shows
+  {lt:0xfff73a,md:0xfac42e,dk:0x91721b},   // 3  yellow
+  {lt:0x5df974,md:0x4ac65c,dk:0x2b7335},   // 4  green
+  {lt:0xffa435,md:0xfa822a,dk:0x914b18},   // 5  orange
+  {lt:0xcc74ff,md:0xa25cea,dk:0x5e3588},   // 6  purple
+  {lt:0x3ab8ff,md:0x2e92f2,dk:0x1b558c},   // 7  blue
+  {lt:0xff8dde,md:0xf470b0,dk:0x8e4166},   // 8  pink
+  {lt:0xd4ff5d,md:0xa8d94a,dk:0x617e2b},   // 9  lime
+  {lt:0x2fd4c3,md:0x25a89b,dk:0x15615a},   // 10 teal
+  {lt:0xde975d,md:0xb0784a,dk:0x66462b},   // 11 brown
+  {lt:0x4a6cd4,md:0x3b56a8,dk:0x223261}    // 12 navy
+];
+const ROOM={plinth:0x557c78,slab:0xc5bba5,tileA:0xede9dc,tileB:0xdedfd0,
+            wall:0xabc6bc,cap:0xfff2d9,frame:0x326e68,glass:0xa5d9dc,
+            rail:0xcaa66b,step:0xd8cbb3,sill:0xe8b94e,table:0xb99770,lock:0xd9b64a};
+const ROT=[0,-Math.PI/2,Math.PI,Math.PI/2];
+const GAP=1.16, CELLW=0.86;
+
+const view=document.getElementById("view");
+let renderer,scene,camera,rootG,roomG,seatG,peepG;
+let TILES=[],SEATMESH={},CLOCK=0,LAND=false,LAST=0;
+/* Which way up the room sits: automatic, from the shape of the window. Wide
+   gets the landscape room, tall gets the portrait one.
+
+   This is free here, and that is the whole reason it can be automatic - turning
+   the room is a CAMERA move, so the board, its coordinates and the puzzle are
+   untouched. The 2D build had to transpose the level data to leave portrait,
+   which mirrors every board.
+
+   ⚠ No manual override. There was a button, and it could not be made honest:
+   flip the view and the next resize - or simply the next level - put it back,
+   because the fit is recomputed from the window every time. A control that
+   undoes itself is worse than no control, so the window decides and nothing
+   else does. */
+const autoLand=()=>view.clientWidth>view.clientHeight;
+let S=null,SEL=null,SPOTS=[],DRAG=null,CUR=1,MOVES=0;
+/** ⚠ Starts TRUE. gameplayStart/Stop only come out as a matched pair if the
+    game admits it is not playing yet; starting false means the first
+    setPaused(false) sees no change and emits nothing at all. */
+let PAUSED=true;
+/** ⚠ The single place the host is told whether play is live. This is not
+    telemetry - it is how the host knows when it may interrupt with an ad.
+    Emitting from each call site guarantees missing one, and the one missed is
+    where an ad lands in the middle of a turn. */
+function setPaused(v){
+  if(v===PAUSED) return;
+  PAUSED=v;
+  if(v) PLATFORM.gameplayStop(); else PLATFORM.gameplayStart();
+}
+
+const wx=(g,c)=>(c-(g.W-1)/2)*GAP, wz=(g,r)=>(r-(g.H-1)/2)*GAP;
+
+function three(){
+  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
+  renderer.setClearColor(0xc6ddd3,1);
+  if(THREE.ColorManagement) THREE.ColorManagement.enabled=true;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.06;
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  view.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0xc6ddd3,34,78);
+  camera=new THREE.PerspectiveCamera(40,16/10,0.1,160);
+
+  scene.add(new THREE.HemisphereLight(0xe9f9ff,0x71836c,0.85));
+  scene.add(new THREE.AmbientLight(0xffffff,0.14));
+  const key=new THREE.DirectionalLight(0xfff0d6,1.22);
+  key.position.set(4,16,5);
+  key.castShadow=true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.radius=3;
+  key.shadow.bias=-0.0006; key.shadow.normalBias=0.022;
+  const d=20;
+  key.shadow.camera.left=-d; key.shadow.camera.right=d;
+  key.shadow.camera.top=d;   key.shadow.camera.bottom=-d;
+  key.shadow.camera.near=1;  key.shadow.camera.far=56;
+  scene.add(key);
+  /* ⚠ Set .position.set(), never Object.assign. `position` on an Object3D is a
+     read-only accessor, so assigning to it throws - and being inside the boot
+     try/catch, it surfaced as "this device cannot run 3D graphics" on a machine
+     that runs it perfectly well. */
+  const fill=new THREE.DirectionalLight(0x9fc0ff,0.22);
+  fill.position.set(-8,6,5); scene.add(fill);
+  const rim=new THREE.DirectionalLight(0xbcd6ff,0.34);
+  rim.position.set(-4,3.5,-9); scene.add(rim);
+
+  backdrop();
+  rootG=new THREE.Group(); scene.add(rootG);
+}
+
+/* ---- backdrop: a sky to sit under and a floor to stand on ---- */
+function gradTex(stops){
+  const c=document.createElement("canvas"); c.width=8; c.height=256;
+  const x=c.getContext("2d"), g=x.createLinearGradient(0,0,0,256);
+  for(const st of stops) g.addColorStop(st[0],st[1]);
+  x.fillStyle=g; x.fillRect(0,0,8,256);
+  const t=new THREE.CanvasTexture(c);
+  /* ⚠ A CanvasTexture is sRGB and has to say so, or with colour management on it
+     is read as linear and the whole backdrop comes back bleached. */
+  t.encoding=THREE.sRGBEncoding;
+  return t;
+}
+function poolTex(){
+  const n=512,c=document.createElement("canvas"); c.width=c.height=n;
+  const x=c.getContext("2d");
+  const g=x.createRadialGradient(n/2,n/2,0,n/2,n/2,n/2);
+  g.addColorStop(0,"#e9e6cc"); g.addColorStop(0.36,"#d3dcc4");
+  g.addColorStop(0.68,"#b6cfc0"); g.addColorStop(1,"#a4c4ba");
+  x.fillStyle=g; x.fillRect(0,0,n,n);
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+function backdrop(){
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(90,32,20),
+    new THREE.MeshBasicMaterial({
+      map:gradTex([[0,"#f9efd7"],[0.42,"#dcece0"],[0.76,"#bbdbd3"],[1,"#9cbbb5"]]),
+      side:THREE.BackSide,fog:false,depthWrite:false})));
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(40,56),
+    new THREE.MeshBasicMaterial({map:poolTex(),fog:true}));
+  ground.rotation.x=-Math.PI/2; ground.position.y=-1.06;
+  scene.add(ground);
+}
+
+/* ---- rounded geometry, cached by size ---- */
+const GEO=new Map();
+function rbox(w,h,d,r){
+  const k=w.toFixed(3)+"_"+h.toFixed(3)+"_"+d.toFixed(3)+"_"+r.toFixed(3);
+  let g=GEO.get(k); if(g) return g;
+  r=Math.max(0.004,Math.min(r,w/2-0.002,h/2-0.002,d/2-0.002));
+  const sh=new THREE.Shape();
+  const x0=-w/2+r,y0=-h/2+r,x1=w/2-r,y1=h/2-r;
+  sh.moveTo(x0,-h/2); sh.lineTo(x1,-h/2);
+  sh.absarc(x1,y0,r,-Math.PI/2,0);
+  sh.lineTo(w/2,y1);  sh.absarc(x1,y1,r,0,Math.PI/2);
+  sh.lineTo(x0,h/2);  sh.absarc(x0,y1,r,Math.PI/2,Math.PI);
+  sh.lineTo(-w/2,y0); sh.absarc(x0,y0,r,Math.PI,Math.PI*1.5);
+  const depth=Math.max(0.002,d-2*r);
+  g=new THREE.ExtrudeGeometry(sh,{depth:depth,bevelEnabled:true,bevelThickness:r,
+      bevelSize:r,bevelSegments:2,curveSegments:3,steps:1});
+  g.translate(0,0,-depth/2); g.computeVertexNormals();
+  GEO.set(k,g); return g;
+}
+const MAT=new Map();
+function mat(hex,opt){
+  const k=hex+"|"+JSON.stringify(opt||{});
+  if(!MAT.has(k)) MAT.set(k,new THREE.MeshStandardMaterial(
+      Object.assign({color:hex,roughness:0.76,metalness:0.0},opt||{})));
+  return MAT.get(k);
+}
+function solid(w,h,d,r,m,shadow){
+  const o=new THREE.Mesh(rbox(w,h,d,r),m);
+  if(shadow!==false){ o.castShadow=true; o.receiveShadow=true; }
+  return o;
+}
+const tube=(rad,len,m)=>new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,12),m);
+
+/* ============================================================== the room */
+function buildRoom(g){
+  if(roomG) rootG.remove(roomG);
+  roomG=new THREE.Group(); rootG.add(roomG);
+  TILES=[];
+  const W=g.W,H=g.H,SX=W*GAP,SZ=H*GAP,HW=SX/2,HH=SZ/2;
+  const two=g.doors.length>1;
+
+  const plinth=solid(SX+1.8,0.5,SZ+1.5,0.20,mat(ROOM.plinth),false);
+  plinth.receiveShadow=true; plinth.userData.deco=true;
+  plinth.position.set(0,-0.72,0); roomG.add(plinth);
+  const slab=solid(SX+0.8,0.44,SZ+0.8,0.15,mat(ROOM.slab),false);
+  slab.receiveShadow=true; slab.position.y=-0.26; roomG.add(slab);
+
+  for(let r=0;r<H;r++) for(let c=0;c<W;c++){
+    if(g.hole[idx(g,c,r)]) continue;
+    const base=((c+r)&1)?ROOM.tileA:ROOM.tileB;
+    const t=solid(1.0,0.09,1.0,0.05,mat(base),false);
+    t.receiveShadow=true;
+    t.position.set(wx(g,c),0,wz(g,r));
+    t.userData={cell:[c,r],base:base};
+    roomG.add(t); TILES.push(t);
+  }
+
+  const WALLH=1.34, TH=0.22;
+  /* ⚠ A wall standing between the camera and the room has to come down. Which
+     one that is depends on the VIEW, not on the board, so it is read here. */
+  const NEARH=LAND?0.66:WALLH;
+  function wall(len,vertical,x,z,glass,height){
+    const hh=height||WALLH;
+    const m=solid(vertical?TH:len,hh,vertical?len:TH,0.06,mat(ROOM.wall));
+    m.position.set(x,hh/2-0.07,z); roomG.add(m);
+    const cap=solid(vertical?TH+0.07:len+0.07,0.10,vertical?len+0.07:TH+0.07,0.045,mat(ROOM.cap));
+    cap.position.set(x,hh-0.07,z); roomG.add(cap);
+    if(!glass) return;
+    const gm=mat(ROOM.glass,{emissive:0x8dc9cc,emissiveIntensity:0.12,roughness:0.22});
+    for(const at of glass){
+      const win=solid(vertical?0.05:0.58,0.38,vertical?0.58:0.05,0.03,gm,false);
+      const off=TH/2+0.012;
+      win.position.set(vertical?x+(x<0?off:-off):at, hh*0.60, vertical?at:z+(z<0?off:-off));
+      roomG.add(win);
+    }
+  }
+  const colsAt=[],rowsAt=[];
+  for(let c=0;c<W;c++) if(c%2===0) colsAt.push(wx(g,c));
+  for(let r=0;r<H;r++) if(r%2===0) rowsAt.push(wz(g,r));
+
+  wall(SX+0.8,false,0,-HH-0.25,colsAt);
+  wall(SX+0.8,false,0,HH+0.25,null,0.62);
+  // the two long walls, each in segments so their doorways stay open
+  for(let k=0;k<2;k++){
+    const x=k?-HW-0.25:HW+0.25;
+    const gap=(k===0)?g.doors[0][1]:(two?g.doors[1][1]:-1);
+    const h=k?WALLH:NEARH;
+    for(let r=0;r<H;r++){
+      if(r===gap) continue;
+      wall(GAP,true,x,wz(g,r),(!LAND&&!k&&r%2===0)?[wz(g,r)]:null,h);
+    }
+  }
+  if(!two){                                     // a handrail, where there is a wall to hang it on
+    const railM=mat(ROOM.rail,{roughness:0.42});
+    const rail=tube(0.035,SZ+0.5,railM);
+    rail.rotation.x=Math.PI/2;
+    rail.position.set(-HW+0.16,1.42,0); rail.castShadow=true; roomG.add(rail);
+    for(const zz of [-HH+0.6,0,HH-0.6]){
+      const post=tube(0.028,0.58,railM);
+      post.position.set(-HW+0.16,1.14,zz); roomG.add(post);
+    }
+  }
+
+  for(let k=0;k<g.doors.length;k++) doorway(g,k,k?WALLH:NEARH,HW);
+  for(const f of g.fixtures) roomG.add(fixture(g,f));
+  gardenLounge(g,SX,SZ);
+}
+
+/** Scenery sits beyond the room and both queue corridors, never on puzzle cells. */
+function gardenLounge(g,sx,sz){
+  const deco=new THREE.Group(); deco.userData.deco=true; roomG.add(deco);
+  const terrace=solid(sx+3,0.12,2.1,0.12,mat(0xd4c9ae),false);
+  terrace.position.set(0,-0.85,-sz/2-1.65); terrace.receiveShadow=true; deco.add(terrace);
+  const leaves=mat(0x689c7b,{roughness:0.85}), tips=mat(0x94b88b);
+  for(const sign of [-1,1]){
+    const x=sign*(sx/2+0.7), z=-sz/2-1.0;
+    const planter=solid(0.82,0.58,0.82,0.14,mat(0xc08e73));
+    planter.position.set(x,-0.5,z); deco.add(planter);
+    const trunk=tube(0.075,0.8,mat(0x997957)); trunk.position.set(x,0,z); deco.add(trunk);
+    for(let i=0;i<3;i++){
+      const crown=new THREE.Mesh(new THREE.SphereGeometry(0.48-i*0.07,12,8),i===2?tips:leaves);
+      crown.scale.set(1,0.9,0.9); crown.position.set(x+(i===1?0.17:0),0.40+i*0.26,z);
+      crown.castShadow=true; deco.add(crown);
+    }
+  }
+  // Timber bench and brass feet make the exterior read as a waiting garden.
+  for(let i=0;i<3;i++){
+    const slat=solid(2.4,0.1,0.16,0.04,mat(0xb79568));
+    slat.position.set(0,-0.22,-sz/2-1.5+i*0.2); deco.add(slat);
+  }
+  for(const x of [-0.85,0.85]){
+    const leg=solid(0.12,0.6,0.52,0.035,mat(ROOM.frame));
+    leg.position.set(x,-0.55,-sz/2-1.3); deco.add(leg);
+  }
+  // Inset wainscot strips remain below the backrests and help show room depth.
+  const trim=solid(sx+0.35,0.1,0.06,0.02,mat(ROOM.frame),false);
+  trim.position.set(0,0.35,-sz/2-0.12); deco.add(trim);
+}
+
+/** One doorway: a frame, a doorstep and a platform to wait on. */
+function doorway(g,k,hh,HW){
+  const side=k?-1:1, dz=wz(g,g.doors[k][1]), x=side*(HW+0.25);
+  for(const s of [-1,1]){
+    const post=solid(0.20,hh+0.16,0.16,0.05,mat(ROOM.frame));
+    post.position.set(x,(hh+0.16)/2-0.07,dz+s*GAP*0.54); roomG.add(post);
+  }
+  if(hh>0.9){
+    const lintel=solid(0.20,0.16,GAP*1.18,0.05,mat(ROOM.frame));
+    lintel.position.set(x,hh+0.01,dz); roomG.add(lintel);
+  }
+  const step=solid(0.94,0.09,0.94,0.05,mat(ROOM.tileA),false);
+  step.receiveShadow=true;
+  step.position.set(wx(g,g.doors[k][0]),0.005,dz); roomG.add(step);
+  const strip=solid(0.12,0.06,GAP*0.96,0.02,
+                    mat(ROOM.sill,{emissive:ROOM.sill,emissiveIntensity:0.25}),false);
+  strip.position.set(side*(HW-0.06),0.075,dz); roomG.add(strip);
+
+  const queueCount=Math.min(8,queueOf(g,k).length);
+  const queueDirection=dz>0?-1:1;
+  const platformLength=0.9+Math.max(0,queueCount-1)*0.52;
+  const plat=solid(1.55,0.30,platformLength,0.12,mat(ROOM.step),false);
+  plat.receiveShadow=true; plat.userData.deco=true;
+  plat.position.set(side*(HW+0.8),-0.19,dz+queueDirection*(platformLength-0.9)/2); roomG.add(plat);
+  for(let i=0;i<queueCount;i++){
+    const marker=solid(0.22,0.012,0.035,0.005,mat(ROOM.frame),false);
+    marker.position.set(side*(HW+1.35),-0.025,dz+queueDirection*i*0.52);
+    marker.userData.deco=true; roomG.add(marker);
+  }
+}
+
+/** An obstacle: a small table with bottles on it, bolted to its cell. */
+function fixture(g,f){
+  const grp=new THREE.Group();
+  const top=solid(0.82,0.09,0.60,0.04,mat(ROOM.table));
+  top.position.y=0.42; grp.add(top);
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const leg=solid(0.08,0.38,0.08,0.03,mat(0x6a7280));
+    leg.position.set(sx*0.32,0.19,sz*0.22); grp.add(leg);
+  }
+  const bottles=[[-0.20,0x7fbf9a],[0.02,0xd8dde4],[0.22,0x7fbf9a]];
+  for(let i=0;i<bottles.length;i++){
+    const b=tube(0.055,0.20,mat(bottles[i][1],{roughness:0.3}));
+    b.position.set(bottles[i][0],0.57,(i%2?0.07:-0.06)); b.castShadow=true; grp.add(b);
+  }
+  grp.position.set(wx(g,f[0]),0,wz(g,f[1]));
+  return grp;
+}
+
+/* ============================================================== the seat */
+function buildSeat(b){
+  const grp=new THREE.Group();
+  const t=TONE[b.colour]||TONE[0];
+  const L=b.len, w=(L-1)*GAP+CELLW;
+  const add=(m)=>{ m.userData.seatId=b.id; grp.add(m); return m; };
+
+  const plinth=solid(w*0.80,0.11,0.60,0.04,mat(t.dk)); plinth.position.set(0,0.065,0.02); add(plinth);
+  const seat=solid(w,0.20,0.84,0.085,mat(t.md));       seat.position.set(0,0.225,-0.01); add(seat);
+  const pad=solid(w*0.88,0.10,0.70,0.05,mat(t.lt));    pad.position.set(0,0.335,-0.035); add(pad);
+  const back=solid(w,0.58,0.20,0.085,mat(t.md));       back.position.set(0,0.51,0.32); add(back);
+  const bp=solid(w*0.86,0.40,0.11,0.05,mat(t.lt));     bp.position.set(0,0.51,0.225); add(bp);
+  const crown=solid(w*0.95,0.10,0.25,0.045,mat(t.dk)); crown.position.set(0,0.82,0.32); add(crown);
+  for(let k=1;k<b.cap;k++){
+    const dv=solid(0.055,0.17,0.76,0.022,mat(t.dk));
+    dv.position.set((k-b.cap/2)*GAP,0.305,-0.02); add(dv);
+  }
+  for(const sx of [-1,1]){
+    const arm=solid(0.11,0.13,0.64,0.05,mat(t.dk));
+    arm.position.set(sx*(w/2+0.015),0.385,0.015); add(arm);
+  }
+  if(FIXED(b)){
+    const plate=solid(w+0.08,0.05,0.94,0.03,mat(0x626b79),false);
+    plate.position.set(0,0.025,0); add(plate);
+    for(const sx of [-1,1]) for(const sz of [-1,1]){
+      const bolt=tube(0.05,0.07,mat(0x99a3b2,{roughness:0.38}));
+      bolt.position.set(sx*(w/2-0.10),0.065,sz*0.38); add(bolt);
+    }
+  }
+  /* The padlock, on the BACK of the seat, which is where the shipped game puts
+     it. It comes off the moment somebody sits down. */
+  if(b.chain){
+    const lockG=new THREE.Group();
+    const body=solid(0.20,0.20,0.10,0.05,mat(ROOM.lock,{roughness:0.4}));
+    lockG.add(body);
+    const sh=new THREE.Mesh(new THREE.TorusGeometry(0.075,0.022,8,16,Math.PI),
+                            mat(0xcfd6e0,{roughness:0.35}));
+    sh.position.y=0.10; lockG.add(sh);
+    lockG.position.set(0,0.58,0.45);
+    lockG.userData.seatId=b.id; lockG.name="lock";
+    grp.add(lockG);
+  }
+  grp.userData.seatId=b.id;
+  return grp;
+}
+
+/* ========================================================= the passenger */
+function buildPeep(ci){
+  const grp=new THREE.Group();
+  const t=TONE[ci]||TONE[0];
+  /* ⚠ The DEEP tone. A passenger only sits in a seat of their own colour, so a
+     body in the cushion's shade vanishes into it the moment they land. */
+  const body=new THREE.Mesh(peepGeo("body"),mat(t.dk,{roughness:0.48}));
+  body.position.y=0.43; body.castShadow=true; grp.add(body);
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.152,0.176,0.07,16),mat(t.lt));
+  collar.position.y=0.555; grp.add(collar);
+  const skin=[0xf0cbaa,0xc48e69,0xe1ac83][ci%3];
+  const head=new THREE.Mesh(peepGeo("head"),mat(skin,{roughness:0.58}));
+  head.position.y=0.72; head.castShadow=true; grp.add(head);
+  const hair=new THREE.Mesh(peepGeo("hair"),mat([0x49392f,0x725238,0x30343b][ci%3]));
+  hair.position.y=0.735; grp.add(hair);
+  for(const side of [-1,1]){
+    const eye=new THREE.Mesh(peepGeo("eye"),mat(0x263334));
+    eye.position.set(side*0.059,0.726,-0.166); grp.add(eye);
+    const shine=new THREE.Mesh(peepGeo("shine"),mat(0xffffff));
+    shine.position.set(side*0.059-0.004,0.733,-0.181); grp.add(shine);
+  }
+  const nose=new THREE.Mesh(peepGeo("nose"),mat(skin));
+  nose.position.set(0,0.686,-0.176); grp.add(nose);
+  const arms=[];
+  for(const sx of [-1,1]){
+    const pivot=new THREE.Group(); pivot.position.set(sx*0.19,0.52,0);
+    const a=new THREE.Mesh(peepGeo("arm"),mat(t.dk));
+    a.position.y=-0.11; a.castShadow=true;
+    pivot.add(a);
+    const hand=new THREE.Mesh(peepGeo("hand"),mat(skin));
+    hand.position.y=-0.22; pivot.add(hand);
+    grp.add(pivot); arms.push(pivot);
+  }
+  const legs=[],knees=[];
+  for(const side of [-1,1]){
+    const hip=new THREE.Group(); hip.position.set(side*0.095,0.30,0);
+    const thigh=new THREE.Mesh(peepGeo("leg"),mat(t.dk)); thigh.position.y=-0.065; hip.add(thigh);
+    const knee=new THREE.Group(); knee.position.y=-0.13;
+    const shin=new THREE.Mesh(peepGeo("leg"),mat(t.dk)); shin.position.y=-0.055; knee.add(shin);
+    const shoe=solid(0.135,0.075,0.21,0.035,mat(0xfaf1dc));
+    shoe.position.set(0,-0.12,-0.045); shoe.castShadow=true; knee.add(shoe);
+    hip.add(knee); grp.add(hip); legs.push(hip); knees.push(knee);
+  }
+  const bag=solid(0.21,0.24,0.12,0.05,mat(t.md));
+  bag.position.set(0,0.43,0.195); grp.add(bag);
+  grp.userData.backpack=bag;
+  grp.userData.arms=arms;
+  grp.userData.legs=legs; grp.userData.knees=knees;
+  return grp;
+}
+
+/** Shared low-poly meshes keep long queues cheap to rebuild. Forward is local -Z. */
+function peepGeo(kind){
+  const key="peep_"+kind;
+  if(!GEO.has(key)){
+    const sizes={head:0.183,eye:0.021,shine:0.006,nose:0.026,hand:0.051};
+    let geo;
+    if(kind==="body") geo=new THREE.CapsuleGeometry(0.17,0.15,4,12);
+    else if(kind==="hair") geo=new THREE.SphereGeometry(0.19,16,8,0,Math.PI*2,0,1.2);
+    else if(kind==="arm") geo=new THREE.CapsuleGeometry(0.05,0.12,3,8);
+    else if(kind==="leg") geo=new THREE.CapsuleGeometry(0.052,0.055,3,8);
+    else geo=new THREE.SphereGeometry(sizes[kind],12,8);
+    GEO.set(key,geo);
+  }
+  return GEO.get(key);
+}
+
+function posePassenger(mesh,phase,seated){
+  const u=mesh.userData;
+  if(!u.legs) return;
+  // Fill each cushion, while retaining clearance between neighbours on benches.
+  // The scale belongs to the seated pose so the queue and walking lanes stay clear.
+  u.poseScale=seated?[1.48,1.16,1.40]:[1,1,1];
+  mesh.scale.set(...u.poseScale);
+  if(u.backpack) u.backpack.visible=!seated;
+  for(let i=0;i<2;i++){
+    const stride=Math.sin(phase+i*Math.PI);
+    u.legs[i].rotation.x=seated?Math.PI/2:stride*0.62;
+    u.knees[i].rotation.x=seated?-Math.PI/2:-Math.max(0,-stride)*0.72;
+    u.arms[i].rotation.x=seated?0.20:-stride*0.48;
+    u.arms[i].rotation.z=(i===0?1:-1)*0.08;
+  }
+  mesh.rotation.z=seated?0:Math.sin(phase)*0.035;
+}
+
+/* ============================================================ the board */
+function buildBoard(g){
+  buildRoom(g);
+  if(seatG) rootG.remove(seatG);
+  if(peepG) rootG.remove(peepG);
+  seatG=new THREE.Group(); rootG.add(seatG);
+  peepG=new THREE.Group(); rootG.add(peepG);
+  SEATMESH={};
+  for(const b of g.seats){
+    const m=buildSeat(b);
+    seatG.add(m); SEATMESH[b.id]=m;
+    placeMesh(g,b,true);
+  }
+}
+function placeMesh(g,b,snap){
+  const m=SEATMESH[b.id]; if(!m) return;
+  const cs=cellsOf(b);
+  let sx=0,sz=0;
+  for(const p of cs){ sx+=wx(g,p[0]); sz+=wz(g,p[1]); }
+  m.userData.to=[sx/cs.length,sz/cs.length];
+  m.rotation.y=ROT[b.dir];
+  if(snap) m.position.set(m.userData.to[0],0,m.userData.to[1]);
+}
+/** Drop the padlock off a seat that has just been sat in. */
+function unlockMesh(b){
+  const m=SEATMESH[b.id]; if(!m) return;
+  const lock=m.children.find(ch=>ch.name==="lock");
+  if(lock) lock.userData.drop=performance.now();
+}
+
+/** Two lines, one per door, drawn on the platform outside it. */
+function layQueue(g){
+  if(!peepG.userData.q) peepG.userData.q=[];
+  const q=peepG.userData.q;
+  const want=g.doors.length*8;
+  while(q.length<want){ const m=new THREE.Group(); peepG.add(m); q.push(m); }
+  const HW=g.W*GAP/2;
+  for(let k=0;k<g.doors.length;k++){
+    const line=queueOf(g,k), side=k?-1:1, dz=wz(g,g.doors[k][1]);
+    for(let i=0;i<8;i++){
+      const slot=q[k*8+i];
+      while(slot.children.length) slot.remove(slot.children[0]);
+      if(i>=line.length){ slot.visible=false; continue; }
+      slot.visible=true;
+      slot.add(buildPeep(line[i]));
+      // A single line along the outside wall preserves board size on phones.
+      // The first guest faces their own door; the rest face the guest ahead.
+      const direction=dz>0?-1:1;
+      slot.position.set(side*(HW+0.95),0.02,dz+direction*i*0.52);
+      slot.rotation.y=i===0?(side>0?-Math.PI/2:Math.PI/2):(direction>0?0:Math.PI);
+      slot.userData.base=slot.position.y;
+    }
+  }
+}
+
+/* ============================================================== camera */
+const BOX=new THREE.Box3(), CORNER=new THREE.Vector3();
+function inFrame(){
+  for(let i=0;i<8;i++){
+    CORNER.set(i&1?BOX.max.x:BOX.min.x,i&2?BOX.max.y:BOX.min.y,i&4?BOX.max.z:BOX.min.z);
+    CORNER.project(camera);
+    if(Math.abs(CORNER.x)>0.94||CORNER.y>0.76||CORNER.y< -0.68) return false;
+  }
+  return true;
+}
+/** Fit to what is on screen, measured rather than guessed: the room and the
+    queues count, the plinth and the platforms may bleed off the edges. */
+function frame(g){
+  resize();
+  const keep=rootG.rotation.y;
+  rootG.rotation.y=LAND?-Math.PI/2:0;
+  rootG.updateMatrixWorld(true);
+  BOX.makeEmpty();
+  for(const ch of roomG.children) if(!ch.userData.deco) BOX.expandByObject(ch);
+  if(peepG&&peepG.children.length) BOX.expandByObject(peepG);
+  rootG.rotation.y=keep; rootG.updateMatrixWorld(true);
+  const sx=BOX.max.x-BOX.min.x, sz=BOX.max.z-BOX.min.z;
+  const cx=(BOX.max.x+BOX.min.x)/2, cz=(BOX.max.z+BOX.min.z)/2;
+  const AZ=LAND?0.17:0.30;
+  let d=(Math.max(sx/1.72,sz*0.86)+1.1)*1.10;
+  for(let i=0;i<90;i++){
+    camera.position.set(cx+d*0.65*Math.sin(AZ),d*0.76,cz+d*0.65*Math.cos(AZ));
+    camera.lookAt(cx,0.2,cz);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+    if(inFrame()) break;
+    d*=1.028;
+  }
+}
+function resize(){
+  const r=view.getBoundingClientRect();
+  const w=Math.max(240,Math.floor(r.width)), h=Math.max(240,Math.floor(r.height));
+  if(renderer.domElement.width===w*Math.min(2,devicePixelRatio||1)
+     && renderer.domElement.clientHeight===h) return;
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+  renderer.setSize(w,h,false);
+  renderer.domElement.style.width="100%"; renderer.domElement.style.height="100%";
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+
+/* ================================================================ input */
+const ray=new THREE.Raycaster(), pt=new THREE.Vector2();
+const FLOOR=new THREE.Plane(new THREE.Vector3(0,1,0),0), HIT=new THREE.Vector3();
+function aim(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  pt.x=((e.clientX-r.left)/r.width)*2-1;
+  pt.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(pt,camera);
+}
+/** ⚠ Through rootG's inverse, and GAP divided back out. */
+function pointerGrid(e){
+  aim(e);
+  if(!ray.ray.intersectPlane(FLOOR,HIT)) return null;
+  const p=rootG.worldToLocal(HIT.clone());
+  return [p.x/GAP+(S.W-1)/2,p.z/GAP+(S.H-1)/2];
+}
+function seatUnder(e){
+  aim(e);
+  for(const h of ray.intersectObjects([seatG],true)){
+    let o=h.object;
+    while(o){ if(o.userData&&o.userData.seatId!=null) return S.seats[o.userData.seatId]; o=o.parent; }
+  }
+  return null;
+}
+const footCentre=(b,c,r)=>(b.dir&1)?[c,r+(b.len-1)/2]:[c+(b.len-1)/2,r];
+function snapTo(b,spots,gp){
+  let best=[b.c,b.r], bd=Infinity;
+  for(const sp of spots.concat([[b.c,b.r]])){
+    const fc=footCentre(b,sp[0],sp[1]);
+    const dd=(fc[0]-gp[0])*(fc[0]-gp[0])+(fc[1]-gp[1])*(fc[1]-gp[1]);
+    if(dd<bd){ bd=dd; best=sp; }
+  }
+  return best;
+}
+function preview(g,b,at){
+  const m=SEATMESH[b.id]; if(!m) return;
+  const hc=b.c,hr=b.r; b.c=at[0]; b.r=at[1];
+  const cs=cellsOf(b); let sx=0,sz=0;
+  for(const p of cs){ sx+=wx(g,p[0]); sz+=wz(g,p[1]); }
+  b.c=hc; b.r=hr;
+  m.userData.to=[sx/cs.length,sz/cs.length];
+}
+function lift(){
+  for(const id in SEATMESH){
+    const m=SEATMESH[id], up=!!SEL&&SEL.id===+id;
+    m.position.y=up?0.20:0; m.scale.setScalar(up?1.06:1);
+  }
+}
+function drop(b,at){
+  if(!fits(S,b,at[0],at[1])){ preview(S,b,[b.c,b.r]); tip("Somebody is standing there."); return; }
+  place(S,b,at[0],at[1]); placeMesh(S,b,false); MOVES++;
+  SEL=null; SPOTS=[]; lift(); tip("");
+}
+
+/* The flight. Only the ROUTE is special - the landing goes through the same
+   walker tick as everybody who walked in, so the thud, the padlock opening and
+   the win check are not written a second time here. */
+const FLY_MS=640, FLY_UP=1.7;
+function jumpAt(b){
+  const got=jumpBoard(S,b);
+  if(!got){
+    SFX.no(); buzz(8);
+    tip("Tap a lifted seat - one the front of a queue can use.");
+    return;                       // still armed, still unpaid: the tap is free
+  }
+  /* ⚠ Paid HERE, not when the button was pressed. Arming and then changing
+     your mind has to cost nothing, or the cancel is a trap. */
+  if(!payFor("jump",CF.boosterJump.price)){
+    queueOf(S,got.door).unshift(got.ci);        // hand the claim straight back
+    got.b.claim.delete(got.k); got.b.pending--;
+    return;
+  }
+  ARMED=null; boosterUi(); lift(); tip("");
+  teleBooster("jump");
+  if(LESSON&&LESSON.spot==="jump") endLesson();
+  const HW=S.W*GAP/2, side=got.door?-1:1, dz=wz(S,S.doors[got.door][1]);
+  const pc=placeCell(got.b,got.k), from=[side*(HW+0.95),dz];
+  const mesh=buildPeep(got.ci); peepG.add(mesh);
+  mesh.position.set(from[0],0.02,from[1]);
+  S.walkers.push({b:got.b,k:got.k,ci:got.ci,mesh:mesh,cell:null,t:0,dur:FLY_MS,
+                  fly:true,from:from,to:[wx(S,pc[0]),wz(S,pc[1])],
+                  faceTo:ROT[got.b.dir]});
+  layQueue(S);
+}
+view.addEventListener("pointerdown",function(e){
+  if(!S||S.phase!=="play") return;
+  const b=seatUnder(e);
+  if(!b){
+    const gp=pointerGrid(e);
+    if(SEL&&SPOTS.length&&gp){
+      const at=snapTo(SEL,SPOTS,gp);
+      if(at[0]!==SEL.c||at[1]!==SEL.r){ drop(SEL,at); return; }
+    }
+    SEL=null; SPOTS=[]; lift(); return;
+  }
+  /* ⚠ First refusal, ahead of the grey and padlock refusals below: armed, this
+     tap is a passenger flying in, and both of those are places to fly INTO. */
+  if(ARMED==="jump"){ jumpAt(b); return; }
+  if(FIXED(b)){ SEL=null; SPOTS=[]; lift(); tip("Grey seats are bolted down."); return; }
+  if(b.chain){ SEL=null; SPOTS=[]; lift(); tip("Padlocked. It frees up once somebody sits in it."); return; }
+  SEL=b; SPOTS=placements(S,b); lift();
+  if(!SPOTS.length){ tip("Nowhere for that seat to slide."); return; }
+  tip("");
+  DRAG={b:b,home:[b.c,b.r],at:[b.c,b.r]};
+  try{ renderer.domElement.setPointerCapture(e.pointerId); }catch(_){}
+});
+view.addEventListener("pointermove",function(e){
+  if(!DRAG) return;
+  const gp=pointerGrid(e); if(!gp) return;
+  const at=snapTo(DRAG.b,SPOTS,gp);
+  if(at[0]!==DRAG.at[0]||at[1]!==DRAG.at[1]){ DRAG.at=at; preview(S,DRAG.b,at); }
+});
+function endDrag(e){
+  if(!DRAG) return;
+  const d=DRAG; DRAG=null;
+  try{ renderer.domElement.releasePointerCapture(e.pointerId); }catch(_){}
+  if(d.at[0]===d.home[0]&&d.at[1]===d.home[1]){ preview(S,d.b,d.home); return; }
+  drop(d.b,d.at);
+}
+view.addEventListener("pointerup",endDrag);
+view.addEventListener("pointercancel",endDrag);
+
+/* ================================================================= loop */
+function step(dt){
+  const g=S;
+  if(!g||g.phase!=="play"||PAUSED) return;
+  g.left-=dt/1000;
+  if(g.left<=0){ g.left=0; finish(false); return; }
+
+  for(let i=g.walkers.length-1;i>=0;i--){
+    const a=g.walkers[i];
+    a.t+=dt/a.dur;
+    if(a.t>=1){
+      const opened=seatTaken(g,a.b,a.k,a.ci);
+      if(opened) unlockMesh(a.b);
+      const pc=placeCell(a.b,a.k);
+      const facing=ROT[a.b.dir];
+      a.mesh.position.set(wx(g,pc[0])-Math.sin(facing)*0.08,0.16,
+                          wz(g,pc[1])-Math.cos(facing)*0.08);
+      a.mesh.rotation.y=ROT[a.b.dir];
+      a.mesh.userData.seatId=a.b.id;
+      a.mesh.userData.sat=performance.now();
+      SFX.seated(); buzz(12);
+      posePassenger(a.mesh,0,true);
+      const ar=a.mesh.userData.arms;
+      if(ar){ ar[0].rotation.x=0; ar[1].rotation.x=0; }
+      g.walkers.splice(i,1);
+      if(g.seated>=g.total){ finish(true); return; }
+      continue;
+    }
+    if(a.fly){
+      /* ⚠ a.cell stays null. They are in the air, so walkerAt() must not read
+         them as standing on the floor and route somebody else around them. */
+      const e=a.t*a.t*(3-a.t*2);
+      a.mesh.position.set(a.from[0]+(a.to[0]-a.from[0])*e,
+                          0.02+Math.sin(a.t*Math.PI)*FLY_UP,
+                          a.from[1]+(a.to[1]-a.from[1])*e);
+      a.mesh.rotation.y=a.faceTo;
+      posePassenger(a.mesh,a.t*Math.PI*2,false);
+      continue;
+    }
+    const n=a.path.length-1, f=a.t*n, i0=Math.min(n,Math.floor(f)), m=f-i0;
+    const p0=a.path[i0], p1=a.path[Math.min(n,i0+1)];
+    const cx=p0[0]+(p1[0]-p0[0])*m, cz=p0[1]+(p1[1]-p0[1])*m;
+    a.cell=[Math.round(cx),Math.round(cz)];
+    const ph=a.t*n*Math.PI*2;
+    a.mesh.position.set(wx(g,cx),0.02+Math.abs(Math.sin(ph))*0.025,wz(g,cz));
+    /* ⚠ Local -z is forward, matching ROT[], or they walk backwards. */
+    if(p1[0]!==p0[0]||p1[1]!==p0[1]){
+      const target=Math.atan2(-(p1[0]-p0[0]),-(p1[1]-p0[1]));
+      const delta=Math.atan2(Math.sin(target-a.mesh.rotation.y),Math.cos(target-a.mesh.rotation.y));
+      a.mesh.rotation.y+=delta*Math.min(1,dt/65);
+    }
+    posePassenger(a.mesh,ph,false);
+  }
+
+  g.cool-=dt;
+  if(g.cool<=0 && g.walkers.length<2){
+    const got=nextUp(g);
+    if(got){
+      g.lastDoor=got.door;
+      const line=queueOf(g,got.door), ci=line.shift();
+      got.b.claim.add(got.k); got.b.pending++;
+      const path=walkPath(g,got.b,got.k,got.entry,got.door);
+      const start=path.length?path[0]:placeCell(got.b,got.k);
+      const mesh=buildPeep(ci); peepG.add(mesh);
+      mesh.position.set(wx(g,start[0]),0.02,wz(g,start[1]));
+      g.walkers.push({b:got.b,k:got.k,ci:ci,path:path.length?path:[start],
+                      t:0,dur:Math.max(280,(path.length||1)*150),mesh:mesh,cell:null});
+      g.cool=180;
+      layQueue(g);
+    }
+  }
+  for(const b of g.seats){
+    const m=SEATMESH[b.id]; if(!m) continue;
+    const to=m.userData.to; if(!to) continue;
+    const dx=(to[0]-m.position.x)*Math.min(1,dt/90);
+    const dz=(to[1]-m.position.z)*Math.min(1,dt/90);
+    m.position.x+=dx; m.position.z+=dz;
+    if(dx||dz) for(const p of peepG.children)
+      if(p.userData.seatId===b.id){ p.position.x+=dx; p.position.z+=dz; }
+  }
+}
+
+function idle(dt){
+  CLOCK+=dt/1000;
+  /* ⚠ Armed, every seat the front of a queue could be flown into lifts and
+     breathes. Without it "tap a seat" is a guess, and a guess that lands on the
+     wrong colour reads as the booster being broken. lift() puts them all back
+     down, so every path that disarms calls it. */
+  if(S&&S.phase==="play"&&ARMED==="jump"){
+    const p=0.5+0.5*Math.sin(CLOCK*5.2);
+    for(const b of S.seats){
+      const m=SEATMESH[b.id]; if(!m) continue;
+      const ok=jumpDoor(S,b)!=null&&freeSlot(b)>=0;
+      m.position.y=ok?0.11+0.10*p:0;
+      m.scale.setScalar(ok?1.03+0.04*p:1);
+    }
+  }
+  const q=peepG&&peepG.userData.q;
+  if(q) for(let i=0;i<q.length;i++){
+    const sl=q[i]; if(!sl.visible) continue;
+    sl.position.y=0.02+Math.sin(CLOCK*1.5+i*0.85)*0.016;
+    sl.rotation.z=Math.sin(CLOCK*1.1+i*1.7)*0.022;
+  }
+  if(peepG) for(const m of peepG.children){
+    const at=m.userData.sat; if(!at) continue;
+    const k=(performance.now()-at)/260;
+    const base=m.userData.poseScale||[1,1,1];
+    if(k>=1){ m.userData.sat=0; m.scale.set(...base); continue; }
+    const e=Math.sin(k*Math.PI)*(1-k);
+    m.scale.set(base[0]*(1+e*0.10),base[1]*(1-e*0.16),base[2]*(1+e*0.10));
+  }
+  // padlocks falling away from seats that have just been sat in
+  for(const id in SEATMESH){
+    const lock=SEATMESH[id].children.find(ch=>ch.name==="lock");
+    if(!lock||!lock.userData.drop) continue;
+    const k=(performance.now()-lock.userData.drop)/420;
+    if(k>=1){ SEATMESH[id].remove(lock); continue; }
+    lock.position.y=0.58-k*k*1.6;
+    lock.rotation.z=k*2.2;
+  }
+}
+
+function tick(t){
+  const dt=Math.min(60,t-(LAST||t)); LAST=t;
+  if(S&&renderer){
+    resize(); step(dt); idle(dt);
+    rootG.rotation.y+=((LAND?-Math.PI/2:0)-rootG.rotation.y)*Math.min(1,dt/110);
+    hud();
+    renderer.render(scene,camera);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ================================================================ sound
+   No audio file anywhere: a single-file game that has to carry a sound bank
+   stops being a single file. Every cue is a shaped oscillator instead. The
+   context is built on the FIRST CUE rather than at load, because a browser will
+   not let one start before the player has touched something. */
+let AC=null;
+function blip(freq,dur,type,peak,delay){
+  /* ⚠ The host's mute outranks the in-game switch. An in-game toggle must not
+     be able to bring sound back over a page the player has silenced. */
+  if(!save.sound||PLATFORM.hostMuted()) return;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+    const t=AC.currentTime+(delay||0);
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(peak,t+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t+dur+.02);
+  }catch(e){ /* no output device, or a browser that refuses one */ }
+}
+/* A body dropping onto a cushion, not a note. Two things make it that:
+   ⚠ the pitch FALLS - 165Hz to 62 in an eighth of a second. A held tone at any
+   frequency is a chime however quietly it is played.
+   ⚠ a breath of noise under it, low-passed, at a fifth of the tone's level.
+   That is the upholstery; without it the drop is a kick drum. */
+const SEATED_PEAK=.017;
+function thud(peak){
+  if(!save.sound||PLATFORM.hostMuted()) return;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+    const t=AC.currentTime;
+    const lp=AC.createBiquadFilter();
+    lp.type="lowpass"; lp.frequency.value=430; lp.Q.value=.7;
+    lp.connect(AC.destination);
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type="sine";
+    o.frequency.setValueAtTime(165,t);
+    o.frequency.exponentialRampToValueAtTime(62,t+.13);
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(peak,t+.010);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.21);
+    o.connect(g); g.connect(lp);
+    o.start(t); o.stop(t+.23);
+    const n=Math.floor(AC.sampleRate*.16), buf=AC.createBuffer(1,n,AC.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+    const src=AC.createBufferSource(), ng=AC.createGain();
+    src.buffer=buf;
+    ng.gain.setValueAtTime(peak*.2,t);
+    ng.gain.exponentialRampToValueAtTime(.0001,t+.15);
+    src.connect(ng); ng.connect(lp);
+    src.start(t); src.stop(t+.17);
+  }catch(e){}
+}
+function buzz(ms){ try{ if(save.vibe&&navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+/* ⚠ No cue on dragging a seat. It is the thing the player does most - dozens of
+   times a level - and any sound on it becomes a rattle rather than feedback. */
+const SFX={
+  seated:()=>thud(SEATED_PEAK),
+  buy:()=>{ blip(680,.07,"square",.05); blip(1020,.10,"square",.04,.07); },
+  win:()=>[523,659,784,1046].forEach((f,i)=>blip(f,.28,"triangle",.09,i*.11)),
+  lose:()=>{ blip(300,.22,"sawtooth",.06); blip(190,.34,"sawtooth",.06,.13); },
+  no:()=>blip(160,.13,"square",.05)
+};
+
+/* ============================================================= boosters */
+let ARMED=null;                       // "jump" while the next pick-up is a jump
+const $=id=>document.getElementById(id);
+const BOOSTERS=[["time","booster_time",()=>CF.boosterTime.price],
+                ["jump","booster_jump",()=>CF.boosterJump.price],
+                ["area","booster_area",()=>CF.boosterArea.price]];
+function boosterUi(){
+  for(const row of BOOSTERS){
+    const id=row[0], open=has(row[1]), price=row[2]();
+    const b=$("b-"+id), c=$("b-"+id+"-cost");
+    b.classList.toggle("locked",!open);
+    b.classList.toggle("armed",ARMED===id);
+    b.disabled=!open;
+    if(!open){ c.className="cost lv"; c.textContent="LV "+unlockedAt(row[1]); }
+    else { c.className="cost"+(save.coins<price?" poor":""); c.innerHTML="<i></i>"+price; }
+  }
+}
+/** A lesson hands out one free use of the booster it is teaching. */
+function payFor(id,price){
+  if(FREEBIE===id){ FREEBIE=null; return true; }
+  return spend(price);
+}
+function spend(price){
+  if(save.coins<price){ SFX.no(); tip("Not enough gold - "+(price-save.coins)+" short."); return false; }
+  save.coins-=price; SFX.buy(); persist(); paintPurse(); boosterUi(); return true;
+}
+/** ⚠ A lesson PAUSES the board, and the wash over it deliberately does not
+    block clicks - it has to stay out of the way so the lesson can say "tap this
+    button". The cost is that every OTHER booster stays live over a frozen
+    board: arm a jump under the grey seat's card and the passenger hangs in
+    mid-air with the gold already gone. A booster answers while its own lesson
+    is up, or while there is no lesson at all. */
+const boosterOpen=id=>!LESSON||LESSON.spot===id;
+function wireBoosters(){
+  $("b-time").onclick=function(){
+    if(!S||S.phase!=="play"||!has("booster_time")) return;
+    if(!boosterOpen("time")) return;
+    if(!payFor("time",CF.boosterTime.price)) return;
+    S.left+=CF.boosterTime.value; teleBooster("time");
+    if(LESSON&&LESSON.spot==="time") endLesson();
+    tip("+"+CF.boosterTime.value+" seconds.");
+  };
+  $("b-jump").onclick=function(){
+    if(!S||S.phase!=="play"||!has("booster_jump")) return;
+    if(!boosterOpen("jump")) return;
+    if(ARMED==="jump"){ ARMED=null; boosterUi(); lift(); tip(""); return; }
+    // Only a look at the price here - nothing is taken until a jump lands.
+    if(FREEBIE!=="jump"&&save.coins<CF.boosterJump.price){
+      SFX.no(); tip("Not enough gold - "+(CF.boosterJump.price-save.coins)+" short."); return;
+    }
+    ARMED="jump"; SEL=null; SPOTS=[]; DRAG=null; lift(); boosterUi();
+    tip("Tap the seat to fly the next passenger into.");
+  };
+  $("b-area").onclick=function(){
+    if(!S||S.phase!=="play"||!has("booster_area")) return;
+    if(!boosterOpen("area")) return;
+    /* Nobody mid-aisle. Every seat steps one column right, and a walker whose
+       route was computed on the old grid would be walking through furniture. */
+    if(S.walkers.length){ tip("Wait for the aisle to clear."); return; }
+    if(!payFor("area",CF.boosterArea.price)) return;
+    addLine(S); teleBooster("area");
+    if(LESSON&&LESSON.spot==="area") endLesson();
+    SEL=null; SPOTS=[]; DRAG=null;
+    buildBoard(S); layQueue(S); frame(S); lift();
+    tip("A new lane opens up.");
+  };
+}
+
+/* ============================================================ telemetry
+   One row per finished level, straight into the same Realtime Database the 2D
+   build writes to - see ANALYTICS.md.
+
+   ⚠ `from` is "3d", not "web". These rows come from a different renderer AND a
+   different shell, and folding them into the shipped game's winrate would be
+   exactly the mistake that file warns about: two populations under one number.
+   pull_runs.py and stats.html both group by source, so they separate cleanly. */
+const RUNS_URL="https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app/runs.json";
+const BUILD="/*__BUILD__*/";
+/** FNV-1a over the fields that decide what a board actually IS, so a retune is
+    visible in the data rather than silently averaged into the old numbers. */
+function runSig(raw){
+  if(!raw) return "0";
+  const s=JSON.stringify([raw.w,raw.h,raw.t,raw.d|0,raw.dr,raw.dr2,raw.hl,raw.fx,raw.lk,raw.s,raw.q,raw.q2]);
+  let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){
+    h^=s.charCodeAt(i);
+    h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0;
+  }
+  return h.toString(36);
+}
+const isDevHost=h=>h==="localhost"||h==="127.0.0.1"||h===""||
+  /^192\.168\./.test(h)||/^10\./.test(h)||/^172\.(1[6-9]|2\d|3[01])\./.test(h);
+let teleAt=0, teleUsed=[];
+function teleStart(){ teleAt=performance.now(); teleUsed=[]; }
+function teleBooster(id){ if(teleUsed.length<40) teleUsed.push(id); }
+/** Fire and forget. ⚠ Nothing here may throw, block, or hold up a card: a
+    player whose network refuses the write must not be able to tell. */
+function teleEnd(won,stars){
+  if(!teleAt) return 0;
+  const ms=Math.round(performance.now()-teleAt);
+  teleAt=0;
+  let host=""; try{ host=location.hostname; }catch(e){}
+  const row={lvl:CUR,sig:runSig(LEVELS[CUR-1]),diff:S?S.diff|0:0,
+             result:won?"win":"lose",ms:ms,moves:MOVES|0,stars:stars|0,
+             build:BUILD,dev:isDevHost(host)?1:0,host:host,from:"3d",ga:0,t:Date.now()};
+  if(teleUsed.length) row.used=teleUsed.slice();
+  try{
+    fetch(RUNS_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify(row),keepalive:true,mode:"cors"}).catch(()=>{});
+  }catch(e){}
+  return ms;
+}
+
+/* ================================================================== hud */
+function tip(t){ document.getElementById("tip").textContent=t||""; }
+function paintPurse(){ $("g-coins").textContent=save.coins.toLocaleString("en-US"); }
+function hud(){
+  const g=S; if(!g) return;
+  const m=Math.floor(g.left/60), sec=Math.floor(g.left%60);
+  $("g-clock").textContent=m+":"+String(sec).padStart(2,"0");
+  $("g-timepill").classList.toggle("low",g.left<=30);
+}
+function refreshHome(){
+  const n=Math.min(save.unlocked,LEVELS.length), last=LEVELS.length;
+  $("h-play").textContent="Play  ·  Level "+n;
+  $("h-stars").textContent=totalStars().toLocaleString("en-US");
+  $("h-coins").textContent=save.coins.toLocaleString("en-US");
+  const hard=nextHardFrom(n);
+  $("h-nexthard").innerHTML=hard?"Next hard level: <i>"+hard+"</i>":"";
+  /* ⚠ Rounded down off the campaign length rather than written out. "2000+" has
+     to stay true if the ladder moves, and it has moved twice; a number typed
+     here is a second copy of the campaign that goes stale with nothing failing. */
+  const round=Math.floor(last/500)*500;
+  $("h-waiting").textContent=round>=500
+    ? round.toLocaleString("en-US")+"+ levels waiting for you" : "";
+  $("h-ver").textContent="build "+BUILD;
+}
+function show(name){
+  /* ⚠ Here, because this is the one choke point for leaving a board. Play
+     resumes from startLevel's tail instead of from here: a lesson card is up at
+     that moment on the levels that carry one, and play is not live behind it. */
+  if(name!=="play") setPaused(true);
+  for(const id of ["home","levels","play"])
+    document.getElementById(id).classList.toggle("on",id===name);
+  if(name==="home") refreshHome();
+  if(name==="levels") buildGrid();
+}
+
+/* ---- the progress board -------------------------------------------------
+   ⚠ What is AHEAD, not what is behind. Cleared levels cannot be replayed and
+   their stars are already summed on the line above, so the only thing worth
+   showing is the road: where you stand, what is coming, and how much of it
+   there is. ⚠ And nothing here starts a level - PLAY is the only way onto a
+   board, so the cells are divs with nothing to press. */
+const GRID_AHEAD=29;
+function buildGrid(){
+  const grid=$("l-grid"); grid.innerHTML="";
+  const last=LEVELS.length, here=Math.min(save.unlocked,last);
+  const upto=Math.min(last,here+GRID_AHEAD);
+  $("l-sum").innerHTML="Level <b>"+here+"</b> of "+last.toLocaleString("en-US")
+    +" &middot; <b>"+totalStars()+"</b> stars &middot; <b>"+save.coins.toLocaleString("en-US")+"</b> gold";
+  const cell=n=>{
+    const d=LEVELS[n-1].d|0, el=document.createElement("div");
+    el.className="cell"+(n===here?" here":"")+(d?" d"+d:"");
+    el.innerHTML=(d?'<span class="d">'+(d===2?"VERY HARD":"HARD")+"</span>":"")+n;
+    grid.appendChild(el);
+  };
+  for(let n=here;n<=upto;n++) cell(n);
+  // the gap, then the far end - only where there is something to elide
+  if(upto<last-1){
+    const dots=document.createElement("div");
+    dots.className="cell dots"; dots.textContent="\u2026";
+    grid.appendChild(dots);
+    cell(last);
+  }else{
+    for(let n=upto+1;n<=last;n++) cell(n);
+  }
+}
+
+/* =============================================================== revive
+   ⚠ Offered BEFORE the loss card, and the loss row has already gone out by the
+   time it appears - so a bought continuation is a second telemetry row carrying
+   `revive`, not an edit to the first. Two rows is the honest account: a loss,
+   then a second game that was paid for. */
+const KEEP={price:500,secs:60};
+let AFTER_REVIVE=null;
+function offerRevive(then){
+  AFTER_REVIVE=then;
+  const poor=save.coins<KEEP.price;
+  $("rv-go").classList.toggle("poor",poor);
+  $("revive").classList.add("on");
+}
+function declineRevive(){
+  $("revive").classList.remove("on");
+  const then=AFTER_REVIVE; AFTER_REVIVE=null;
+  if(then) then();
+}
+function revive(){
+  if(save.coins<KEEP.price){ SFX.no(); return; }
+  save.coins-=KEEP.price; persist(); paintPurse(); boosterUi(); SFX.buy();
+  AFTER_REVIVE=null;
+  $("revive").classList.remove("on");
+  S.phase="play";
+  setPaused(false);            // bought their way back in - play is live again
+  S.left=KEEP.secs;
+  /* ⚠ Re-arm the clock the row is measured against. Without this the continued
+     game posts nothing at all and a bought win vanishes from the data. */
+  teleStart(); teleBooster("revive");
+  tip("+"+KEEP.secs+" seconds. Keep going.");
+}
+$("rv-go").onclick=revive;
+$("rv-x").onclick=declineRevive;
+
+/* =========================================================== walkthrough
+   One bubble, one new thing, everything else washed out.
+
+   ⚠ A booster lesson is explained and PRESSED in the same step, and comes with
+   a free go. There is no button to click past first: a card that can be
+   dismissed is a card that gets dismissed, and the player ends up owning a
+   booster they have never used.
+
+   ⚠ Nothing is locked out. A waiting step grows a GOT IT after eight seconds -
+   a board can always turn out to have no move left in it, and a tutorial nobody
+   can leave is a fault rather than a lesson. */
+const LESSONS=[
+  {id:"grey",at:()=>firstBoard(b=>b.s.some(x=>x[3]===0)),title:"Fixed seat",
+   text:"The grey seats are bolted to the floor. They do not move, whatever you drag - "
+       +"and they only ever take the sky-blue passengers."},
+  {id:"time",at:()=>unlockedAt("booster_time"),title:"Time booster",spot:"time",
+   text:"Running out of clock is the only way to lose a board. This booster puts seconds "
+       +"back on it. Here is a free one - tap the clock button."},
+  {id:"jump",at:()=>unlockedAt("booster_jump"),title:"Jump booster",spot:"jump",
+   text:"A passenger has to walk to their seat, so a seat with no way through to it is no "
+       +"use. Jump flies them straight over. Here is a free one - tap the arrow, then tap "
+       +"a seat."},
+  {id:"area",at:()=>unlockedAt("booster_area"),title:"Add line",spot:"area",
+   text:"Every room has one spare lane down its left side, folded away. This opens it, so "
+       +"there is somewhere to slide a seat to. Here is a free one - tap the green button."},
+  {id:"lock",at:()=>firstBoard(b=>!!b.lk),title:"Locked seat",
+   text:"A padlocked seat will not budge. Seat a passenger in it and the lock comes off - "
+       +"then it slides like any other."}
+];
+let FREEBIE=null, LESSON=null, lessonTimer=0;
+function lessonDue(n){
+  for(const L of LESSONS){
+    if(save.seen.indexOf(L.id)>=0) continue;
+    const at=L.at();
+    if(isFinite(at)&&at>0&&n>=at) return L;
+  }
+  return null;
+}
+function showLesson(L){
+  LESSON=L; setPaused(true);
+  FREEBIE=L.spot||null;
+  $("coach-title").textContent=L.title;
+  $("coach-text").textContent=L.text;
+  const waiting=!!L.spot;
+  $("coach-go").hidden=waiting;
+  $("coach-wait").hidden=!waiting;
+  $("coach-bub").className="bub "+(waiting?"high":"mid");
+  $("boosters").classList.toggle("spot",waiting);
+  for(const row of BOOSTERS) $("b-"+row[0]).classList.toggle("lit",waiting&&row[0]===L.spot);
+  $("coach").classList.add("on");
+  clearTimeout(lessonTimer);
+  if(waiting) lessonTimer=setTimeout(()=>{ $("coach-go").hidden=false; $("coach-wait").hidden=true; },8000);
+}
+function endLesson(){
+  if(!LESSON) return;
+  if(save.seen.indexOf(LESSON.id)<0) save.seen.push(LESSON.id);
+  persist();
+  clearTimeout(lessonTimer);
+  LESSON=null; FREEBIE=null; setPaused(false);
+  $("coach").classList.remove("on");
+  $("boosters").classList.remove("spot");
+  for(const row of BOOSTERS) $("b-"+row[0]).classList.remove("lit");
+}
+$("coach-go").onclick=endLesson;
+
+/* ================================================================ flow */
+function startLevel(n){
+  n=Math.max(1,Math.min(LEVELS.length,n));
+  CUR=n; S=loadLevel(n); SEL=null; SPOTS=[]; DRAG=null;
+  ARMED=null;
+  show("play");
+  LAND=autoLand();
+  buildBoard(S); layQueue(S); frame(S); lift();
+  $("g-level").textContent=n;
+  const gr=S.diff, chip=$("g-grade");
+  chip.hidden=!gr; chip.textContent=GRADE[gr]||"";
+  chip.className="grade"+(gr===2?" g2":"");
+  paintPurse(); boosterUi();
+  MOVES=0; teleStart();
+  $("card").classList.remove("on");
+  $("revive").classList.remove("on");
+  closeSettings();
+  show("play");
+  const L=lessonDue(n);
+  if(L) showLesson(L); else { LESSON=null; setPaused(false); $("coach").classList.remove("on"); }
+  tip("Press and hold a seat, drag it, let go.");
+  /* ⚠ Last, not first. finish() reads the board it is handed, and everything
+     above still replaces S, the HUD and the card. */
+  if(WIN_ASKED&&S.phase==="play"){
+    S.seated=S.total; S.queue.length=0; S.queue2.length=0;
+    S.left=Math.max(S.left,S.time*0.9);
+    finish(true);
+  }
+}
+function finish(won){
+  S.phase=won?"win":"lose";
+  ARMED=null; boosterUi();
+  const stars=won?starsFor(S):0;
+  const lvl=CUR, pay=purse();
+  /* ⚠ Posted here, while the run is still the one that was played - the next
+     startLevel replaces it. The row goes out before the card, so a player who
+     closes the tab on the win still counts. */
+  teleEnd(won,stars);
+  if(won){ SFX.win(); buzz([18,60,18]); PLATFORM.happytime(); }
+  else { SFX.lose(); buzz(90); }
+  setPaused(true);                       // the board is over; no ad mid-turn
+  if(won){
+    if(stars>(save.stars[lvl]||0)) save.stars[lvl]=stars;      // only ever raises
+    if(lvl+1>save.unlocked) save.unlocked=Math.min(LEVELS.length,lvl+1);
+    save.streak++;
+    save.coins+=pay.total;
+  }else{
+    save.streak=0;
+  }
+  persist(); paintPurse();
+
+  $("c-title").textContent=won?"Level complete!":"Out of time";
+  $("c-title").className="ctitle "+(won?"win":"lose");
+  $("c-stars").innerHTML=won?[0,1,2].map(i=>i<stars?"★":"<i>★</i>").join(""):"";
+  $("c-sub").textContent=won
+    ? "Cleared with "+Math.ceil(S.left)+"s to spare."
+    : (S.total-S.seated)+" still waiting outside.";
+
+  /* Asked for `lvl`, the level just CLEARED - the bar is the reward for this
+     game, not for the one being handed over. */
+  const fp=won?featureProgress(lvl):null;
+  $("c-feat").hidden=!fp;
+  if(fp){
+    $("c-feat-lab").textContent=fp.label+" · level "+fp.at;
+    $("c-feat-badge").textContent=fp.at;
+    // from zero, so the bar is seen to fill rather than arriving already full
+    $("c-feat-fill").style.width="0%";
+    requestAnimationFrame(function(){ $("c-feat-fill").style.width=(fp.pct*100).toFixed(1)+"%"; });
+  }
+  const coins=$("c-coins");
+  coins.hidden=!won;
+  coins.querySelector("span").textContent="+"+pay.total;
+  const st=$("c-streak");
+  st.hidden=!(won&&has("winstreak")&&pay.bonus);
+  if(!st.hidden) st.textContent=save.streak+" in a row · +"+pay.bonus+" bonus";
+
+  $("c-go").textContent=won?"Next level":"Try again";
+  /* A win shows the card. A loss offers the 60 seconds FIRST, and only reveals
+     the card if the offer is turned down. */
+  if(won) $("card").classList.add("on");
+  else offerRevive(()=>$("card").classList.add("on"));
+}
+$("h-play").onclick=()=>startLevel(Math.min(save.unlocked,LEVELS.length));
+$("h-levels").onclick=()=>show("levels");
+$("l-back").onclick=()=>show("home");
+
+/* ---- settings ----------------------------------------------------------
+   ⚠ Opening it PAUSES. A panel over the board with the clock still running is
+   the shape of a complaint. */
+function togLabels(){
+  $("set-sound").textContent="Sound: "+(save.sound?"on":"off");
+  $("set-vibe").textContent="Vibration: "+(save.vibe?"on":"off");
+}
+function openSettings(){ if(!S) return; setPaused(true); togLabels(); $("settings").classList.add("on"); }
+function closeSettings(){ $("settings").classList.remove("on"); if(!LESSON) setPaused(false); }
+$("g-menu").onclick=openSettings;
+$("set-resume").onclick=closeSettings;
+$("set-retry").onclick=()=>{ closeSettings(); startLevel(CUR); };
+$("set-home").onclick=()=>{ closeSettings(); S=null; show("home"); };
+$("set-sound").onclick=()=>{ save.sound=!save.sound; persist(); togLabels(); if(save.sound) SFX.buy(); };
+$("set-vibe").onclick=()=>{ save.vibe=!save.vibe; persist(); togLabels(); if(save.vibe) buzz(20); };
+$("set-privacy").onclick=()=>$("privacy").classList.add("on");
+$("priv-close").onclick=()=>$("privacy").classList.remove("on");
+
+document.getElementById("c-go").onclick=()=>startLevel(S.phase==="win"?CUR+1:CUR);
+document.getElementById("c-home").onclick=()=>{
+  document.getElementById("card").classList.remove("on"); S=null; show("home");
+};
+
+/* =============================================================== boot */
+async function boot(){
+  if(typeof THREE==="undefined"){
+    document.getElementById("boot").textContent="3D library did not load";
+    return;
+  }
+  /* ⚠ loadingStart before init, not after. The host wants the bracket around
+     the whole load, and PLATFORM remembers the call for the moment the SDK
+     actually turns up. */
+  PLATFORM.loadingStart();
+  await PLATFORM.init();
+  // ⚠ After init, so the host's copy is wiped too - not just the local one.
+  if(RESET_ASKED) PLATFORM.storage.removeItem(SAVE_KEY);
+  loadSave();
+  try{ three(); }
+  catch(err){
+    /* ⚠ A machine with WebGL blocked throws HERE, not at the script tag, and
+       without this the page sits on the loading text forever with no clue.
+       ⚠ And it logs. A catch that only shows a friendly message hides the one
+       fact needed to tell "no WebGL on this machine" from "a bug in setup" -
+       which is exactly what it did the first time this page failed to boot. */
+    console.error("3D setup failed:", err);
+    document.getElementById("boot").textContent="This device cannot run 3D graphics";
+    PLATFORM.loadingStop();     // ⚠ or the host spins forever behind the message
+    return;
+  }
+  document.getElementById("boot").remove();
+  /* ?dbg=1 - the board and the armed flag, live, for a test to read. Getters
+     rather than a copy, because both are reassigned on every level. */
+  if(DBG_ASKED) window.DBG={get board(){return S;},get armed(){return ARMED;},
+                            get cur(){return CUR;},get save(){return save;}};
+  wireBoosters(); paintPurse(); boosterUi();
+  /* ⚠ The host's mute can change at any time, so the settings label has to
+     follow it rather than only the in-game switch. */
+  PLATFORM.onHostMuteChange(()=>togLabels());
+  PLATFORM.loadingStop();
+  /* ⚠ Every OTHER lesson marked seen, so the one asked for is the one the
+     level owes. ?reset on its own hands you the earliest unseen lesson, which
+     is the grey seat, not the one you came to look at. And the gold, so a
+     locked-out price is not what you end up reading. */
+  if(INTRO_ONLY){
+    save.seen=LESSONS.map(L=>L.id).filter(id=>id!==INTRO_ONLY);
+    save.coins=Math.max(save.coins,5000);
+  }
+  if(LEVEL_ASKED>=1){
+    /* Past the unlock gate as well as past the home screen: unlocking is what
+       the campaign is for, and this is for looking at one board. */
+    save.unlocked=Math.max(save.unlocked,Math.min(LEVELS.length,LEVEL_ASKED));
+    startLevel(LEVEL_ASKED);
+    requestAnimationFrame(tick);
+    window.ready=true;
+    wireResize();
+    return;
+  }
+  show("home");
+  requestAnimationFrame(tick);
+  window.ready=true;
+  wireResize();
+}
+function wireResize(){
+  const reframe=()=>{
+    if(!S) return;
+    const want=autoLand();
+    if(LAND!==want){ LAND=want; buildRoom(S); }   // only rebuild on an actual flip
+    frame(S);
+  };
+  window.addEventListener("resize",reframe);
+  /* ⚠ orientationchange as well as resize. iOS fires resize with the OLD size
+     during a rotation, so the fit is computed against a window that no longer
+     exists; a second pass after the frame has settled is what catches it. */
+  window.addEventListener("orientationchange",()=>{
+    reframe();
+    setTimeout(reframe,260);
+  });
+}
+boot().catch(err=>{
+  /* ⚠ boot() is async now, so a throw inside it becomes an unhandled rejection
+     that shows nothing on screen - the exact failure mode the try/catch around
+     three() exists to prevent. */
+  console.error("boot failed:",err);
+  const el=document.getElementById("boot");
+  if(el) el.textContent="Could not start the game";
+});
+</script>
