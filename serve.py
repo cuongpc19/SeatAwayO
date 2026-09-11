@@ -3,8 +3,17 @@
 The plain http.server hands the browser a cached copy on every reload, which is
 how a stale build ends up on screen looking like a bug that was already fixed.
 This one forbids caching outright.
+
+⚠ It listens on every interface, not just loopback, so a phone on the same
+Wi-Fi can reach it - which is the only way to test what this game is actually
+played on. Bound to 127.0.0.1 it answers the machine it runs on and nothing
+else, and from the phone that looks exactly like the address being wrong.
+
+⚠ That does mean anything on the LAN can read this directory while it runs.
+It is a dev server on a home network, not a deployment; do not run it on one
+you do not control.
 """
-import http.server, socketserver, os, sys
+import http.server, socketserver, os, socket, sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +50,30 @@ class Server(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-with Server(("127.0.0.1", PORT), NoCache) as srv:
+def lan_ip():
+    """The address a phone on the same Wi-Fi should type.
+
+    ⚠ Asked of a UDP socket rather than of the hostname: this machine has more
+    than one adapter (a VirtualBox host-only one among them) and resolving the
+    hostname can hand back whichever of them sorts first. Connecting a datagram
+    socket makes the OS pick the interface it would actually route out of. No
+    packet is sent."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+
+with Server(("", PORT), NoCache) as srv:
     print("http://127.0.0.1:%d/            the game     (no-cache)" % PORT, flush=True)
     print("http://127.0.0.1:%d/level_player.html  the editor" % PORT, flush=True)
+    ip = lan_ip()
+    if ip:
+        print("http://%s:%d/            from a phone on the same Wi-Fi" % (ip, PORT), flush=True)
+        print("  (if it does not answer, Windows Firewall is blocking the port -", flush=True)
+        print("   see the netsh line in CRAZYGAMES.md)", flush=True)
     srv.serve_forever()
