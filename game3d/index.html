@@ -718,6 +718,89 @@ body{font-family:var(--body);color:var(--ivory)}
   #home::before{transform:none}
 }
 
+/* ---------------- UI_UX_RULES.md, applied ----------------
+   ⚠ A THIRD layer, and that is a debt, not a design. build.py appends the
+   sheets in order - template, then redesign.css, then this - so this one wins
+   at equal specificity. It exists because redesign.css is another designer's
+   file and rewriting it would collide with their next regeneration; every rule
+   below names the clause it comes from so the two can be merged later.
+   ../UI_UX_RULES.md is the authority.                                        */
+
+/* --- 2.12  A booster carries NO word under its icon. ----------------------
+   Three buttons in a row, each with a caption, makes the row a line taller -
+   and in a portrait game the height of that row is height taken off the board.
+   The icon plus the badge already say the two things needed at that moment:
+   WHAT it is, and WHAT IT COSTS. The full name lives in aria-label, which is
+   where a screen reader looks for it anyway. */
+#play .boost::after{content:none!important}
+
+/* --- 2.13  The icon is the FACE of the button, not a sticker on it. -------
+   A big button around a small icon reads as two nested squares rather than one
+   button. 2/3 of the width is where the icon breathes without swimming. */
+#play .boost{width:66px;height:66px;border-radius:19px;padding:0;
+             display:grid;place-items:center}
+#play .boost .ico{width:44px;height:44px;transform:none}   /* 44/66 = 2/3 */
+
+/* --- 2.5 / 6.2  The price is on the button before it is pressed, and the
+   badge says which of the two things it is: a free go, or a price. Green is a
+   count, gold is a cost - one badge, never two conventions to learn. */
+#play .boost .cost{top:-7px;right:-7px;bottom:auto}
+#play .boost .cost.free{background:linear-gradient(180deg,#8ee6a8,#2f9e57);
+                        color:#06331a;box-shadow:0 2px 0 #1d6b3a}
+#play .boost .cost.free i{display:none}
+
+/* --- 3.5 / 6.5  Cannot be used right now? Go dim. Never charge the tap and
+   then explain. Refusing after the touch punishes the player for something the
+   game already knew. */
+#play .boost .cost.poor{background:linear-gradient(180deg,#f0a0a0,#b4453d);color:#fff}
+#play .boost.broke{opacity:.45}
+#play .boost.broke:active{transform:none}
+
+/* --- 2.6  Touch target. 66px clears 44 comfortably; the phone size below
+   must not drop under it. */
+@media (max-width:430px){
+  #play .boost{width:56px;height:56px;border-radius:16px}
+  #play .boost .ico{width:37px;height:37px}       /* still 2/3 */
+}
+
+/* --- 3.8  Every offer needs a free way out, THE SAME SIZE as the yes. -----
+   A decline shrunk into a corner cross is a trick, and players read it as one.
+   Same width, same height, same row - only the colour differs. */
+#revive .rv-x{display:none}
+#revive .rv-row{display:grid;gap:10px;width:100%;margin-top:4px}
+#revive .rv-go{width:100%;margin:0}
+/* Same height as well as same width - 3.8 is about them reading as a pair. */
+#revive .rv-go,#revive .rv-no{min-height:52px;display:flex;align-items:center;
+  justify-content:center}
+#revive .rv-no{width:100%;margin:0;font-family:var(--disp,inherit);font-weight:800;
+  font-size:16px;letter-spacing:.06em;text-transform:uppercase;
+  padding:14px 18px;border:0;border-radius:16px;cursor:pointer;
+  color:#eaf3f2;background:linear-gradient(180deg,#5a6b74,#3c4a52);
+  box-shadow:0 5px 0 #26313a}
+#revive .rv-no:active{transform:translateY(3px);box-shadow:0 2px 0 #26313a}
+/* ⚠ Nothing for .rv-go.poor here: offerRevive() already greys it, so 3.5 was
+   satisfied before this sheet existed. A second rule would only be a second
+   place to change it. */
+
+/* --- 6.7  A lesson card says three things and always offers a way past. ---
+   Somebody who already knows, locked inside a tutorial, is an avoidable
+   annoyance - and skipping still counts as taught, or they meet it again. */
+#coach .bub .skip{display:block;margin:10px auto 0;padding:7px 16px;
+  border:0;background:none;cursor:pointer;
+  font:600 13px/1 var(--ui,system-ui,sans-serif);letter-spacing:.04em;
+  color:rgba(20,40,44,.55);text-decoration:underline;text-underline-offset:3px}
+#coach .bub .skip:hover{color:rgba(20,40,44,.85)}
+
+/* --- 3.10  Panel width follows content, it is not left to a default. ------
+   A card with a board preview wants room; a card that is read in one breath
+   wants less, so the eye does not travel. */
+#card .cbox{max-width:430px}
+#revive .rv{max-width:400px}
+
+@media (prefers-reduced-motion:reduce){
+  #play .boost,#revive .rv-go,#revive .rv-no{transition:none!important}
+}
+
 </style>
 
 <div id="boot">Loading&hellip;</div>
@@ -871,9 +954,14 @@ body{font-family:var(--body);color:var(--ivory)}
     <div class="rv-plus">+60</div>
   </div>
   <div class="rv-say">Add <b>60</b> seconds to keep playing!</div>
-  <button class="rv-go" id="rv-go" type="button">
-    <span>Continue</span><span class="rv-cost"><i></i>500</span>
-  </button>
+  <!-- 3.8: the way out is the same size as the way in. A decline shrunk into
+       a corner cross is a trick, and players read it as one. -->
+  <div class="rv-row">
+    <button class="rv-go" id="rv-go" type="button">
+      <span>Continue</span><span class="rv-cost"><i></i>500</span>
+    </button>
+    <button class="rv-no" id="rv-no" type="button">Give up</button>
+  </div>
 </div></div>
 
 <div id="coach">
@@ -2091,14 +2179,23 @@ function frame(g){
   rootG.rotation.y=keep; rootG.updateMatrixWorld(true);
   const sx=BOX.max.x-BOX.min.x, sz=BOX.max.z-BOX.min.z;
   const cx=(BOX.max.x+BOX.min.x)/2, cz=(BOX.max.z+BOX.min.z)/2;
-  const AZ=LAND?0.17:0.30;
+  /* ⚠ TWO angles, and only one of them was ever changed. AZ swings the room
+     diagonally; ELEV decides whether you look INTO the room or down onto it.
+     The old pair worked out at 49.5 deg of elevation - so the seats read as
+     flat coloured slabs, the walls stood edge-on and the passengers were dots.
+     "Make it diagonal" had been applied to the azimuth alone, which is why the
+     view still looked like a plan. At 32 deg the seat backs and the far wall
+     come into view, and it reads as a room. */
+  const ELEV=32*Math.PI/180;
+  const AZ=LAND?0.35:0.42;              // 20 deg landscape, 24 deg portrait
+  const EH=Math.sin(ELEV), ER=Math.cos(ELEV);
   let d=(Math.max(sx/1.72,sz*0.86)+1.1)*1.10;
-  for(let i=0;i<90;i++){
-    camera.position.set(cx+d*0.65*Math.sin(AZ),d*0.76,cz+d*0.65*Math.cos(AZ));
+  for(let i=0;i<140;i++){
+    camera.position.set(cx+d*ER*Math.sin(AZ),d*EH,cz+d*ER*Math.cos(AZ));
     camera.lookAt(cx,0.2,cz);
     camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
     if(inFrame()) break;
-    d*=1.028;
+    d*=1.022;                   // finer steps: a low camera needs more room
   }
 }
 function resize(){
@@ -2449,8 +2546,15 @@ function boosterUi(){
     b.classList.toggle("locked",!open);
     b.classList.toggle("armed",ARMED===id);
     b.disabled=!open;
+    /* 6.2 - one badge, two meanings, never two conventions to learn: green is
+       a free go this lesson handed out, gold is a price. 6.5/3.5 - a booster
+       that cannot be afforded says so BEFORE the tap, not after it. */
+    const free=FREEBIE===id;
+    const broke=!free&&save.coins<price;
     if(!open){ c.className="cost lv"; c.textContent="LV "+unlockedAt(row[1]); }
-    else { c.className="cost"+(save.coins<price?" poor":""); c.innerHTML="<i></i>"+price; }
+    else if(free){ c.className="cost free"; c.textContent="FREE"; }
+    else { c.className="cost"+(broke?" poor":""); c.innerHTML="<i></i>"+price; }
+    b.classList.toggle("broke",open&&broke);
   }
 }
 /** A lesson hands out one free use of the booster it is teaching. */
@@ -2513,7 +2617,7 @@ function wireBoosters(){
    exactly the mistake that file warns about: two populations under one number.
    pull_runs.py and stats.html both group by source, so they separate cleanly. */
 const RUNS_URL="https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app/runs.json";
-const BUILD="1768e4a";
+const BUILD="fc46b4a+";
 /** FNV-1a over the fields that decide what a board actually IS, so a retune is
     visible in the data rather than silently averaged into the old numbers. */
 function runSig(raw){
@@ -2648,6 +2752,7 @@ function revive(){
 }
 $("rv-go").onclick=revive;
 $("rv-x").onclick=declineRevive;
+$("rv-no").onclick=declineRevive;
 
 /* =========================================================== walkthrough
    One bubble, one new thing, everything else washed out.
@@ -2687,6 +2792,19 @@ function lessonDue(n){
   }
   return null;
 }
+/** 6.7 - "Skip" on every lesson, and skipping still counts as taught, so it
+    is not met again next level. Somebody who already knows, locked inside a
+    tutorial, is an avoidable annoyance; a lesson with no way out is a fault
+    rather than a lesson. ⚠ Built once and reused - appending on every show
+    would stack a column of Skip buttons down the card. */
+function addSkip(){
+  const bub=$("coach-bub");
+  if(bub.querySelector(".skip")) return;
+  const b=document.createElement("button");
+  b.type="button"; b.className="skip"; b.textContent="Skip";
+  b.onclick=endLesson;
+  bub.appendChild(b);
+}
 function showLesson(L){
   LESSON=L; setPaused(true);
   FREEBIE=L.spot||null;
@@ -2698,6 +2816,12 @@ function showLesson(L){
   $("coach-bub").className="bub "+(waiting?"high":"mid");
   $("boosters").classList.toggle("spot",waiting);
   for(const row of BOOSTERS) $("b-"+row[0]).classList.toggle("lit",waiting&&row[0]===L.spot);
+  addSkip();
+  /* ⚠ AFTER FREEBIE is set, not before. startLevel() paints the boosters and
+     THEN shows the lesson, so the badge was drawn while the free go did not yet
+     exist and the button still asked for gold the player was not going to
+     spend. Repainted here, and again in endLesson() when the free go expires. */
+  boosterUi();
   $("coach").classList.add("on");
   clearTimeout(lessonTimer);
   if(waiting) lessonTimer=setTimeout(()=>{ $("coach-go").hidden=false; $("coach-wait").hidden=true; },8000);
@@ -2708,6 +2832,7 @@ function endLesson(){
   persist();
   clearTimeout(lessonTimer);
   LESSON=null; FREEBIE=null; setPaused(false);
+  boosterUi();                       // the free go is gone; show the price again
   $("coach").classList.remove("on");
   $("boosters").classList.remove("spot");
   for(const row of BOOSTERS) $("b-"+row[0]).classList.remove("lit");
