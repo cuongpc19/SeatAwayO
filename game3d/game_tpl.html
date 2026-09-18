@@ -225,6 +225,18 @@
   .cell.dots{grid-column:1/-2;aspect-ratio:auto;min-height:2rem;background:none;box-shadow:none;
              color:rgba(255,255,255,.5);font-size:1.2rem;letter-spacing:.4em}
 
+  #turn{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+        background:#0d2426;padding:26px}
+  #turn.on{display:grid}
+  .turn-box{text-align:center;color:#eaf3f2;max-width:300px}
+  .turn-box svg{width:96px;height:96px;fill:none;stroke:currentColor;
+    stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;opacity:.9;
+    animation:tilt 2.4s ease-in-out infinite}
+  .turn-box p{margin:18px 0 0;font:700 17px/1.45 var(--ui,system-ui,sans-serif);
+    letter-spacing:.02em}
+  @keyframes tilt{0%,55%,100%{transform:rotate(0)}30%,45%{transform:rotate(-82deg)}}
+  @media (prefers-reduced-motion:reduce){ .turn-box svg{animation:none} }
+
   /* ---- the revive offer ----
      Its own dialog, not the loss card recoloured: this is an offer, and it has
      to read as one before the player has decided anything. */
@@ -440,6 +452,20 @@
   </div>
   <button class="cbtn" id="priv-close" type="button">Close</button>
 </div></div>
+
+<!-- ⚠ A prompt, not a button. The toggle that used to live here undid itself
+     on the next resize, and a control that cancels itself is worse than none.
+     This has nothing to press: turn the phone and it goes away. -->
+<div id="turn" hidden>
+  <div class="turn-box">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="20" y="6" width="24" height="40" rx="5"></rect>
+      <path d="M12 52a22 22 0 0 0 40-6"></path>
+      <path d="M46 40l6 6-7 4"></path>
+    </svg>
+    <p>Turn your phone sideways</p>
+  </div>
+</div>
 
 <div id="revive"><div class="rv">
   <div class="rv-banner">Time Out!</div>
@@ -673,7 +699,15 @@ const GAP=1.16, CELLW=0.86;
 
 const view=document.getElementById("view");
 let renderer,scene,camera,rootG,roomG,seatG,peepG;
-let TILES=[],SEATMESH={},CLOCK=0,LAND=false,LAST=0;
+/* ⚠ Always true, never read off the window. The room lies along its long
+   axis, which is the layout the camera elevation was chosen against: stood
+   upright that long axis runs INTO the screen, where a 32-degree camera
+   foreshortens it by sin(32)=0.53 and a 6x10 board projects as 6 wide by 5.3
+   tall - square, in the middle of a screen twice as tall as it is wide.
+   Following the window shape meant the phone silently chose a worse game to
+   look at. It is kept as a variable rather than inlined because buildRoom()
+   and frame() both branch on it. */
+let TILES=[],SEATMESH={},CLOCK=0,LAND=true,LAST=0;
 /* Which way up the room sits: automatic, from the shape of the window. Wide
    gets the landscape room, tall gets the portrait one.
 
@@ -687,7 +721,9 @@ let TILES=[],SEATMESH={},CLOCK=0,LAND=false,LAST=0;
    because the fit is recomputed from the window every time. A control that
    undoes itself is worse than no control, so the window decides and nothing
    else does. */
-const autoLand=()=>view.clientWidth>view.clientHeight;
+/** Is the screen itself the wrong way round for the room? Not a question
+    about the room any more - only about whether to ask the player to turn. */
+const upright=()=>view.clientHeight>view.clientWidth*1.05;
 let S=null,SEL=null,SPOTS=[],DRAG=null,CUR=1,MOVES=0;
 /** ⚠ Starts TRUE. gameplayStart/Stop only come out as a matched pair if the
     game admits it is not playing yet; starting false means the first
@@ -1215,6 +1251,11 @@ function frame(g){
      From half that distance the loop has to walk out to the real limit, so the
      answer is the closest fit rather than the first acceptable one. */
   let d=(Math.max(sx/1.72,sz*0.86)+1.1)*0.55;
+  /* ⚠ Aimed at the room's centre, full stop. Shifting the aim to the middle of
+     the free band was tried and measured: 41% of the width became 40%. The
+     band is very nearly centred already, and under perspective the projected
+     shape's centre is not the projection of the 3D centre anyway, so the
+     correction chased a number it could not reach. Left out on purpose. */
   for(let i=0;i<260;i++){
     camera.position.set(cx+d*ER*Math.sin(AZ),d*EH,cz+d*ER*Math.cos(AZ));
     camera.lookAt(cx,0.2,cz);
@@ -1856,7 +1897,7 @@ function endLesson(){
   if(save.seen.indexOf(LESSON.id)<0) save.seen.push(LESSON.id);
   persist();
   clearTimeout(lessonTimer);
-  LESSON=null; FREEBIE=null; setPaused(false);
+  LESSON=null; FREEBIE=null; syncPause();
   boosterUi();                       // the free go is gone; show the price again
   $("coach").classList.remove("on");
   $("boosters").classList.remove("spot");
@@ -1870,7 +1911,7 @@ function startLevel(n){
   CUR=n; S=loadLevel(n); SEL=null; SPOTS=[]; DRAG=null;
   ARMED=null;
   show("play");
-  LAND=autoLand();
+  askTurn();
   buildBoard(S); layQueue(S); frame(S); lift();
   $("g-level").textContent=n;
   const gr=S.diff, chip=$("g-grade");
@@ -1883,7 +1924,7 @@ function startLevel(n){
   closeSettings();
   show("play");
   const L=lessonDue(n);
-  if(L) showLesson(L); else { LESSON=null; setPaused(false); $("coach").classList.remove("on"); }
+  if(L) showLesson(L); else { LESSON=null; $("coach").classList.remove("on"); syncPause(); }
   tip("Press and hold a seat, drag it, let go.");
   /* ⚠ Last, not first. finish() reads the board it is handed, and everything
      above still replaces S, the HUD and the card. */
@@ -1958,7 +1999,7 @@ function togLabels(){
   $("set-vibe").textContent="Vibration: "+(save.vibe?"on":"off");
 }
 function openSettings(){ if(!S) return; setPaused(true); togLabels(); $("settings").classList.add("on"); }
-function closeSettings(){ $("settings").classList.remove("on"); if(!LESSON) setPaused(false); }
+function closeSettings(){ $("settings").classList.remove("on"); syncPause(); }
 $("g-menu").onclick=openSettings;
 $("set-resume").onclick=closeSettings;
 $("set-retry").onclick=()=>{ closeSettings(); startLevel(CUR); };
@@ -2032,11 +2073,28 @@ async function boot(){
   window.ready=true;
   wireResize();
 }
+/** ⚠ Pauses as well as covers. A board whose clock keeps running behind a
+    full-screen prompt spends the player's time on something they cannot play,
+    and they come back to a level they have already half lost. */
+/** ⚠ ONE predicate, and everything that can hold the board goes through it.
+    Three callers used to set the flag directly, so whichever ran last won:
+    startLevel asked about the phone, then the lesson logic overrode it, and a
+    board opened with its clock running behind a full-screen prompt. Anything
+    new that needs to hold the board belongs in this list, not in its own
+    setPaused() call. */
+function syncPause(){
+  if(!S||S.phase!=="play") return;
+  setPaused(upright() || !!LESSON || $("settings").classList.contains("on"));
+}
+function askTurn(){
+  const bad=upright(), el=$("turn");
+  if(el){ el.hidden=!bad; el.classList.toggle("on",bad); }
+  syncPause();
+}
 function wireResize(){
   const reframe=()=>{
     if(!S) return;
-    const want=autoLand();
-    if(LAND!==want){ LAND=want; buildRoom(S); }   // only rebuild on an actual flip
+    askTurn();
     frame(S);
   };
   window.addEventListener("resize",reframe);
