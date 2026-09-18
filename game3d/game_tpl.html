@@ -467,9 +467,14 @@
     <div class="rv-plus">+60</div>
   </div>
   <div class="rv-say">Add <b>60</b> seconds to keep playing!</div>
-  <button class="rv-go" id="rv-go" type="button">
-    <span>Continue</span><span class="rv-cost"><i></i>500</span>
-  </button>
+  <!-- 3.8: the way out is the same size as the way in. A decline shrunk into
+       a corner cross is a trick, and players read it as one. -->
+  <div class="rv-row">
+    <button class="rv-go" id="rv-go" type="button">
+      <span>Continue</span><span class="rv-cost"><i></i>500</span>
+    </button>
+    <button class="rv-no" id="rv-no" type="button">Give up</button>
+  </div>
 </div></div>
 
 <div id="coach">
@@ -1169,14 +1174,23 @@ function frame(g){
   rootG.rotation.y=keep; rootG.updateMatrixWorld(true);
   const sx=BOX.max.x-BOX.min.x, sz=BOX.max.z-BOX.min.z;
   const cx=(BOX.max.x+BOX.min.x)/2, cz=(BOX.max.z+BOX.min.z)/2;
-  const AZ=LAND?0.17:0.30;
+  /* ⚠ TWO angles, and only one of them was ever changed. AZ swings the room
+     diagonally; ELEV decides whether you look INTO the room or down onto it.
+     The old pair worked out at 49.5 deg of elevation - so the seats read as
+     flat coloured slabs, the walls stood edge-on and the passengers were dots.
+     "Make it diagonal" had been applied to the azimuth alone, which is why the
+     view still looked like a plan. At 32 deg the seat backs and the far wall
+     come into view, and it reads as a room. */
+  const ELEV=32*Math.PI/180;
+  const AZ=LAND?0.35:0.42;              // 20 deg landscape, 24 deg portrait
+  const EH=Math.sin(ELEV), ER=Math.cos(ELEV);
   let d=(Math.max(sx/1.72,sz*0.86)+1.1)*1.10;
-  for(let i=0;i<90;i++){
-    camera.position.set(cx+d*0.65*Math.sin(AZ),d*0.76,cz+d*0.65*Math.cos(AZ));
+  for(let i=0;i<140;i++){
+    camera.position.set(cx+d*ER*Math.sin(AZ),d*EH,cz+d*ER*Math.cos(AZ));
     camera.lookAt(cx,0.2,cz);
     camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
     if(inFrame()) break;
-    d*=1.028;
+    d*=1.022;                   // finer steps: a low camera needs more room
   }
 }
 function resize(){
@@ -1527,8 +1541,15 @@ function boosterUi(){
     b.classList.toggle("locked",!open);
     b.classList.toggle("armed",ARMED===id);
     b.disabled=!open;
+    /* 6.2 - one badge, two meanings, never two conventions to learn: green is
+       a free go this lesson handed out, gold is a price. 6.5/3.5 - a booster
+       that cannot be afforded says so BEFORE the tap, not after it. */
+    const free=FREEBIE===id;
+    const broke=!free&&save.coins<price;
     if(!open){ c.className="cost lv"; c.textContent="LV "+unlockedAt(row[1]); }
-    else { c.className="cost"+(save.coins<price?" poor":""); c.innerHTML="<i></i>"+price; }
+    else if(free){ c.className="cost free"; c.textContent="FREE"; }
+    else { c.className="cost"+(broke?" poor":""); c.innerHTML="<i></i>"+price; }
+    b.classList.toggle("broke",open&&broke);
   }
 }
 /** A lesson hands out one free use of the booster it is teaching. */
@@ -1726,6 +1747,7 @@ function revive(){
 }
 $("rv-go").onclick=revive;
 $("rv-x").onclick=declineRevive;
+$("rv-no").onclick=declineRevive;
 
 /* =========================================================== walkthrough
    One bubble, one new thing, everything else washed out.
@@ -1765,6 +1787,19 @@ function lessonDue(n){
   }
   return null;
 }
+/** 6.7 - "Skip" on every lesson, and skipping still counts as taught, so it
+    is not met again next level. Somebody who already knows, locked inside a
+    tutorial, is an avoidable annoyance; a lesson with no way out is a fault
+    rather than a lesson. ⚠ Built once and reused - appending on every show
+    would stack a column of Skip buttons down the card. */
+function addSkip(){
+  const bub=$("coach-bub");
+  if(bub.querySelector(".skip")) return;
+  const b=document.createElement("button");
+  b.type="button"; b.className="skip"; b.textContent="Skip";
+  b.onclick=endLesson;
+  bub.appendChild(b);
+}
 function showLesson(L){
   LESSON=L; setPaused(true);
   FREEBIE=L.spot||null;
@@ -1776,6 +1811,12 @@ function showLesson(L){
   $("coach-bub").className="bub "+(waiting?"high":"mid");
   $("boosters").classList.toggle("spot",waiting);
   for(const row of BOOSTERS) $("b-"+row[0]).classList.toggle("lit",waiting&&row[0]===L.spot);
+  addSkip();
+  /* ⚠ AFTER FREEBIE is set, not before. startLevel() paints the boosters and
+     THEN shows the lesson, so the badge was drawn while the free go did not yet
+     exist and the button still asked for gold the player was not going to
+     spend. Repainted here, and again in endLesson() when the free go expires. */
+  boosterUi();
   $("coach").classList.add("on");
   clearTimeout(lessonTimer);
   if(waiting) lessonTimer=setTimeout(()=>{ $("coach-go").hidden=false; $("coach-wait").hidden=true; },8000);
@@ -1786,6 +1827,7 @@ function endLesson(){
   persist();
   clearTimeout(lessonTimer);
   LESSON=null; FREEBIE=null; setPaused(false);
+  boosterUi();                       // the free go is gone; show the price again
   $("coach").classList.remove("on");
   $("boosters").classList.remove("spot");
   for(const row of BOOSTERS) $("b-"+row[0]).classList.remove("lit");

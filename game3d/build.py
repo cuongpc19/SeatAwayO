@@ -64,6 +64,21 @@ if style.exists():
     css = css.replace("HERO_DATA_URI", "data:image/png;base64," + hero)
     page = page.replace("</style>", css + "\n</style>", 1)
 
+# ⚠ Order is the whole mechanism: template CSS, then redesign.css, then ui.css.
+# Equal specificity means last wins, so ui.css carries ../UI_UX_RULES.md over
+# another designer's sheet without editing their file.
+rules_css = HERE / "ui.css"
+if rules_css.exists():
+    rules = rules_css.read_text(encoding="utf-8")
+    page = page.replace("</style>", rules + "\n</style>", 1)
+    # ⚠ Proved against the FILES themselves, never against a marker string typed
+    # here as well. A marker copied into a check is a marker free to drift out of
+    # the sheet it is meant to be watching - which is exactly how the first
+    # version of this line came to assert on text no stylesheet contained.
+    if style.exists():
+        assert page.rindex(rules.strip().splitlines()[0]) > page.rindex(css.strip().splitlines()[0]), \
+            "ui.css must come AFTER redesign.css or it overrides nothing"
+
 # ⚠ Before three.js goes in, not after. The duplicate check below is looking for
 # collisions between rules3d.js and the template, and half a megabyte of
 # minified library in the haystack only makes it slower and noisier.
