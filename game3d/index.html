@@ -2158,11 +2158,36 @@ function layQueue(g){
 
 /* ============================================================== camera */
 const BOX=new THREE.Box3(), CORNER=new THREE.Vector3();
+/** How much of the frame the room is allowed to fill, MEASURED off the HUD
+    rather than typed in.
+
+    ⚠ The old bounds were three constants - 0.94 of the width, the top 0.76 and
+    the bottom 0.68 - chosen once against one screen. They are the reason the
+    room sat small with air all round it: they reserve the same slice of every
+    screen whether or not anything is actually there. The rule is "as close as
+    possible while the whole room still shows", and the only things in the way
+    are the top bar and the booster row, both of which can say how tall they
+    are. ⚠ Vertical only: the HUD eats height, never width.
+
+    NDC runs -1..1 with +1 at the TOP, so a bar `h` pixels deep from the top
+    edge ends at 1 - 2h/H. */
+const EDGE=6;                       // a hair of air so nothing touches an edge
+function limits(){
+  const r=view.getBoundingClientRect(), W=r.width||1, H=r.height||1;
+  const bar=document.querySelector("#play .topbar"), bst=$("boosters");
+  let top=0, bot=0;
+  if(bar){ const b=bar.getBoundingClientRect(); top=Math.max(0,b.bottom-r.top); }
+  if(bst){ const b=bst.getBoundingClientRect(); bot=Math.max(0,r.bottom-b.top); }
+  return { x:1-EDGE*2/W,
+           hi:1-(top+EDGE)*2/H,
+           lo:-1+(bot+EDGE)*2/H };
+}
 function inFrame(){
+  const L=limits();
   for(let i=0;i<8;i++){
     CORNER.set(i&1?BOX.max.x:BOX.min.x,i&2?BOX.max.y:BOX.min.y,i&4?BOX.max.z:BOX.min.z);
     CORNER.project(camera);
-    if(Math.abs(CORNER.x)>0.94||CORNER.y>0.76||CORNER.y< -0.68) return false;
+    if(Math.abs(CORNER.x)>L.x||CORNER.y>L.hi||CORNER.y<L.lo) return false;
   }
   return true;
 }
@@ -2189,13 +2214,18 @@ function frame(g){
   const ELEV=32*Math.PI/180;
   const AZ=LAND?0.35:0.42;              // 20 deg landscape, 24 deg portrait
   const EH=Math.sin(ELEV), ER=Math.cos(ELEV);
-  let d=(Math.max(sx/1.72,sz*0.86)+1.1)*1.10;
-  for(let i=0;i<140;i++){
+  /* ⚠ Start deliberately too CLOSE and back off. The old opening guess was
+     already roughly right, so the loop usually accepted it on the first pass -
+     which made the multiplier, not the frame, decide how big the room looked.
+     From half that distance the loop has to walk out to the real limit, so the
+     answer is the closest fit rather than the first acceptable one. */
+  let d=(Math.max(sx/1.72,sz*0.86)+1.1)*0.55;
+  for(let i=0;i<260;i++){
     camera.position.set(cx+d*ER*Math.sin(AZ),d*EH,cz+d*ER*Math.cos(AZ));
     camera.lookAt(cx,0.2,cz);
     camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
     if(inFrame()) break;
-    d*=1.022;                   // finer steps: a low camera needs more room
+    d*=1.012;                   // fine steps, because this is now the real fit
   }
 }
 function resize(){
@@ -2617,7 +2647,7 @@ function wireBoosters(){
    exactly the mistake that file warns about: two populations under one number.
    pull_runs.py and stats.html both group by source, so they separate cleanly. */
 const RUNS_URL="https://seatmatch-292b3-default-rtdb.asia-southeast1.firebasedatabase.app/runs.json";
-const BUILD="fc46b4a+";
+const BUILD="2093fb8";
 /** FNV-1a over the fields that decide what a board actually IS, so a retune is
     visible in the data rather than silently averaged into the old numbers. */
 function runSig(raw){
