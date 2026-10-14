@@ -225,18 +225,6 @@
   .cell.dots{grid-column:1/-2;aspect-ratio:auto;min-height:2rem;background:none;box-shadow:none;
              color:rgba(255,255,255,.5);font-size:1.2rem;letter-spacing:.4em}
 
-  #turn{position:fixed;inset:0;z-index:40;display:none;place-items:center;
-        background:#0d2426;padding:26px}
-  #turn.on{display:grid}
-  .turn-box{text-align:center;color:#eaf3f2;max-width:300px}
-  .turn-box svg{width:96px;height:96px;fill:none;stroke:currentColor;
-    stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;opacity:.9;
-    animation:tilt 2.4s ease-in-out infinite}
-  .turn-box p{margin:18px 0 0;font:700 17px/1.45 var(--ui,system-ui,sans-serif);
-    letter-spacing:.02em}
-  @keyframes tilt{0%,55%,100%{transform:rotate(0)}30%,45%{transform:rotate(-82deg)}}
-  @media (prefers-reduced-motion:reduce){ .turn-box svg{animation:none} }
-
   /* ---- the revive offer ----
      Its own dialog, not the loss card recoloured: this is an offer, and it has
      to read as one before the player has decided anything. */
@@ -452,20 +440,6 @@
   </div>
   <button class="cbtn" id="priv-close" type="button">Close</button>
 </div></div>
-
-<!-- ⚠ A prompt, not a button. The toggle that used to live here undid itself
-     on the next resize, and a control that cancels itself is worse than none.
-     This has nothing to press: turn the phone and it goes away. -->
-<div id="turn" hidden>
-  <div class="turn-box">
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <rect x="20" y="6" width="24" height="40" rx="5"></rect>
-      <path d="M12 52a22 22 0 0 0 40-6"></path>
-      <path d="M46 40l6 6-7 4"></path>
-    </svg>
-    <p>Turn your phone sideways</p>
-  </div>
-</div>
 
 <div id="revive"><div class="rv">
   <div class="rv-banner">Time Out!</div>
@@ -699,15 +673,7 @@ const GAP=1.16, CELLW=0.86;
 
 const view=document.getElementById("view");
 let renderer,scene,camera,rootG,roomG,seatG,peepG;
-/* ⚠ Always true, never read off the window. The room lies along its long
-   axis, which is the layout the camera elevation was chosen against: stood
-   upright that long axis runs INTO the screen, where a 32-degree camera
-   foreshortens it by sin(32)=0.53 and a 6x10 board projects as 6 wide by 5.3
-   tall - square, in the middle of a screen twice as tall as it is wide.
-   Following the window shape meant the phone silently chose a worse game to
-   look at. It is kept as a variable rather than inlined because buildRoom()
-   and frame() both branch on it. */
-let TILES=[],SEATMESH={},CLOCK=0,LAND=true,LAST=0;
+let TILES=[],SEATMESH={},CLOCK=0,LAND=false,LAST=0;
 /* Which way up the room sits: automatic, from the shape of the window. Wide
    gets the landscape room, tall gets the portrait one.
 
@@ -721,9 +687,7 @@ let TILES=[],SEATMESH={},CLOCK=0,LAND=true,LAST=0;
    because the fit is recomputed from the window every time. A control that
    undoes itself is worse than no control, so the window decides and nothing
    else does. */
-/** Is the screen itself the wrong way round for the room? Not a question
-    about the room any more - only about whether to ask the player to turn. */
-const upright=()=>view.clientHeight>view.clientWidth*1.05;
+const autoLand=()=>view.clientWidth>view.clientHeight;
 let S=null,SEL=null,SPOTS=[],DRAG=null,CUR=1,MOVES=0;
 /** ⚠ Starts TRUE. gameplayStart/Stop only come out as a matched pair if the
     game admits it is not playing yet; starting false means the first
@@ -1242,8 +1206,22 @@ function frame(g){
      "Make it diagonal" had been applied to the azimuth alone, which is why the
      view still looked like a plan. At 32 deg the seat backs and the far wall
      come into view, and it reads as a room. */
-  const ELEV=32*Math.PI/180;
-  const AZ=LAND?0.35:0.42;              // 20 deg landscape, 24 deg portrait
+  /* ⚠ TWO elevations, because the two frames want opposite things and one
+     number cannot serve both.
+
+     The board is deeper than it is wide - level 19 is 6 across by 10 deep - and
+     that depth runs INTO the screen, where it is foreshortened by sin(ELEV).
+     So a LOW camera flattens the projection: at 32 degrees a 6x10 board lands
+     6 wide by 5.3 tall, near enough square. On a wide screen that is exactly
+     right and you can see into the room. On a screen twice as tall as it is
+     wide it is the worst possible shape - it leaves the whole of the height
+     unused and the room sits small in the middle, which is what it did.
+
+     Measured at 393x740, room as a share of the frame:
+        50 deg -> 88% wide, 48% tall      32 deg -> 89% wide, 37% tall
+     Portrait takes the height; landscape keeps the low, into-the-room angle. */
+  const ELEV=(LAND?32:50)*Math.PI/180;
+  const AZ=LAND?0.35:0.244;             // 20 deg landscape, 14 deg portrait
   const EH=Math.sin(ELEV), ER=Math.cos(ELEV);
   /* ⚠ Start deliberately too CLOSE and back off. The old opening guess was
      already roughly right, so the loop usually accepted it on the first pass -
@@ -1911,7 +1889,7 @@ function startLevel(n){
   CUR=n; S=loadLevel(n); SEL=null; SPOTS=[]; DRAG=null;
   ARMED=null;
   show("play");
-  askTurn();
+  LAND=autoLand();
   buildBoard(S); layQueue(S); frame(S); lift();
   $("g-level").textContent=n;
   const gr=S.diff, chip=$("g-grade");
@@ -2084,17 +2062,13 @@ async function boot(){
     setPaused() call. */
 function syncPause(){
   if(!S||S.phase!=="play") return;
-  setPaused(upright() || !!LESSON || $("settings").classList.contains("on"));
-}
-function askTurn(){
-  const bad=upright(), el=$("turn");
-  if(el){ el.hidden=!bad; el.classList.toggle("on",bad); }
-  syncPause();
+  setPaused(!!LESSON || $("settings").classList.contains("on"));
 }
 function wireResize(){
   const reframe=()=>{
     if(!S) return;
-    askTurn();
+    const want=autoLand();
+    if(LAND!==want){ LAND=want; buildRoom(S); }   // only rebuild on an actual flip
     frame(S);
   };
   window.addEventListener("resize",reframe);
