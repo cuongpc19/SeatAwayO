@@ -1567,6 +1567,52 @@ individual player's rows &mdash; there is nothing in them to search on.</p>
 #card .wide-btn:active { box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), 0 3px 0 #33599a, 0 5px 6px rgba(0,0,0,.25); }
 #card .wide-btn.blue:active { box-shadow: inset 0 -6px 0 rgba(60,90,84,.10), 0 3px 0 #b9b7aa, 0 5px 6px rgba(0,0,0,.22); }
 
+/* ---- the card, deeper still: the HUD's glossy toy stuff ----
+   Asked for again (2026-10-16), and picked off three renders (B): the same
+   hard gloss over the top half that the HUD's pills wear, a white rim round
+   the plate and the buttons, a thicker slab under the plate, the title and the
+   purse stroked, the bar's groove rimmed in white. Lighting and edges only -
+   nothing here moves or resizes, so the card lays out where the shell put it. */
+#card .panel i {
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #a9d0c9, #5d8e87);
+  box-shadow: 0 0 0 4px #fff, 0 14px 0 4px #3e6862, 0 22px 24px rgba(0,0,0,.35),
+              inset 0 4px 0 rgba(255,255,255,.55), inset 0 -6px 0 rgba(0,0,0,.14);
+}
+#card .panel u {
+  box-shadow: inset 0 5px 0 rgba(255,255,255,.95), inset 0 -14px 18px rgba(60,90,84,.16),
+              inset 0 0 0 2px rgba(93,142,135,.25);
+}
+#card .panel u b {
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #a6d4cb 0%, #6f9f97 60%, #5d8e87 100%);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.5), inset 0 -4px 0 rgba(0,0,0,.12), 0 6px 0 #4a7a73, 0 10px 10px rgba(0,0,0,.2);
+}
+#c-card.lose .panel u b {
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #f28a9b 0%, #d8556a 60%, #b33c51 100%);
+}
+#c-card .panel u b::after { display: none; }     /* the gloss is in the band's background now */
+#card .head { -webkit-text-stroke: 7px #1d2438; paint-order: stroke fill; }
+#card .star svg { filter: drop-shadow(0 5px 0 #a5620a) drop-shadow(0 11px 9px rgba(0,0,0,.32)); }
+#card .feat .track { box-shadow: inset 0 4px 5px rgba(20,50,46,.55), 0 0 0 3px #fff, 0 3px 0 3px #c9c6bb; }
+#card .feat .fill {
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #8fe0f7 0%, #4bb0d8 60%, #2d8fbd 100%);
+}
+#card .feat .lab { color: #3f6f68; text-shadow: 0 2px 0 #fff; }
+#card .feat .badge { box-shadow: 0 6px 0 #355d58, 0 10px 10px rgba(0,0,0,.28), 0 0 0 3px #fff; }
+#card .coins span { -webkit-text-stroke: 7px #6b3d00; text-shadow: 0 3px 0 #6b3d00, 0 6px 8px rgba(0,0,0,.25); }
+#card .wide-btn {
+  border: 3px solid rgba(255,255,255,.95);
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #7fa8f5 0%, #4a7ad0 60%, #3d6cc0 100%);
+}
+#card .wide-btn.blue {
+  background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #ffffff 0%, #f3f2ed 60%, #e3e1d8 100%);
+}
+
 /* ---- the revive offer, in the same colours ----
    Built like the card - a rim, a face, a band riding the top - so it is dealt
    the same way: the rim is the floor slab, the face the wall, the band the
@@ -1650,6 +1696,80 @@ individual player's rows &mdash; there is nothing in them to search on.</p>
   border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffd964 55%, #f2a51a);
 }
 #g-clock.tfx-up { color: #8dffb0; }
+
+/* ---- the HUD, made of the same glossy toy stuff as PLAY and the boosters ----
+   Asked for (2026-10-16): the flat pills read as a web page's chrome over a 3D
+   room. Picked off three renders (B): a ramp on the face, a gloss over its top
+   half, a slab edge under it, a white rim, and the type stroked in the slab's
+   blue. ⚠ The gloss is a background layer, not ::before - .pill.hint already
+   uses both pseudo-elements for the walkthrough's pulse. */
+#play .pill, #play .topbar .icon-btn { border: 2.5px solid rgba(255,255,255,.92); }
+#play .pill {
+  background: linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #78a6ff 0%, #4a7ad0 60%, #3d69bf 100%);
+  box-shadow: 0 5px 0 #2a4d94, 0 9px 14px rgba(10,30,70,.3), inset 0 -3px 0 rgba(0,0,0,.10);
+}
+#play .pill-lab, #play .pill-val {
+  -webkit-text-stroke: 3px #23407e; paint-order: stroke fill; text-shadow: 0 2px 0 #23407e;
+}
+#play .topbar .icon-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              linear-gradient(180deg, #a9b2c0 0%, #7d8696 100%);
+  box-shadow: 0 4px 0 #555d6b, 0 8px 12px rgba(0,0,0,.22), inset 0 -3px 0 rgba(0,0,0,.10);
+}
+#play .grade {
+  background: linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.16) 46%, rgba(255,255,255,0) 47%),
+              var(--gr);                 /* over the badge's own colour: HARD is orange, VERY HARD purple */
+  box-shadow: 0 3px 0 var(--gr-dk), 0 6px 10px rgba(0,0,0,.2);
+}
+
+/* ---- the HUD scales with the screen's height ----
+   The bar's pills and the booster tiles are fixed rem sizes in the shell, right
+   on a phone held upright and oversized on anything short - a landscape
+   window, a laptop - where the room shrinks to fit between them while they stay
+   phone-sized and loom over a small room. shell3d.js sets --bk from the
+   viewport's height on both; each scales as one piece, and the room takes back
+   what they give up (render3d.js fits to their rects).
+   ⚠ The bar scales about the safe-area line, not its own top edge: its pills
+   draw up towards that line and never past it into a notch. */
+#boosters { transform: translateX(-50%) scale(var(--bk, 1)); transform-origin: 50% 100%; }
+#play .topbar { transform: scale(var(--bk, 1)); transform-origin: 50% var(--safe-t); }
+
+/* ---- desktop: the boosters in a column beside the room ----
+   For a computer only - a phone keeps the row along the foot. The boosters
+   stand down the right of the waiting line, centred on the height, so the room
+   takes back the band the row had along the foot.
+   ⚠ Level, clock and gold stay in the bar across the TOP, as on a phone. They
+   stood in a matching column down the left for a while; asked back to the top
+   (2026-10-16). The bar still grows and shrinks with the window through --bk,
+   above, and the room fits under it, because render3d.js reads the bar as a
+   band and the boosters as a column from their rects.
+   ⚠ Beside the room, not at the screen's edge: render3d.js publishes where the
+   room landed as --room-r after each fit and reserves only the column's width
+   and air, so the two never chase each other.
+   "A computer" is a mouse (hover and a fine pointer) on a window at least as
+   wide as it is tall: a phone turned sideways has neither, and a desktop
+   window dragged narrow is the phone's shape and gets the phone's layout. */
+@media (hover: hover) and (pointer: fine) and (min-aspect-ratio: 1/1) {
+  /* The bar spans between the two planters at the top of the room - asked for
+     (2026-10-16) - rather than a fixed 46rem of the window, which on a wide
+     screen ran its ends out over them. render3d.js publishes their edges as
+     --pot-* after each fit. The width is divided by --bk because the bar is
+     then scaled by it; min-width keeps the pills whole on a narrow board,
+     where the bar spills past the planters evenly. */
+  #play .topbar {
+    position: absolute; top: 0; margin: 0; max-width: none; min-width: max-content;
+    padding-left: 0; padding-right: 0;
+    left: calc((var(--pot-l-in, 30%) + var(--pot-r-in, 70%)) / 2);
+    width: calc((var(--pot-r-in, 70%) - var(--pot-l-in, 30%)) / var(--bk, 1));
+    transform: translateX(-50%) scale(var(--bk, 1)); transform-origin: 50% var(--safe-t);
+  }
+  #boosters {
+    left: calc(var(--room-r, 70%) + 1.75rem); right: auto; top: 50%; bottom: auto;
+    flex-direction: column; gap: 1.5rem;
+    transform: translateY(-50%) scale(var(--bk, 1)); transform-origin: 0 50%;
+  }
+}
 
 </style>
 <script>
@@ -5105,19 +5225,38 @@ const G3 = (function () {
      pitch of 1.33 rad, which puts the camera 76 degrees up and a little behind
      the seats. Read here rather than copied, so the two cannot drift apart.
 
-     ⚠ Parallel projection, like the 2D draw: a row at the back of the room is
-     the same size as a row at the front. A perspective camera at this height
-     swells the near rows, which is a different board to look at.
+     PERSPECTIVE, since 2026-10-16, asked for against the original side by
+     side: a real eye, so the near rows stand a little larger than the far
+     ones and the room's walls lean in towards the top - the depth the
+     original has and a parallel projection cannot give, however the room is
+     lit. Before that the room was drawn parallel, like the 2D draw, so that a
+     row at the back was the size of a row at the front. The direction of
+     view is unchanged; only the lens is. The picking and the shell's marks
+     project through the camera, whichever it is, so nothing else moved.
+
+     The lens: a vertical field of FOV degrees (LOOK.fov, ?fov=N to try one),
+     from ELEV_DEG up (68 now, not the atlas's 76 - see there).
+     Narrow is near-parallel; wide swells the near rows like the original's
+     bus. The camera is then stood as far back as fits the room into the free
+     band - see fit().
 
      ?elev=N still tries a height, for comparing on a real screen. */
-  const ELEV_ASKED = (e => (e >= 15 && e <= 85 ? e : 0))(
-    parseFloat(new URLSearchParams(location.search).get("elev")));
-  const ELEV = ELEV_ASKED ? ELEV_ASKED * Math.PI / 180 : META.pitch;
+  const Q = new URLSearchParams(location.search);
+  const ELEV_ASKED = (e => (e >= 15 && e <= 85 ? e : 0))(parseFloat(Q.get("elev")));
+  const FOV_ASKED = (f => (f >= 8 && f <= 80 ? f : 0))(parseFloat(Q.get("fov")));
+  /* The height, in degrees. The atlas's 76 was the 2D draw's, and with a real
+     lens it looked down a well: the walls chased in to the top and the room
+     read as a trapezoid. Asked about (2026-10-16); of 52, 60, 68 and 76
+     rendered on a desktop and a phone, 60 first - then, from a second set
+     at 58, 68 and 78, the user picked 68: the cells stay near square, the
+     room stands taller in the frame, and the front of a seat still shows. */
+  const ELEV_DEG = ELEV_ASKED || 68;
+  const ELEV = ELEV_DEG * Math.PI / 180;
   const YAW = META.yaw || 0;
-  const CAM_DIST = 30;                     // parallel projection: only clears the room
+  const CAM_DIST = 30;                     // where the fit starts looking from
 
   const TONE = [
-    { lt: 0xbdc5d4, md: 0x969ca8, dk: 0x575a61 },   // 0  grey   - bolted down
+    { lt: 0xbdc5d4, md: 0x969ca8, dk: 0x575a61 },   // 0  grey   - bolted down (LOOK.grey may replace it)
     { lt: 0xff4e5b, md: 0xe83e48, dk: 0x87242a },   // 1  red
     { lt: 0x2cc3ff, md: 0x239be1, dk: 0x145a82 },   // 2  sky
     { lt: 0xfff73a, md: 0xfac42e, dk: 0x91721b },   // 3  yellow
@@ -5130,13 +5269,69 @@ const G3 = (function () {
     { lt: 0x2fd4c3, md: 0x25a89b, dk: 0x15615a },   // 10 teal
     { lt: 0xde975d, md: 0xb0784a, dk: 0x66462b },   // 11 brown
   ];
-  const HUE = {
-    plinth: 0x557c78, slab: 0xc5bba5, tileA: 0xede9dc, tileB: 0xdedfd0,
+  /* ---- the look: how the room is lit and finished ----------------------
+     ⚠ Asked for (2026-10-16): the seats, the room and the passengers as vivid
+     as the booster tiles, and as solid-looking - "the more 3D the better".
+     The tiles are drawn art: flat saturated colour, a bright bevel along the
+     top, a dark edge underneath, and nothing between them and the screen. The
+     room was lit to about twice white and handed to ACES, which pulls every
+     bright colour towards white - the sky seats came out baby blue, the
+     orange ones apricot - and every face was matte, so a seat was one flat
+     wash with no edge to it.
+     Now: no filmic curve, so a colour renders as the colour it was given; the
+     light summing to white on a face that looks at the key and to about half
+     on one that looks away, so every box has a lit side and a shaded side; a
+     glossy finish with a soft studio reflection in it, for the sheen the
+     tiles have; and the passenger in the deep tone's richer half.
+     ?look=soft brings the old look back for comparing on a real screen;
+     ?look=vivid is the new light on the old room colours. */
+  const LOOKS = {
+    soft:  { aces: true,  exposure: 1.06, rough: 0.76, env: 0,    hemi: 0.85, amb: 0.14,
+             key: 1.22, fill: 0.22, rim: 0.34, face: 0.25, peep: 0,    edge: 1,    room: 0 },
+    vivid: { aces: false, exposure: 1.0,  rough: 0.42, env: 0.5,  hemi: 0.26, amb: 0.0,
+             key: 0.64, fill: 0.10, rim: 0.18, face: 0.30, peep: ["dk", "md", 0.55], edge: 0.28, room: 0,
+             // the lens, in degrees: of 22, 32 and 42 rendered side by side, 32 - the
+             // walls lean in and the near rows stand out, and the room keeps its size
+             fov: 32 },
+  };
+  LOOKS.deep = Object.assign({}, LOOKS.vivid, { room: 1 });
+  /* Then (2026-10-16), against the original side by side: "better, but still
+     not as pretty". What the original has that this did not: a DARK checker
+     floor, so every seat stands out of it; seats finished like candy - a wet
+     sheen, the cushion a clear step lighter than the body; and passengers in
+     the bright tone, not the deep one. `candy` is all three; `candyDeep` keeps
+     the deep passengers; `mid` is a lighter checker. Compare with ?look=. */
+  LOOKS.candy = Object.assign({}, LOOKS.deep, {
+    cells: [0x5e6369, 0x898e95], line: 0, coat: 0.7, rough: 0.34, env: 0.6, face: 0.45,
+    peep: ["lt", "md", 0.25],
+    // ⚠ The bolted-down grey seat was the checker's own grey, and sank into it.
+    // On a dark floor it is silver, as the original draws it.
+    grey: { lt: 0xf2f4f7, md: 0xd0d6de, dk: 0x8d94a0 } });
+  LOOKS.candyDeep = Object.assign({}, LOOKS.candy, { peep: ["dk", "md", 0.55] });
+  LOOKS.mid = Object.assign({}, LOOKS.candyDeep, { cells: [0x9aa0a7, 0xbdc2c8] });
+  // candyDeep: picked by the user off the four renders (2026-10-16).
+  const LOOK = LOOKS[Q.get("look")] || LOOKS.candyDeep;
+  const FOV = FOV_ASKED || LOOK.fov || 30;
+  if (LOOK.grey) TONE[0] = LOOK.grey;
+  const HUE = LOOK.room ? {
+    /* The vivid room: the plinth and the door frames in the teal seat's own
+       family, the tiles white and a cool pale grey, the walls a clean mint,
+       the paving and the sill warmer and brighter. Still quiet next to the
+       seats - the decoration is the room's, the colour is the pieces'. */
+    plinth: 0x2f9d93, slab: 0xd9d0b9, tileA: 0xfdfdfb, tileB: 0xe6ecf1,
+    wall: 0xbfe2d7, cap: 0xfff7e6, frame: 0x1e6f68, glass: 0x9fe2e8,
+    rail: 0xd9ad63, step: 0xe6d8ba, sill: 0xf3bd3a, table: 0xc49a66, lock: 0xf2c23a,
+    crate: 0x9c6f44, crateTop: 0xc1965e, strap: 0x5c4732,
+  } : {
+    plinth: 0x557c78, slab: 0xcdd2d8, tileA: 0xfafaf8, tileB: 0xeff0f1,
     wall: 0xabc6bc, cap: 0xfff2d9, frame: 0x326e68, glass: 0xa5d9dc,
     rail: 0xcaa66b, step: 0xd8cbb3, sill: 0xe8b94e, table: 0xb99770, lock: 0xd9b64a,
     crate: 0x8a6a48, crateTop: 0xa98a63, strap: 0x5c4732,
   };
-  const SKY = 0xa3cbb9;                  // clear colour and fog: the far edge of the ground
+  const SKY = 0xe9e6dd;                  // clear colour and fog: the far edge of the ground
+  // The floor's cells, two alternating, and the slab's line between them - see buildRoom.
+  // ⚠ Not FLOOR: that name is the picking plane, further down this scope.
+  const CELLS = LOOK.cells || [0xffffff, 0xf1f2f4], CELL_LINE = LOOK.line === undefined ? 0.05 : LOOK.line;
   const ROT = [0, -Math.PI / 2, Math.PI, Math.PI / 2];   // a seat's dir, as a turn
   const FACE = { u: 0, d: Math.PI, l: Math.PI / 2, r: -Math.PI / 2 };
 
@@ -5162,8 +5357,9 @@ const G3 = (function () {
     renderer.setClearColor(SKY, 1);
     if (THREE.ColorManagement) THREE.ColorManagement.enabled = true;
     renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    // Linear, not none: it is the one that keeps exposure as a knob.
+    renderer.toneMapping = LOOK.aces ? THREE.ACESFilmicToneMapping : THREE.LinearToneMapping;
+    renderer.toneMappingExposure = LOOK.exposure;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Underneath #board, in the same box: the CSS gives every canvas inset 0.
@@ -5178,10 +5374,11 @@ const G3 = (function () {
     // Pushed well past the room: under a parallel camera every part of the room
     // sits at much the same distance, and fog would grey the board evenly.
     scene.fog = new THREE.Fog(SKY, 60, 120);
-    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    scene.add(new THREE.HemisphereLight(0xe9f9ff, 0x71836c, 0.85));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.14));
-    const key = new THREE.DirectionalLight(0xfff0d6, 1.22);
+    camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 400);
+    scene.add(new THREE.HemisphereLight(0xe9f9ff, 0x71836c, LOOK.hemi));
+    if (LOOK.amb) scene.add(new THREE.AmbientLight(0xffffff, LOOK.amb));
+    if (LOOK.env) scene.environment = studioEnv();
+    const key = new THREE.DirectionalLight(0xfff0d6, LOOK.key);
     key.position.set(4, 16, 5);              // from over the camera's shoulder
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
@@ -5193,9 +5390,9 @@ const G3 = (function () {
     key.shadow.camera.near = 1; key.shadow.camera.far = 56;
     scene.add(key);
     // ⚠ .position.set(), never Object.assign: position is a read-only accessor.
-    const fill = new THREE.DirectionalLight(0x9fc0ff, 0.22);
+    const fill = new THREE.DirectionalLight(0x9fc0ff, LOOK.fill);
     fill.position.set(-8, 6, 5); scene.add(fill);
-    const rim = new THREE.DirectionalLight(0xbcd6ff, 0.34);
+    const rim = new THREE.DirectionalLight(0xbcd6ff, LOOK.rim);
     rim.position.set(-4, 3.5, -9); scene.add(rim);
     backdrop();
     rootG = new THREE.Group(); scene.add(rootG);
@@ -5214,26 +5411,55 @@ const G3 = (function () {
     t.encoding = THREE.sRGBEncoding;       // ⚠ or colour management bleaches it
     return t;
   }
+  /** A studio to reflect: a bright sky fading to a grey floor, and two soft
+      lamps where the key and the fill stand. What puts the sheen along a
+      seat's rounded edges and a catchlight on a passenger's head - the room
+      has no window to reflect, so one is made up. The lamps never light the
+      scene; they are only there to be seen in the gloss. */
+  function studioEnv() {
+    const pm = new THREE.PMREMGenerator(renderer);
+    const sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 16, 12),
+      new THREE.MeshBasicMaterial({
+        map: gradTex([[0, "#ffffff"], [0.45, "#d9e3ec"], [0.62, "#aeb8c2"], [1, "#5c6670"]]),
+        side: THREE.BackSide })));
+    for (const [x, y, z, w] of [[4, 16, 5, 9], [-9, 7, 5, 5]]) {
+      const lamp = new THREE.Mesh(new THREE.PlaneGeometry(w, w), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      lamp.position.set(x, y, z); lamp.lookAt(0, 0, 0); sc.add(lamp);
+    }
+    const t = pm.fromScene(sc, 0.04).texture;
+    pm.dispose();
+    return t;
+  }
   function poolTex() {
     const n = 512, c = document.createElement("canvas"); c.width = c.height = n;
     const x = c.getContext("2d");
     const g = x.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-    g.addColorStop(0, "#d5eadf"); g.addColorStop(0.36, "#bdddcd");
-    g.addColorStop(0.68, "#a5cfba"); g.addColorStop(1, "#91c1aa");
+    g.addColorStop(0, "#e9e6dd"); g.addColorStop(0.36, "#e9e6dd");
+    g.addColorStop(0.68, "#e5e2d8"); g.addColorStop(1, "#dedbd0");
     x.fillStyle = g; x.fillRect(0, 0, n, n);
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
   }
-  /* The ground around the room and the sky over it: mint, picked off three
-     renders (A) when the old cream-to-sage read as faded - after the young
-     grass (C) was tried in the game and found too bright to sit in front of,
-     and A itself then softened: 60% of its saturation, a touch lighter. ⚠ Neither is
+  /* The ground around the room and the sky over it: the board's own floor,
+     #e9e6dd, sampled off the rendered tiles and asked for by name - the room
+     stands on a ground of its own colour, framed by its teal plinth alone. Only
+     the far rim of the ground darkens a touch, where nothing is in view.
+     Before that (2026-10-16): sky blue, so the Seat Jam
+     home screen's sunny sky carries on into the board. Picked off
+     real renders: a pale first try read washed out next to Home, and of three
+     deeper ones this - C, the ground at about 72% lightness against Home's
+     58-63% - was chosen over the one matching Home outright. It is the old
+     mint's lightness ladder, 0.11 darker, at hue 198 and 94% saturation.
+     The mint had been picked off three renders (A) when the old
+     cream-to-sage read as faded - after the young grass (C) was tried in the
+     game and found too bright - and A then softened. ⚠ Neither is
      tone-mapped. ACES greys and darkens whatever it is handed, which is right
      for a lit room and wrong for a backdrop whose colour was chosen by eye -
      it was half of why the old one looked washed out. */
   function backdrop() {
     scene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 32, 20),
       new THREE.MeshBasicMaterial({
-        map: gradTex([[0, "#f3f9f5"], [0.42, "#cee5da"], [0.76, "#acd2c2"], [1, "#96c3b0"]]),
+        map: gradTex([[0, "#efede6"], [0.42, "#e9e6dd"], [0.76, "#e9e6dd"], [1, "#e9e6dd"]]),
         side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
     const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 56),
       new THREE.MeshBasicMaterial({ map: poolTex(), fog: true, toneMapped: false }));
@@ -5263,8 +5489,14 @@ const G3 = (function () {
   const MAT = new Map();
   function mat(hex, opt) {
     const k = hex + "|" + JSON.stringify(opt || {});
-    if (!MAT.has(k)) MAT.set(k, new THREE.MeshStandardMaterial(
-      Object.assign({ color: hex, roughness: 0.76, metalness: 0.0 }, opt || {})));
+    /* Physical, for the clearcoat, when the look asks for one: a thin wet
+       layer over the colour that puts the candy sheen of the original's seats
+       along every rounded edge. Standard otherwise - the cheaper shader. */
+    if (!MAT.has(k)) MAT.set(k, LOOK.coat
+      ? new THREE.MeshPhysicalMaterial(Object.assign({ color: hex, roughness: LOOK.rough, metalness: 0.0,
+          envMapIntensity: LOOK.env, clearcoat: LOOK.coat, clearcoatRoughness: 0.28 }, opt || {}))
+      : new THREE.MeshStandardMaterial(
+          Object.assign({ color: hex, roughness: LOOK.rough, metalness: 0.0, envMapIntensity: LOOK.env }, opt || {})));
     return MAT.get(k);
   }
   function solid(w, h, d, r, m, shadow) {
@@ -5297,6 +5529,23 @@ const G3 = (function () {
       t.receiveShadow = true;
       t.position.set(wx(g, c), 0, wz(g, r));
       roomG.add(t);
+    }
+    /* The cells, so each one a seat can stand in reads at a glance - asked for
+       (2026-10-16), very light: white and pale-grey squares with the slab's grey
+       showing as a line between them.
+       ⚠ On top of the SLAB, not the tiles. rbox's bevel grows a shape outward by
+       its radius, so the slab stands 0.74 tall rather than 0.44 and its top, at
+       y 0.11, sits over the tiles' (0.095): the floor anyone has ever seen in
+       this room is the slab, and the tiles under it never showed - recolouring
+       them, or their grout, changed nothing on screen. */
+    if (CELLS) {
+      const top = new THREE.Box3().setFromObject(slab).max.y + 0.001;
+      const sq = new THREE.PlaneGeometry(GAP - CELL_LINE, GAP - CELL_LINE);
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+        const p = new THREE.Mesh(sq, mat(CELLS[(c + r) & 1]));
+        p.rotation.x = -Math.PI / 2; p.position.set(wx(g, c), top, wz(g, r)); p.receiveShadow = true;
+        roomG.add(p);
+      }
     }
 
     /* The board's own walls: its hole cells, which the 2D game raises into a
@@ -5373,18 +5622,24 @@ const G3 = (function () {
   function garden(sx, sz) {
     const deco = new THREE.Group(); deco.userData.deco = true; roomG.add(deco);
     const z0 = -sz / 2;                      // -z: the far end, beyond row 0
-    const terrace = solid(sx + 3, 0.12, 2.1, 0.12, mat(0xd4c9ae), false);
+    /* ⚠ Under the vivid look the old tan paving lit up into a solid beige block
+       across the top of a phone's screen, and drew the eye off the board. Now
+       a shade off the ground it stands on: there, not a thing to look at. */
+    const terrace = solid(sx + 3, 0.12, 2.1, 0.12, mat(LOOK.room ? 0xe3dcc8 : 0xd4c9ae), false);
     terrace.position.set(0, -0.85, z0 - 1.65); terrace.receiveShadow = true; deco.add(terrace);
+    terrace.userData.terrace = true;         // left out of the desktop fit - see fit()
     const leaves = mat(0x689c7b, { roughness: 0.85 }), tips = mat(0x94b88b);
     for (const sign of [-1, 1]) {
       const x = sign * (sx / 2 + 0.7), z = z0 - 1.0;
       const planter = solid(0.82, 0.58, 0.82, 0.14, mat(0xc08e73));
       planter.position.set(x, -0.5, z); deco.add(planter);
       const trunk = tube(0.075, 0.8, mat(0x997957)); trunk.position.set(x, 0, z); deco.add(trunk);
+      // tagged by side: the desktop bar spans between the two - see fit()
+      planter.userData.planter = trunk.userData.planter = sign;
       for (let i = 0; i < 3; i++) {
         const crown = new THREE.Mesh(new THREE.SphereGeometry(0.48 - i * 0.07, 12, 8), i === 2 ? tips : leaves);
         crown.scale.set(1, 0.9, 0.9); crown.position.set(x + (i === 1 ? 0.17 : 0), 0.40 + i * 0.26, z);
-        crown.castShadow = true; deco.add(crown);
+        crown.castShadow = true; crown.userData.planter = sign; deco.add(crown);
       }
     }
   }
@@ -5466,14 +5721,34 @@ const G3 = (function () {
     const L = b.len, w = (L - 1) * GAP + CELLW;
     tag(solid(w * 0.80, 0.11, 0.60, 0.04, mat(t.dk))).position.set(0, 0.065, 0.02);
     tag(solid(w, 0.20, 0.84, 0.085, mat(t.md))).position.set(0, 0.225, -0.01);
-    tag(solid(w * 0.88, 0.10, 0.70, 0.05, mat(t.lt))).position.set(0, 0.335, -0.035);
+    /* ⚠ The cushion and the back's face were the LIGHT tone, and from this
+       camera the cushion is most of what a seat is - it read as a pale seat in
+       a darker frame. Both are now the body's tone with a quarter of the light
+       one in it: still a step up from the back, no longer washed out. */
+    const face = new THREE.Color(t.md).lerp(new THREE.Color(t.lt), LOOK.face).getHex();
+    /* ⚠ The back's top rail and the arms were the DEEP tone, and once the seats
+       were vivid that read as two dark bars on every seat - "the back and the
+       arms are too dark, too far from the seat's colour, and they darken the
+       whole seat" (2026-10-16). Now the body's tone with a little of the deep
+       one: a shade, not a second colour. The base and the dividers stay deep -
+       the base is hardly seen, and a divider is the line between two places. */
+    const edge = new THREE.Color(t.md).lerp(new THREE.Color(t.dk), LOOK.edge).getHex();
+    tag(solid(w * 0.88, 0.10, 0.70, 0.05, mat(face))).position.set(0, 0.335, -0.035);
     tag(solid(w, 0.58, 0.20, 0.085, mat(t.md))).position.set(0, 0.51, 0.32);
-    tag(solid(w * 0.86, 0.40, 0.11, 0.05, mat(t.lt))).position.set(0, 0.51, 0.225);
-    tag(solid(w * 0.95, 0.10, 0.25, 0.045, mat(t.dk))).position.set(0, 0.82, 0.32);
+    tag(solid(w * 0.86, 0.40, 0.11, 0.05, mat(face))).position.set(0, 0.51, 0.225);
+    tag(solid(w * 0.95, 0.10, 0.25, 0.045, mat(edge))).position.set(0, 0.82, 0.32);
     for (let k = 1; k < b.cap; k++) {
       tag(solid(0.055, 0.17, 0.76, 0.022, mat(t.dk))).position.set((k - b.cap / 2) * (w / b.cap), 0.305, -0.02);
     }
-    for (const sx of [-1, 1]) tag(solid(0.11, 0.13, 0.64, 0.05, mat(t.dk))).position.set(sx * (w / 2 + 0.015), 0.385, 0.015);
+    /* The arms, kept but very small - asked for that way after they had been
+       taken off altogether. They were 0.11 wide, 0.13 tall and 0.64 long, out
+       past the body, and from above two dark rails framed every seat. Now a
+       slim low rail on each side of the body's top edge: enough to say
+       "armchair", not enough to draw a border round the cushion. (A first
+       cut at 0.055 x 0.07 x 0.34 was asked a little longer and a touch
+       bigger.) */
+    for (const sx of [-1, 1])
+      tag(solid(0.07, 0.085, 0.54, 0.03, mat(edge))).position.set(sx * (w / 2 - 0.04), 0.365, 0.02);
     if (b.colour === 0) {                      // grey: bolted to the floor, and it shows
       const plate = tag(solid(w + 0.08, 0.05, 0.94, 0.03, mat(0x626b79), false));
       plate.position.set(0, 0.025, 0);
@@ -5511,16 +5786,23 @@ const G3 = (function () {
   function buildPeep(ci) {
     const grp = new THREE.Group();
     const t = TONE[ci] || TONE[0];
-    // ⚠ The DEEP tone: a passenger sits in a seat of their own colour, and a body
-    // in the cushion's shade vanishes into it.
-    const body = new THREE.Mesh(peepGeo("body"), mat(t.dk, { roughness: 0.48 }));
+    /* ⚠ The DEEP tone: a passenger sits in a seat of their own colour, and a
+       body in the cushion's shade vanishes into it. Under the vivid look the
+       deep tone is pulled part-way to the body tone - a rich red, not maroon -
+       and still a clear step down from the cushion. */
+    const dk = LOOK.peep
+      ? new THREE.Color(t[LOOK.peep[0]]).lerp(new THREE.Color(t[LOOK.peep[1]]), LOOK.peep[2]).getHex() : t.dk;
+    const body = new THREE.Mesh(peepGeo("body"), mat(dk, { roughness: 0.48 }));
     body.position.y = 0.43; body.castShadow = true; grp.add(body);
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.176, 0.07, 16), mat(t.lt));
     collar.position.y = 0.555; grp.add(collar);
+    /* ⚠ The head is the shirt's colour, hair and all - asked for: with skin
+       and dark hair every head read as the same black dot from above, and the
+       colour that says which seat a passenger wants was only on their back. */
     const skin = [0xf0cbaa, 0xc48e69, 0xe1ac83][ci % 3];
-    const head = new THREE.Mesh(peepGeo("head"), mat(skin, { roughness: 0.58 }));
+    const head = new THREE.Mesh(peepGeo("head"), mat(dk, { roughness: 0.5 }));
     head.position.y = 0.72; head.castShadow = true; grp.add(head);
-    const hair = new THREE.Mesh(peepGeo("hair"), mat([0x49392f, 0x725238, 0x30343b][ci % 3]));
+    const hair = new THREE.Mesh(peepGeo("hair"), mat(dk, { roughness: 0.5 }));
     hair.position.y = 0.735; grp.add(hair);
     for (const side of [-1, 1]) {
       const eye = new THREE.Mesh(peepGeo("eye"), mat(0x263334));
@@ -5528,27 +5810,37 @@ const G3 = (function () {
       const shine = new THREE.Mesh(peepGeo("shine"), mat(0xffffff));
       shine.position.set(side * 0.059 - 0.004, 0.733, -0.181); grp.add(shine);
     }
-    const nose = new THREE.Mesh(peepGeo("nose"), mat(skin));
+    const nose = new THREE.Mesh(peepGeo("nose"), mat(dk));
     nose.position.set(0, 0.686, -0.176); grp.add(nose);
     const arms = [], legs = [], knees = [];
     for (const sx of [-1, 1]) {
       const pivot = new THREE.Group(); pivot.position.set(sx * 0.19, 0.52, 0);
-      const a = new THREE.Mesh(peepGeo("arm"), mat(t.dk)); a.position.y = -0.11; a.castShadow = true;
+      const a = new THREE.Mesh(peepGeo("arm"), mat(dk)); a.position.y = -0.11; a.castShadow = true;
       pivot.add(a);
       const hand = new THREE.Mesh(peepGeo("hand"), mat(skin)); hand.position.y = -0.22; pivot.add(hand);
       grp.add(pivot); arms.push(pivot);
     }
     for (const side of [-1, 1]) {
       const hip = new THREE.Group(); hip.position.set(side * 0.095, 0.30, 0);
-      const thigh = new THREE.Mesh(peepGeo("leg"), mat(t.dk)); thigh.position.y = -0.065; hip.add(thigh);
+      const thigh = new THREE.Mesh(peepGeo("leg"), mat(dk)); thigh.position.y = -0.065; hip.add(thigh);
       const knee = new THREE.Group(); knee.position.y = -0.13;
-      const shin = new THREE.Mesh(peepGeo("leg"), mat(t.dk)); shin.position.y = -0.055; knee.add(shin);
-      const shoe = solid(0.135, 0.075, 0.21, 0.035, mat(0xfaf1dc));
-      shoe.position.set(0, -0.12, -0.045); knee.add(shoe);
+      const shin = new THREE.Mesh(peepGeo("leg"), mat(dk)); shin.position.y = -0.055; knee.add(shin);
+      /* ⚠ The shoes were cream, from the 2D sprites, and with the passenger in
+         the bright tone they read as white feet - asked about (2026-10-16).
+         The original paints a passenger one colour head to foot; here the
+         body's colour a step deeper, so a foot still reads as a foot. */
+      // Smaller than the 2D sprite's boot (0.135 x 0.075 x 0.21): from above,
+      // that read as two big feet - asked smaller (2026-10-16).
+      const shoe = solid(0.095, 0.06, 0.14, 0.03,
+                         mat(new THREE.Color(dk).lerp(new THREE.Color(t.dk), 0.3).getHex()));
+      shoe.position.set(0, -0.115, -0.025); knee.add(shoe);
       hip.add(knee); grp.add(hip); legs.push(hip); knees.push(knee);
     }
-    const bag = solid(0.21, 0.24, 0.12, 0.05, mat(t.md));
-    bag.position.set(0, 0.43, 0.195); grp.add(bag);
+    /* ⚠ From this camera - behind and above - the bag is the lowest thing on
+       screen, and at 0.21 wide it read as two big feet under every passenger
+       (asked smaller, 2026-10-16). Now a small pack high on the back. */
+    const bag = solid(0.13, 0.15, 0.09, 0.04, mat(t.md));
+    bag.position.set(0, 0.47, 0.18); grp.add(bag);
     grp.userData = { ci, arms, legs, knees, bag };
     grp.scale.setScalar(PEEP);
     return grp;
@@ -5681,13 +5973,36 @@ const G3 = (function () {
      each line - stays inside the frame and clear of the HUD. The HUD only eats
      height, and how much is measured off the top bar and the booster row. */
   const BOX = new THREE.Box3();
+  /* Where the room may go: the canvas less the HUD. ⚠ Read off where each part
+     of the HUD actually IS, not where it used to be: on a phone the bar is a
+     band across the top and the boosters a row along the foot, and on a desktop
+     window both stand as columns down the sides (game3d.css). A part wider than
+     it is tall is a band and takes from the top or the foot; one taller than it
+     is wide is a column and takes from its side. With no band at top or foot
+     the room keeps a little air there rather than running to the edge. */
+  const COL_AIR = 52;                    // px: the gap to the room plus the least margin to the screen's edge
   function limits() {
     const r = cv.getBoundingClientRect(), W = r.width || 1, H = r.height || 1, EDGE = 6;
-    const bar = document.querySelector("#play .topbar"), bst = document.getElementById("boosters");
-    let top = 0, bot = 0;
-    if (bar) { const b = bar.getBoundingClientRect(); top = Math.max(0, b.bottom - r.top); }
-    if (bst) { const b = bst.getBoundingClientRect(); bot = Math.max(0, r.bottom - b.top); }
-    return { x: 1 - EDGE * 2 / W, hi: 1 - (top + EDGE) * 2 / H, lo: -1 + (bot + EDGE) * 2 / H };
+    let top = 0, bot = 0, left = 0, right = 0, bar = false;
+    for (const el of [document.querySelector("#play .topbar"), document.getElementById("boosters")]) {
+      if (!el) continue;
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      if (b.width >= b.height) {
+        if (b.top + b.bottom < r.top + r.bottom) { top = Math.max(top, b.bottom - r.top); bar = true; }
+        else bot = Math.max(bot, r.bottom - b.top);
+      } else {
+        // ⚠ A column takes its WIDTH and air, not the space out to where it
+        // stands: it is placed beside the room after the fit (--room-l and
+        // --room-r below), so reserving to its position would chase itself.
+        const need = b.width + COL_AIR;
+        if (b.left + b.right < r.left + r.right) left = Math.max(left, need);
+        else right = Math.max(right, need);
+      }
+    }
+    if (left || right) { top = Math.max(top, H * .035); bot = Math.max(bot, H * .035); }
+    return { side: !!(left || right), bar, xl: -1 + (left + EDGE) * 2 / W, xr: 1 - (right + EDGE) * 2 / W,
+             hi: 1 - (top + EDGE) * 2 / H, lo: -1 + (bot + EDGE) * 2 / H };
   }
   const ROOMBOX = new THREE.Box3();
   function fit(g) {
@@ -5701,46 +6016,100 @@ const G3 = (function () {
       BOX.expandByPoint(rootG.localToWorld(new THREE.Vector3(to3(lx) + 0.3, 1.0, to3(lz))));
       BOX.expandByPoint(rootG.localToWorld(new THREE.Vector3(to3(lx) - 0.3, 0, to3(lz))));
     }
-    const cx = (BOX.max.x + BOX.min.x) / 2, cz = (BOX.max.z + BOX.min.z) / 2;
-    // Behind the seats (+z) and up at the atlas's pitch, turned by its yaw.
-    camera.position.set(cx + CAM_DIST * Math.cos(ELEV) * Math.sin(YAW),
-                        CAM_DIST * Math.sin(ELEV),
-                        cz + CAM_DIST * Math.cos(ELEV) * Math.cos(YAW));
-    camera.lookAt(cx, 0, cz);
-    camera.updateMatrixWorld(true);
-    /* Solved, not searched. A parallel projection is linear, so the frame that
-       holds the room as large as the free band allows - between the top bar and
-       the booster row - comes straight out of the box's extent in camera space:
-       the half-height h that fits both axes, and an offset that centres the
-       room in the BAND rather than in the screen. The HUD is heavier at the
-       bottom, and centring on the screen would leave the top of the band empty. */
-    const L = limits(), inv = camera.matrixWorldInverse, P0 = new THREE.Vector3();
+    /* The camera looks at the middle of the box from the atlas's pitch and
+       yaw, and the fit decides two things: how far back it stands and where
+       it aims. Both are found by iteration, not solved - a perspective
+       projection is not linear in either - projecting the box's corners,
+       reading how much of the free band they take, and stepping the distance
+       by that ratio and the aim by the miss. Four or five rounds settle it to
+       a thousandth; eight are allowed.
+
+       The band is the screen between the top bar and the booster row (or
+       beside the HUD columns). The room, not the room and its queue, goes in
+       the middle across - the booster row is centred on the screen, as in
+       the 2D game, and centring the pair pushed the room 66px off the
+       boosters on a wide screen - but only as far as the frame allows at the
+       same size; on an upright phone, where width is the limit, it stays put.
+       Down the band the whole box is centred: the HUD is heavier at the
+       bottom, and centring on the screen left the top of the band empty. */
+    const L = limits(), P0 = new THREE.Vector3();
+    camera.fov = FOV; camera.aspect = ASPECT; camera.updateProjectionMatrix();
+    const dir = new THREE.Vector3(Math.cos(ELEV) * Math.sin(YAW), Math.sin(ELEV), Math.cos(ELEV) * Math.cos(YAW));
+    const aimAt = new THREE.Vector3((BOX.max.x + BOX.min.x) / 2, 0, (BOX.max.z + BOX.min.z) / 2);
+    let D = CAM_DIST;
+    const place = () => {
+      camera.position.copy(aimAt).addScaledVector(dir, D);
+      camera.lookAt(aimAt);
+      camera.updateMatrixWorld(true);
+    };
+    // a box's extent on screen, in clip units (-1..1 each way)
     const span = box => {
       let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
       for (let i = 0; i < 8; i++) {
         P0.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z)
-          .applyMatrix4(inv);
+          .project(camera);
         a0 = Math.min(a0, P0.x); a1 = Math.max(a1, P0.x); b0 = Math.min(b0, P0.y); b1 = Math.max(b1, P0.y);
       }
       return [a0, a1, b0, b1];
     };
-    const [x0, x1, y0, y1] = span(BOX);                  // the room AND the head of each line
-    const [r0, r1] = span(ROOMBOX);                      // the room on its own
-    const h = Math.max((x1 - x0) / 2 / (ASPECT * L.x), (y1 - y0) / (L.hi - L.lo), 0.5);
-    /* ⚠ Across, the ROOM goes in the middle of the screen, not the room and its
-       queue together. The booster row is centred on the screen, as it is in the
-       2D game, and the line stands off to one side of the room - so centring the
-       pair pushed the room 66px left of the boosters on a wide screen and it read
-       as lopsided. The room is moved towards the middle only as far as the frame
-       allows at this same size, so nothing shrinks to pay for it: where height is
-       the limit there is slack across and the room centres exactly; on an upright
-       phone, where width is the limit, it stays where it was. */
-    const slack = h * ASPECT * L.x;
-    const ox = Math.min(Math.max((r0 + r1) / 2, x1 - slack), x0 + slack);
-    const oy = (y0 + y1) / 2 - h * (L.hi + L.lo) / 2;
-    camera.left = ox - h * ASPECT; camera.right = ox + h * ASPECT;
-    camera.top = oy + h; camera.bottom = oy - h;
-    camera.updateProjectionMatrix();
+    /* ⚠ With no bar across the top to stand in front of the garden, leaving it
+       out of the fit cut its two planters in half at the screen's edge - read
+       as two pillars of the room lost. Then the planters and their trees are
+       taken in, for the HEIGHT only (across, the columns stand beside the
+       room). The terrace is not: it runs well back behind them, and fitting it
+       as well shrank the room to leave an empty band of paving across the top.
+       With the bar there (on a phone, and on a desktop since the level, clock
+       and gold went back to the top) the garden goes behind it as it always
+       did, and taking it in would only shrink the room. */
+    const ALL = BOX.clone();
+    if (L.side && !L.bar)
+      for (const ch of roomG.children) if (ch.isGroup && ch.userData.deco)
+        for (const part of ch.children) if (!part.userData.terrace) ALL.expandByObject(part);
+    const tanH = Math.tan(FOV * Math.PI / 360);
+    const right = new THREE.Vector3(), up = new THREE.Vector3();
+    for (let it = 0; it < 8; it++) {
+      place();
+      let [x0, x1, y0, y1] = span(BOX);                  // the room AND the head of each line
+      const [, , g0, g1] = span(ALL);
+      y0 = Math.min(y0, g0); y1 = Math.max(y1, g1);
+      const [r0, r1] = span(ROOMBOX);                    // the room on its own
+      const s = Math.max((x1 - x0) / (L.xr - L.xl), (y1 - y0) / (L.hi - L.lo));
+      const dx = Math.min(Math.max((L.xl + L.xr) / 2 - (r0 + r1) / 2, L.xl - x0), L.xr - x1);
+      const dy = (L.hi + L.lo) / 2 - (y0 + y1) / 2;
+      // the picture moves by (dx, dy) when the whole rig moves the other way,
+      // by that much of the frame's half-size at the aim's depth
+      right.setFromMatrixColumn(camera.matrixWorld, 0); up.setFromMatrixColumn(camera.matrixWorld, 1);
+      aimAt.addScaledVector(right, -dx * D * tanH * ASPECT).addScaledVector(up, -dy * D * tanH);
+      D = Math.min(400, Math.max(4, D * s));
+      if (Math.abs(s - 1) < 1e-3 && Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) break;
+    }
+    place();
+    /* Where the room landed, across, in #play's pixels: the desktop HUD columns
+       stand just outside it (game3d.css). Measured with the plinth and the
+       platform the line waits on, which the fit leaves out as decoration but
+       a column must not cover; without the garden, which is above the room
+       and never beside the columns. */
+    const play = cv.closest("#play");
+    if (play) {
+      const SHOW = BOX.clone();
+      for (const ch of roomG.children) if (ch.userData.deco && !ch.isGroup) SHOW.expandByObject(ch);
+      const [s0, s1] = span(SHOW), cr = cv.getBoundingClientRect(), pr = play.getBoundingClientRect();
+      const px = a => (cr.left - pr.left + (a + 1) / 2 * cr.width).toFixed(1) + "px";
+      play.style.setProperty("--room-l", px(s0));
+      play.style.setProperty("--room-r", px(s1));
+      /* And where the two planters at the top landed: on a desktop the bar of
+         level, clock and gold spans between them (game3d.css). Inner and outer
+         edge of each, sorted on screen rather than by sign, so a mirrored room
+         cannot swap them. */
+      const pots = { "-1": new THREE.Box3(), "1": new THREE.Box3() };
+      for (const ch of roomG.children) if (ch.isGroup && ch.userData.deco)
+        for (const part of ch.children) if (part.userData.planter) pots[part.userData.planter].expandByObject(part);
+      if (!pots["-1"].isEmpty() && !pots["1"].isEmpty()) {
+        const [a, b] = [span(pots["-1"]), span(pots["1"])].sort((p, q) => p[0] - q[0]);
+        play.style.setProperty("--pot-l-out", px(a[0])); play.style.setProperty("--pot-l-in", px(a[1]));
+        play.style.setProperty("--pot-r-in", px(b[0])); play.style.setProperty("--pot-r-out", px(b[1]));
+      }
+    }
   }
 
   function size() {
@@ -5749,7 +6118,7 @@ const G3 = (function () {
     const w = Math.max(240, Math.round(r.width)), h = Math.max(240, Math.round(r.height));
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
-    ASPECT = w / h;                       // a parallel camera keeps it in its frustum
+    ASPECT = w / h;                       // fit() hands it to the camera
     return w + "x" + h;
   }
 
@@ -6070,7 +6439,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "3b1d92f+";
+const BUILD = "836e977+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
@@ -7100,7 +7469,6 @@ onSeatPick = seat => {
   // would put jumps on boards nobody jumped on.
   teleBooster("jump");
   persist(); buzz(16); onHud(); draw();
-  introSaw("jumped");
   return true;
 };
 
@@ -7117,8 +7485,9 @@ onSeatPick = seat => {
      - a booster step lifts the button through the wash, hands over a free go,
        and then waits for it to actually be pressed. A booster described in a
        paragraph is a paragraph; one you have pressed once is a button you know.
-       The step after it points at what the press did - the arming, the seconds
-       going onto the clock - because that is the half a paragraph cannot show.
+       The press ends the run. What it did - the jump armed with its seats
+       ringed, the lane opened, the seconds on the clock - shows on the board
+       by itself, and a card on top of it only said it again.
 
    The clock is held for the whole run, so none of it is paid for in seconds.
 
@@ -7132,15 +7501,14 @@ const INTRO_RUNS = {
      written here only for a piece that cannot be worked out by looking. */
   grey: [
     { spot: "seats", btn: "GOT IT",
-      text: "The ringed seat is bolted down. It does not move, whatever you drag." },
+      text: "This seat is fixed. It can't be moved!" },
   ],
   /* Two sentences because it is two facts, and the second is the one that makes
      it a puzzle piece rather than an obstacle: the padlock is not permanent, and
      what opens it is the thing the player is doing anyway. */
   lock: [
     { spot: "seats", btn: "GOT IT",
-      text: "The ringed seat is padlocked and will not budge. Seat a passenger in it and "
-          + "the lock comes off - then it slides like any other." },
+      text: "This seat is locked! Fill it with a passenger to unlock it." },
   ],
   /* Each booster is explained and pressed in the same step. There is no NEXT to
      click past first: a card that can be dismissed is a card that gets
@@ -7149,32 +7517,18 @@ const INTRO_RUNS = {
      go. */
   jump: [
     { spot: "b-jump", wait: "armed",
-      text: "A passenger has to walk to their seat, so a seat with no way through to it "
-          + "is no use. Jump flies them straight in instead. Here is a free one - tap "
-          + "the arrow button." },
-    { spot: "seats", wait: "jumped", thru: true, dock: "high", slim: true,
-      text: "Now tap the lit seat. There is no way to walk to it - the passenger at the "
-          + "front of the queue flies straight there, over everything in between." },
+      text: "Can't reach a seat? Jump flies a passenger straight there. "
+          + "Tap it. First one's free!" },
   ],
-  /* Two steps, like the clock. The first buys the press; the second is worth a
-     card of its own because what just happened is easy to misread - the board
-     did not move, it grew, and the lane that opened is the one the panel was
-     already carrying. */
   area: [
     { spot: "b-area", wait: "area",
-      text: "Every bus has one spare lane down its left side, folded away. This opens "
-          + "it, so there is somewhere to slide a seat to. Here is a free one - tap "
-          + "the green button." },
-    { spot: "seats", btn: "GOT IT",
-      text: "The whole board shifted right and that left column is clear floor now. "
-          + "One lane per board, so spend it on the one that has you stuck." },
+      text: "Out of room? Add an extra lane to slide seats into. "
+          + "Tap it. First one's free!" },
   ],
   time: [
     { spot: "b-time", wait: "timed",
-      text: "Running out of clock is the only way to lose a board. This booster puts "
-          + "seconds back on it. Here is a free one - tap the clock button." },
-    { spot: "clock", btn: "GOT IT",
-      text: "+{t} seconds, straight onto the clock. Tap it whenever time gets tight." },
+      text: "Running low on time? This adds extra seconds. "
+          + "Tap it. First one's free!" },
   ],
 };
 
@@ -7184,7 +7538,6 @@ const SPOTS = {
   "b-jump": ["#b-jump", "#boosters"],
   "b-time": ["#b-time", "#boosters"],
   "b-area": ["#b-area", "#boosters"],
-  clock:    [".pill-time", "#play .topbar"],
 };
 
 /** The introduction owed on this level, or null. `at <= n` rather than `at === n`
@@ -7239,12 +7592,6 @@ function introGo(i) {
   INTRO.i = i;
   INTRO.acted = false;             // nothing lit once the step has been answered
   const st = INTRO.steps[i], tip = $("intro-tip");
-  /* There is no way past a step but doing it, so a step with nothing to do
-     cannot be shown at all: on a board where no seat suits the front of the
-     queue there would be nothing to tap and no way on. Nothing can empty the
-     set once the step is up - the clock is stopped, the queue is held, and the
-     only thing a tap can do there is spend the jump. */
-  if (st.wait === "jumped" && !introSeats().length) return introGo(i + 1);
   $("intro-title").textContent = INTRO.label;
   $("intro-text").textContent = st.text
     .replace("{t}", CF.boosterTime.value).replace("{p}", CF.boosterJump.price);
@@ -7299,10 +7646,7 @@ function introSaw(what) {
   if (!INTRO) return;
   const st = INTRO.steps[INTRO.i];
   if (!st || st.wait !== what) return;
-  /* Stop lighting anything the moment they have done it. The jump step lights
-     the seats the front of the queue can use, and the front of the queue has
-     just changed - leaving it live moves the spotlight onto a different set of
-     seats for as long as the beat before the next step lasts. */
+  // stop lighting anything the moment they have done it
   INTRO.acted = true;
   setTimeout(() => { if (INTRO && INTRO.steps[INTRO.i] === st) introGo(INTRO.i + 1); }, 620);
 }
@@ -7355,25 +7699,10 @@ function introSeats() {
   const st = INTRO && INTRO.steps[INTRO.i];
   if (!st || st.spot !== "seats" || !S || INTRO.acted) return [];
   if (INTRO.id === "grey") return S.seats.filter(b => b.colour === 0);
-  /* Every padlock on the board. Unlike the jump step there is nothing to choose
-     between them - the lesson is what the padlock means, and on the board it
-     first appears on there is exactly one. */
+  /* Every padlock on the board. There is nothing to choose between them - the
+     lesson is what the padlock means, and on the board it first appears on
+     there is exactly one. */
   if (INTRO.id === "lock") return S.seats.filter(b => b.chain);
-  // One seat, not every seat the jump could be spent on. Ringing all of them
-  // taught nothing except which seats are the front colour, and on a full board
-  // it covered the board. The jump is for a seat the queue cannot walk to, so
-  // the one worth pointing at is exactly that: unreachable first, then whichever
-  // is furthest from the door.
-  if (INTRO.id === "jump" && S.queue.length) {
-    const ok = S.seats.filter(b => !b.locked && accepts(b, S.queue[0]) && freeSlot(b) >= 0);
-    if (!ok.length) return [];
-    const reach = reachRegion(S, 0);
-    const [dc, dr] = (S.doors && S.doors[0]) || [S.W - 1, S.door];
-    const walk = b => (touches(S, b, reach) ? 0 : 1);          // 1 = no way in on foot
-    const far = b => Math.abs(b.c - dc) + Math.abs(b.r - dr);
-    ok.sort((a, b) => (walk(b) - walk(a)) || (far(b) - far(a)));
-    return [ok[0]];
-  }
   return [];
 }
 
@@ -7437,10 +7766,10 @@ function tutorStep() {
   }
   if (!best) return null;
   return { seat: best.seat, to: best.to,
-    title: blocked ? "A seat is in the doorway" : "Open them a path",
+    title: blocked ? "Seat in the way!" : "Clear a path!",
     text: blocked
-      ? "Drag and drop: press and hold the seat, drag it onto the glowing tile, then let go. The queue boards on its own - you never tap a passenger."
-      : "The front of the queue cannot reach a seat it fits. Slide this one onto the glowing tile to open the way." };
+      ? "Drag the seat onto the glowing tile. Passengers hop on by themselves!"
+      : "They can't reach their seat. Move this one onto the glowing tile." };
 }
 
 /** Recomputed only when the board actually changes, not once a frame. */
@@ -8348,8 +8677,8 @@ onFinish = function (won) {
   const card = () => gen === cardGen &&
     overlay(won ? "LEVEL COMPLETE!" : "OUT OF TIME", stars, "+" + pay.total,
     has("winstreak") && pay.bonus ? save.streak + " IN A ROW · +" + pay.bonus + " BONUS" : "",
-    has("booster_time") ? "There is more time on the booster row, if the gold is there."
-                        : "Clear the doorway first - the queue does the rest.",
+    has("booster_time") ? "Tip: grab extra seconds with the time booster!"
+                        : "Tip: clear the door first. Passengers do the rest!",
     featureProgress(lvl), lvl);
   if (won) { cheer(); setTimeout(card, CHEER_MS); } else offerRevive(card);
 };
@@ -9026,5 +9355,44 @@ let BOOTED = false;
     return out;
   };
 })();
+
+/* ================= the HUD scales with the screen =================
+   The booster row and the bar of level, clock and gold alike - see #boosters
+   and #play .topbar in game3d.css. Full size from 760 px of height up - an upright
+   phone - and down in proportion below that, never under 68%: a tile of about
+   45 px, still a thumb's worth to press. On a desktop window it grows past full too, up to
+   135%, so the columns keep pace with a room that fills a big screen. The room is refitted to whatever the
+   row leaves, because render3d.js reads the row's rect each time it fits. */
+(function () {
+  const row = $("boosters"), bar = document.querySelector("#play .topbar");
+  if (!row) return;
+  const FULL = 760, LEAST = .68, MOST = 1.35;
+  // ⚠ The same test as the media query that lays the HUD out in columns.
+  const desk = window.matchMedia ? matchMedia("(hover: hover) and (pointer: fine) and (min-aspect-ratio: 1/1)") : null;
+  function size() {
+    const h = window.visualViewport ? visualViewport.height : innerHeight;
+    // A phone never grows past the shell's own sizes. A desktop window does: at
+    // 1080 tall the room is twice a phone's and phone-sized pills beside it
+    // read as an afterthought.
+    const most = desk && desk.matches ? MOST : 1;
+    const k = Math.max(LEAST, Math.min(most, h / FULL)).toFixed(3);
+    row.style.setProperty("--bk", k);
+    if (bar) bar.style.setProperty("--bk", k);     // the level, clock and gold scale with it
+  }
+  addEventListener("resize", size);
+  if (window.visualViewport) visualViewport.addEventListener("resize", size);
+  size();
+})();
+
+/* ================= no streak line on the win card =================
+   "12 IN A ROW · +25 BONUS" under the purse is not shown - asked to go
+   (2026-10-16). The bonus is still paid and still counted in the +total above
+   it; only the line saying so is dropped. Passed on as "" rather than hidden in
+   CSS, so the shell also drops the 34 px it opens for the line (--dz) and the
+   buttons do not sit below a gap. */
+{
+  const card = overlay;
+  overlay = function (title, stars, coins, streak, ...rest) { return card(title, stars, coins, "", ...rest); };
+}
 
 </script>
