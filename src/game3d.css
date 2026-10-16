@@ -1,0 +1,281 @@
+/* ---------------- style for the 3D build only ----------------
+   Injected by the `3d` target in build.py, after the page's own <style>. The 2D
+   game that ships has none of this. */
+
+/* The first-boards lesson keeps its pointing hand and its glowing tile, and
+   loses its words. Asked for on the 3D build: on levels 1 and 2 the hand
+   already says "drag this, here", and a paragraph on top of it was reading
+   material in front of a move the player could see.
+
+   ⚠ Hidden, not removed. Unlike the two home lines, the shell touches this one
+   without a guard - $("coach").hidden and $("coach-title").textContent run
+   whenever the lesson re-aims - so taking the element out of the page would
+   throw on the first frame of level 1. #coach is used by nothing else. */
+#coach { display: none !important; }
+
+/* ---- Settings: one more switch, and a way back to level 1 ----
+   The panel is laid out in the 540 x 1160 design box at absolute positions, a
+   row every 90. A Footsteps row goes in under Vibration and a quiet RESET PROGRESS
+   link under PRIVACY, so everything below moves down and the plate grows - and
+   the whole card moves up by half of what it grew, to stay centred. */
+.set-panel      { top: 217px; height: 726px; }
+.set-head       { top: 267px; }
+.set-x          { top: 217px; }
+#set-row-sound  { top: 357px; }
+#set-row-vibe   { top: 447px; }
+#set-row-steps  { top: 537px; }
+#set-retry      { top: 627px; }
+#set-home       { top: 717px; }
+#set-resume     { top: 807px; }
+#set-privacy    { top: 865px; }
+/* ⚠ Quiet on purpose, and behind a confirmation. A button that wipes progress
+   is never where a thumb sweeps past (UI_UX_RULES 1.4, 4.6): it is something a
+   player goes looking for, styled like the PRIVACY link it sits under. */
+#set-reset      { top: 903px; white-space: nowrap; }   /* one line: it wrapped onto two */
+
+/* The confirmation. Inside the same design box, over the settings plate. Both
+   answers are the same size (UI_UX_RULES 3.8); the safe one wears the primary
+   colour. ⚠ Not the cream secondary: next to a red button a cream one reads as
+   the lesser choice, and the lesser choice here must be the one that wipes. */
+#set-confirm { left: 0; top: 0; width: 540px; height: 1160px; display: none; }
+#set-confirm.on { display: block; }
+#set-confirm > * { position: absolute; }
+/* ⚠ Far past the 540 box. The design box is scaled, and a dim sized to it left
+   a lighter band down each side of a wide screen. */
+.sc-dim   { left: -1500px; top: -1500px; width: 3540px; height: 4160px; background: rgba(16,26,51,.55); }
+.sc-panel { left: 70px; top: 400px; width: 400px; height: 430px; border-radius: 30px;
+            background: var(--ms-face); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+.sc-head  { left: 0; top: 452px; width: 540px; text-align: center; transform: translateY(-50%);
+            font-size: 34px; color: #fff; -webkit-text-stroke: 7px var(--ms-ink); paint-order: stroke fill; }
+.sc-text  { left: 100px; top: 488px; width: 340px; text-align: center;
+            font-size: 23px; line-height: 1.3; color: var(--ms-ink); }
+/* below the text, which runs to three lines: at 632 the button sat on the last of them */
+#sc-no    { top: 668px; }
+#sc-yes   { top: 756px; }
+.wide-btn.red { background: linear-gradient(180deg, #ff8a8a, #d8556a); box-shadow: 0 6px 0 #a63c4e; }
+.wide-btn.red:active { box-shadow: 0 3px 0 #a63c4e; }
+
+/* ---- the gear away from a board ----
+   Home: the top-left corner the lives disc uses when lives are on, at the size
+   of the picker disc it mirrors on the right (52 design px). */
+#h-gear {
+  position: absolute; left: calc(var(--corner-l) * 1px); top: 70px;
+  transform: translate(-50%, -50%); width: 52px; height: 52px; border-radius: 16px;
+}
+#h-gear:active { transform: translate(-50%, calc(-50% + 2px)); }
+
+/* Opened off a board: the three buttons that only mean something inside a
+   level go, and the card closes up around what is left - three switches, then
+   PRIVACY and RESET PROGRESS - and is re-centred in the box. */
+#settings.off-board #set-retry,
+#settings.off-board #set-home,
+#settings.off-board #set-resume { display: none; }
+#settings.off-board .set-panel     { top: 339px; height: 483px; }
+#settings.off-board .set-head      { top: 389px; }
+#settings.off-board .set-x         { top: 339px; }
+#settings.off-board #set-row-sound { top: 479px; }
+#settings.off-board #set-row-vibe  { top: 569px; }
+#settings.off-board #set-row-steps { top: 659px; }
+#settings.off-board #set-privacy   { top: 749px; }
+#settings.off-board #set-reset     { top: 789px; }
+
+/* ---- the level picker disc is off the home screen ----
+   Asked for on the 3D build. ⚠ Hidden, not removed: the shell sets its onclick
+   with no guard (document.getElementById("h-levels").onclick = ...), so taking
+   it out of the page throws on load and nothing after that line runs. It was
+   the only way onto the YOUR PROGRESS screen - show("levels") is called from
+   nowhere else - so that screen is now unreachable from the game. */
+#h-levels { display: none !important; }
+
+/* ---- the game's colours on the plates the shell borrowed ----
+   The home screen, the result card, Settings and the booster tips are ports of
+   Marble Sort's, and the shell gives them that game's palette (--ms-* in
+   game_head.html): lavender plates, a lime header, a periwinkle button. Over
+   a room of cream, teal and sky blue they read as screens from another game,
+   which is what was said about them on the 3D build.
+
+   Every colour here is sampled off the board, not chosen:
+     wall  #f3f2ed / #e3e1d8      floor slab  #9cc1bb > #7daaa2 > #5d8e87
+     seat  #bbe9f2 > #4bb0d8 > #2d8fbd       HUD chip  #4a7ad0 / #33599a
+   and how they are dealt was picked off three rendered options (A): headers
+   and switches in the floor's teal, the button that moves you on in the HUD's
+   blue, the button that steps back a cream plate like the face it sits on - so
+   each screen has one loud button and not two. The lose header stays red and
+   the close disc stays red: those say "stop", and no colour of the room does.
+
+   ⚠ The variables, not each rule: --ms-face and --ms-edge are read by the
+   settings plate, the card, the tips and the confirmation alike, and repointing
+   them is one change where chasing every rule would be ten and miss one. */
+:root { --ms-face: #f3f2ed; --ms-edge: #9cc1bb; --ms-win: #5d8e87; }
+.wide-btn { background: linear-gradient(180deg, #8fb2ee, #3d6cc0); box-shadow: 0 6px 0 #33599a; }
+.wide-btn:active, #intro-ok:active { box-shadow: 0 3px 0 #33599a; }
+.wide-btn.blue {
+  background: linear-gradient(180deg, #ffffff, #e3e1d8); box-shadow: 0 6px 0 #b9b7aa;
+  color: var(--ms-ink); -webkit-text-stroke: 0;
+}
+.wide-btn.blue::before { background: rgba(255,255,255,.7); }
+.wide-btn.blue:active { box-shadow: 0 3px 0 #b9b7aa; }
+#rv-go { background: linear-gradient(180deg, #8fb2ee, #3d6cc0); box-shadow: 0 7px 0 #33599a; }
+#rv-go:active { box-shadow: 0 4px 0 #33599a; }
+.tog { background: #c9cdc4; }              /* off: the floor's grey; on is --ms-win */
+
+/* ---- the result card, with depth ----
+   Asked for on the 3D build: the card was flat plates, flat stars and a flat
+   bar sitting over a 3D room. Every change below is lighting - a gradient from
+   a light above, a highlight on the top edge, a darker slab underneath - and no
+   position or size moves, so the card still lays out exactly as the shell
+   placed it. In the colours above: the face is the room's wall, the thick edge
+   its floor slab, the bar a groove of that teal filled with seat blue. */
+
+/* the room behind, dimmed towards its own teal rather than to violet */
+#card .dim { background: rgba(14,32,38,.74); }
+/* the plate: a lit face, a thick edge under it, and a real shadow on the room */
+#card .panel   { background: rgba(22,52,50,.55); filter: drop-shadow(0 18px 22px rgba(0,0,0,.45)); }
+#card .panel i { background: linear-gradient(180deg, #9cc1bb, #5d8e87); }
+#card .panel u {
+  background: linear-gradient(180deg, #fbfaf6 0%, #f3f2ed 45%, #e3e1d8 100%);
+  box-shadow: inset 0 4px 0 rgba(255,255,255,.9), inset 0 -10px 14px rgba(60,90,84,.10);
+}
+/* the header: a raised band with a gloss on it, not a painted stripe */
+#card .panel u b {
+  background: linear-gradient(180deg, #b3dad2 0%, #7daaa2 55%, #5d8e87 100%);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.45), 0 5px 0 #4a7a73, 0 9px 10px rgba(0,0,0,.18);
+}
+#c-card .panel u b::after {
+  content: ""; position: absolute; left: 14px; right: 14px; top: 7px; height: 26px;
+  border-radius: 20px; background: linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0));
+}
+#c-card.lose .panel u b {
+  background: linear-gradient(180deg, #ef7b8e 0%, #d8556a 55%, #b33c51 100%);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.4), 0 5px 0 #8f2f40, 0 9px 10px rgba(0,0,0,.18);
+}
+/* the title: pressed out of the band, a few pixels deep */
+#card .head {
+  text-shadow: 0 2px 0 #1d2438, 0 4px 0 #1d2438, 0 6px 0 #1d2438, 0 9px 10px rgba(0,0,0,.35);
+}
+/* the stars: lit from the top left, a thick gold edge underneath. The fills
+   point at gradients shell3d.js puts in the page; CSS beats the SVG's own
+   fill attribute, so the shell's star drawing is untouched. */
+#card .star svg { overflow: visible;
+  filter: drop-shadow(0 4px 0 #a5620a) drop-shadow(0 9px 8px rgba(0,0,0,.28)); }
+#card .star svg path[fill="#ffc21e"] { fill: url(#g3d-star-on); stroke: #b8700a; }
+#card .star svg path[fill="#7c88a6"] { fill: url(#g3d-star-off); stroke: #5d8e87; }
+/* an unearned star stands on a teal edge, not a gold one. A browser without
+   :has() keeps the gold edge, which is only a colour, not a broken card. */
+#card .star svg:has(path[fill="#7c88a6"]) {
+  filter: drop-shadow(0 4px 0 #5d8e87) drop-shadow(0 9px 8px rgba(0,0,0,.2)); }
+/* the bar: a teal groove sunk into the card, seat blue standing out of it */
+#card .feat .track {
+  background: linear-gradient(180deg, #5d8e87, #7daaa2);
+  box-shadow: inset 0 3px 4px rgba(20,50,46,.45), 0 2px 0 rgba(255,255,255,.9);
+}
+#card .feat .fill {
+  background: linear-gradient(180deg, #e2f8fc 0%, #7fd3ee 40%, #4bb0d8 70%, #2d8fbd 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,40,70,.15);
+}
+/* the prize at its end, framed in the header's teal */
+#card .feat .lab, #card .streak { color: #4f8078; }
+#card .feat .badge { background: #4a7a73; box-shadow: 0 5px 0 #4a7a73, 0 9px 10px rgba(0,0,0,.25); }
+#card .feat .badge::before { background: linear-gradient(180deg, #b3dad2, #7daaa2); }
+#card .feat .badge::after { background: linear-gradient(180deg, #fbfaf6, #e3e1d8);
+  box-shadow: inset 0 3px 4px rgba(60,90,84,.22); }
+/* the coin: a rim and a shadow */
+#card .coins .coin {
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.2), inset 0 3px 0 rgba(255,255,255,.5),
+              0 4px 0 #a5620a, 0 7px 8px rgba(0,0,0,.25);
+}
+/* the buttons: a deeper slab and a shadow on the card */
+#card .wide-btn {
+  background: linear-gradient(180deg, #8fb2ee 0%, #4a7ad0 50%, #3d6cc0 100%);
+  box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), 0 8px 0 #33599a, 0 13px 12px rgba(0,0,0,.25);
+}
+#card .wide-btn.blue {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f2ed 55%, #e3e1d8 100%);
+  box-shadow: inset 0 -6px 0 rgba(60,90,84,.10), 0 8px 0 #b9b7aa, 0 13px 12px rgba(0,0,0,.22);
+}
+#card .wide-btn:active { box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), 0 3px 0 #33599a, 0 5px 6px rgba(0,0,0,.25); }
+#card .wide-btn.blue:active { box-shadow: inset 0 -6px 0 rgba(60,90,84,.10), 0 3px 0 #b9b7aa, 0 5px 6px rgba(0,0,0,.22); }
+
+/* ---- the revive offer, in the same colours ----
+   Built like the card - a rim, a face, a band riding the top - so it is dealt
+   the same way: the rim is the floor slab, the face the wall, the band the
+   floor's teal, the button the HUD's blue. Its picture keeps the red clock and
+   the gold "+60" (gold is the coin's colour, and that number is a prize), on
+   seat-blue paper rather than warm paper. */
+#revive .dim { background: rgba(14,32,38,.74); }
+.rv-plate   { background: linear-gradient(180deg, #9cc1bb, #5d8e87); }
+.rv-plate i { background: #7daaa2; }
+.rv-plate u { background: linear-gradient(180deg, #fbfaf6 0%, #f3f2ed 45%, #e3e1d8 100%);
+  box-shadow: inset 0 4px 0 rgba(255,255,255,.9); }
+.rv-banner {
+  background: linear-gradient(180deg, #b3dad2 0%, #7daaa2 55%, #5d8e87 100%);
+  box-shadow: 0 7px 0 #4a7a73, inset 0 3px 0 rgba(255,255,255,.4);
+  -webkit-text-stroke-color: var(--ms-ink);
+}
+.rv-art { background: #e4f4f8; }
+.rv-art .burst { background: repeating-conic-gradient(#c6ebf4 0deg 11deg, transparent 11deg 22deg); }
+.rv-art .plus { color: #ffd964; -webkit-text-stroke-color: var(--ms-ink); }
+.rv-say { background: rgba(43,53,80,.07); color: var(--ms-ink); -webkit-text-stroke: 0; }
+.rv-say b { color: #4f8078; }
+#rv-go .lab, #rv-go .cost { -webkit-text-stroke-color: var(--ms-ink); }
+#rv-go.broke { background: linear-gradient(180deg, #d3d6cf, #a9ada4); box-shadow: 0 7px 0 #8a8e85; }
+#rv-go.broke:active { box-shadow: 0 4px 0 #8a8e85; }
+#rv-go.broke .lab, #rv-go.broke .cost { -webkit-text-stroke-color: #5f635c; }
+
+/* ---- the booster buttons: drawn tiles ----
+   Each button was a CSS gradient with a white line icon on it. These are
+   finished 3D tiles - an orange stopwatch, a purple hop, a green "+ lane" -
+   drawn by an image model and cut by cut_boosters.py, so the button is the
+   picture and the CSS only lights it: no gradient, no slab shadow (the tile
+   has its own), the line icon hidden. The states keep their filters - locked
+   washes the colour out, spent greys it - with the drop shadow carried along,
+   because a filter replaces the one before it.
+
+   ⚠ The url()s are placeholders: build.py fills them with boosters/*.webp as
+   data URIs, which is why this file is never served as it stands.
+   ⚠ Variables, because the result card's prize badge shows the same tile (see
+   featIcon in shell3d.js) and one copy of each picture is enough. */
+:root {
+  --boost-time: url(/*__BOOST_TIME__*/);
+  --boost-jump: url(/*__BOOST_JUMP__*/);
+  --boost-area: url(/*__BOOST_AREA__*/);
+}
+.boost { background: center / 100% 100% no-repeat; box-shadow: none;
+  filter: drop-shadow(0 5px 6px rgba(0,0,0,.28)); }
+#b-time { background-image: var(--boost-time); }
+#b-jump { background-image: var(--boost-jump); }
+#b-area { background-image: var(--boost-area); }
+.boost .ico { display: none; }
+.boost:active { box-shadow: none; }
+/* ⚠ Locked was saturate(.35), which suited a flat gradient and drained the
+   drawn tiles to mud - every button on levels 1-7 looked faded, and that is
+   what was seen of them first. A little softer is enough: the grey "LV 8" chip
+   under it is what says it is not yours yet. */
+.boost.locked { filter: saturate(.8) brightness(.94) drop-shadow(0 5px 6px rgba(0,0,0,.28)); }
+.boost.spent  { filter: grayscale(.75) brightness(.7) drop-shadow(0 5px 6px rgba(0,0,0,.28)); }
+/* the badge: the tile stands in the gold frame in place of the cream inset */
+.feat .badge .feat-tile { width: 52px; height: 52px; max-width: none; max-height: none;
+  background: center / contain no-repeat; }
+.feat .badge .feat-tile.time { background-image: var(--boost-time); }
+.feat .badge .feat-tile.jump { background-image: var(--boost-jump); }
+.feat .badge .feat-tile.area { background-image: var(--boost-area); }
+#card .feat .badge:has(.feat-tile)::after { display: none; }
+
+/* ---- the time booster, seen to add time ----
+   The "+30s" that flies from the button to the clock, the ring and sparks the
+   clock throws off when it lands, and the green flash on its digits while
+   they count up. Placed by shell3d.js in viewport pixels, hence fixed. */
+.tfx-fly {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; white-space: nowrap;
+  font-family: var(--ms); color: #ffd964; -webkit-text-stroke: 6px var(--ms-ink); paint-order: stroke fill;
+  will-change: transform, opacity;
+}
+.tfx-ring {
+  position: fixed; z-index: 59; pointer-events: none; border-radius: 999px;
+  border: 4px solid #ffd964; box-shadow: 0 0 18px rgba(255,217,100,.8), inset 0 0 10px rgba(255,217,100,.6);
+}
+.tfx-spark {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; width: 9px; height: 9px;
+  border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffd964 55%, #f2a51a);
+}
+#g-clock.tfx-up { color: #8dffb0; }

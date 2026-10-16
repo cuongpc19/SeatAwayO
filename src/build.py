@@ -6,13 +6,18 @@
                          a full room around the grid, a proper win card. The
                          root page, so a deep link reads /?level=1 - see the
                          address bar block in game_shell.js
-  ../dist/index.html     the same game with the CrazyGames host door built in,
+  ../game3d/index.html   the game in 3D, for the web (GitHub Pages /3d/)
+  ../dist/index.html     the game in 3D with the CrazyGames host door built in,
                          ready to drag into their upload box
 
     python build.py            editor + game
-    python build.py crazy      the upload bundle, and the checks that go with it
+    python build.py 3d         the 3D game for the web
+    python build.py crazy      the 3D upload bundle, and the checks that go with it
+
+⚠ This folder is the 3D project. The 2D game - and the build that produced
+its CrazyGames upload - was copied whole to ../../seatawayO-2D on 2026-10-14.
 """
-import json, pathlib, re, subprocess, sys, time
+import hashlib, json, pathlib, re, shutil, subprocess, sys, time
 
 ART = pathlib.Path("../art")
 DATA = open("data_slots.js", encoding="utf-8").read()
@@ -304,8 +309,10 @@ def privacy_page():
 """ % PRIVACY
     out = pathlib.Path("../public/privacy.html")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(page.replace("/*__BUILT__*/", time.strftime("%Y-%m-%d")), encoding="utf-8")
+    page = page.replace("/*__BUILT__*/", time.strftime("%Y-%m-%d"))
+    out.write_text(page, encoding="utf-8")
     print("%-24s %6.0f KB" % (out.as_posix(), len(page) / 1024))
+    return page
 
 
 def live_config():
@@ -361,7 +368,8 @@ def live_config():
     return json.dumps(out, separators=(",", ":"))
 
 
-def build(head_file, shell_file, out, host="none", levels=None):
+def build(head_file, shell_file, out, host="none", levels=None, engine_tail="", head_tail="",
+          shell_tail=""):
     """One page.
 
     `host` picks which platform door is compiled in, and it is a build-time
@@ -378,7 +386,16 @@ def build(head_file, shell_file, out, host="none", levels=None):
         # never finishes one honestly, so telemetry from it would be noise at
         # best - and it has no PLATFORM to name as the source either.
         tele = ANALYTICS + "\n" + TELEMETRY + "\n"
-    page = head + "\n<script>\n" + DATA + "\n" + ENGINE + "\n" + plat + tele + shell + "\n</script>\n"
+    # engine_tail goes straight after the engine, in the SAME script: the 3D
+    # renderer replaces engine functions by redeclaration, and that only holds
+    # inside one script. head_tail is whatever has to load first (three.js).
+    # ⚠ Empty means absent, not "\n": every other target must come out byte for
+    # byte what it was before this parameter existed.
+    page = (head + head_tail + "\n<script>\n" + DATA + "\n" + ENGINE + "\n"
+            + (engine_tail + "\n" if engine_tail else "")
+            + plat + tele + shell + "\n"
+            + (shell_tail + "\n" if shell_tail else "")
+            + "</script>\n")
     # ⚠ A bundle for a host carries the campaign without the test clocks. Built
     # here rather than filtered out afterwards, because "afterwards" is the step
     # that gets skipped - see TEST_CLOCK.
@@ -405,11 +422,15 @@ DEV_TOOLS = {"the JSON export panel": 'id="exp-json"',
              "the gesture trace panel": 'id="trace"'}
 
 
-def check_crazy(page, out):
+def check_crazy(page, out, size=None, count=1):
     """The limits a checklist would otherwise be trusted to remember. All cheap
     here and all expensive at the upload screen - and the dev-tool one is not a
-    retry, it is a failed review."""
-    size = len(page.encode("utf-8"))
+    retry, it is a failed review.
+
+    `page` is every text file of the upload run together, so a check finds what
+    it looks for whichever file it landed in; `size` and `count` are the whole
+    folder's, fonts included."""
+    size = size if size is not None else len(page.encode("utf-8"))
     # Absolute paths break inside the host's iframe. Everything is inlined into
     # this one file, so any of these is a slip rather than a dependency.
     absolute = re.findall(r'(?:src|href)="/[^"]*"', page)
@@ -444,6 +465,7 @@ def check_crazy(page, out):
 
     rows = [(size <= 20 * 1024 * 1024, "under 20 MB - keeps the mobile front page",
              "%.2f MB, over the 20 MB limit" % (size / 1048576)),
+            (count <= 1500, "%d files - the limit is 1500" % count, "%d files, over the 1500 limit" % count),
             (not absolute, "relative paths only",
              "absolute paths: " + " ".join(absolute[:4])),
             (sdk, "CrazyGames SDK wired", "no CrazyGames SDK in the bundle"),
@@ -457,14 +479,14 @@ def check_crazy(page, out):
             (not strays, "no dev tools", "dev tools rode in: " + ", ".join(strays))]
 
     print("")
-    print('Bundle "crazy": %s - %.2f MB' % (out, size / 1048576))
+    print('Bundle "crazy": %s - %d files, %.2f MB' % (out, count, size / 1048576))
     for ok, good, bad in rows:
         print("  %s %s" % ("OK  " if ok else "FAIL", good if ok else bad))
     if not all(ok for ok, _, _ in rows):
         sys.exit(1)
     print("")
     print("  Upload: Developer Portal -> your game -> Builds / Files")
-    print("  Drag the CONTENTS of ../dist/ in. Do not zip it - archives are rejected.")
+    print("  Drag the CONTENTS of ../dist/ in - the folders too. Do not zip it - archives are rejected.")
 
 
 targets = sys.argv[1:] or ["editor", "game"]
@@ -509,6 +531,128 @@ if "plana" in targets:
     open("../a.html", "w", encoding="utf-8").write(swapped)
     print("  plana     ../a.html - APK ladder, own save key")
 
+def build_3d(out, host="none"):
+    """The shipped game with a 3D room in place of the 2D one, and nothing else.
+
+    engine.js is not edited. render3d.js is appended after it and redeclares the
+    eight functions that draw, pick and place the lines; in one script the last
+    `function` of a name is the one every caller gets. Everything else - rules,
+    walking, the queue, boosters, walkthroughs, the result card, sound, the host
+    door - is the same code the 2D build runs.
+
+    ⚠ On the web (`3d`) its own save key, for the same reason as `plana`: GitHub
+    Pages serves the 2D game and this one from ONE origin, and localStorage is
+    keyed by origin. Sharing a key would have the two overwriting each other's
+    progress. On CrazyGames (`crazy`) the 2D game's key is kept: the campaign
+    and its rules are the same, so if this goes up as an update of the listing
+    the 2D game already has, a returning player carries on from their level -
+    and as a new listing it has an origin of its own and the key meets nothing.
+    """
+    R3D = open("render3d.js", encoding="utf-8").read()
+    # ⚠ Proved, not assumed: a rename in engine.js would otherwise leave that one
+    # 2D function quietly running inside the 3D page.
+    for fn in ("fitCanvas", "layout", "P", "draw", "pickWorld", "pickCell", "pickSeatAt",
+               "stopAt"):
+        if ENGINE.count("\nfunction %s(" % fn) != 1:
+            sys.exit("3d: engine.js no longer has exactly one `function %s(` to replace" % fn)
+        if R3D.count("\nfunction %s(" % fn) != 1:
+            sys.exit("3d: render3d.js must declare `function %s(` exactly once" % fn)
+    three = open("../game3d/three.min.js", encoding="utf-8").read()
+    if "</script" in three.lower():
+        sys.exit("3d: three.min.js would close its own script tag")
+    # The shell's additions for this build only. shell3d.js wraps starBurst, so
+    # it has to still be there under that name.
+    S3D = open("shell3d.js", encoding="utf-8").read()
+    if open("game_shell.js", encoding="utf-8").read().count("\nfunction starBurst(") != 1:
+        sys.exit("3d: game_shell.js no longer has one `function starBurst(` for the firecrackers to ride")
+    css3d = open("game3d.css", encoding="utf-8").read()
+    # The booster tiles, drawn rather than styled - see cut_boosters.py.
+    for name in ("time", "jump", "area"):
+        slot, uri = "/*__BOOST_%s__*/" % name.upper(), inline("boosters/%s.webp" % name, "image/webp")
+        if css3d.count(slot) != 1 or not uri:
+            sys.exit("3d: the %s booster tile is missing - its slot in game3d.css or boosters/%s.webp" % (name, name))
+        css3d = css3d.replace(slot, '"%s"' % uri)
+    page = build("game_head.html", "game_shell.js", out, host=host, engine_tail=R3D, shell_tail=S3D,
+                 head_tail="\n<style>\n" + css3d + "\n</style>\n<script>\n" + three + "\n</script>\n")
+    # ⚠ Off the 3D build's home screen: the next hard level and the "2,000+ levels
+    # waiting" line. Removed rather than hidden - the shell already guards both
+    # with `if (nh)` / `if (wt)`, so with no element there it simply skips them.
+    for line in ('<div class="nexthard" id="h-nexthard"></div>', '<div class="aheadline" id="h-waiting"></div>'):
+        if page.count(line) != 1:
+            sys.exit("3d: home line not found exactly once: " + line)
+        page = page.replace(line, "")
+    if host == "none":
+        swapped = page.replace("seatmatch.save.v3", "seatmatch3d.save.v3")
+        if "seatmatch.save.v3" in swapped or swapped == page:
+            sys.exit("3d: the save key survived the swap - it would share progress with the 2D game")
+        if "sdk.crazygames.com" in swapped:
+            sys.exit("3d: the web build carries a host SDK - the platform split has leaked")
+        page = swapped
+    open(out, "w", encoding="utf-8").write(page)
+    print("  3d        %s - 3D room, %s, %.2f MB" % (out, "own save key" if host == "none" else "host " + host,
+                                                   len(page.encode("utf-8")) / 1048576))
+    return page
+
+
+if "3d" in targets:
+    build_3d("../game3d/index.html")
+
+def bundle(page, out_dir="../dist"):
+    """The upload, laid out the way Marble Sort's is:
+
+        dist/index.html            the page: markup and style
+        dist/assets/three-*.js     the 3D library
+        dist/assets/game-*.js      the game - one script, as it was inline
+        dist/fonts/*.woff2         its three faces, carried rather than fetched
+        dist/privacy.html          the policy, same origin
+
+    built by splitting the one-file page `build_3d` makes, so every target runs
+    the same code and only where it sits differs. Asked for on the 3D build.
+
+    ⚠ The game stays ONE script. render3d.js replaces engine functions by
+    redeclaring them, and that only holds inside one script - see build().
+    ⚠ Its name carries a hash of its content, so a host or a browser that kept
+    an old copy cannot pair it with a new page.
+    ⚠ The fonts come from fonts/, written once by fetch_fonts.py and committed,
+    never from the network at build time: a build must not change because
+    Google changed a file."""
+    d = pathlib.Path(out_dir)
+    if d.exists():
+        shutil.rmtree(d)                 # what is in dist is exactly what this wrote
+    (d / "assets").mkdir(parents=True)
+    (d / "fonts").mkdir()
+    three = open("../game3d/three.min.js", encoding="utf-8").read()
+    tag = "<script>\n" + three + "\n</script>"
+    if page.count(tag) != 1 or page.count("\n<script>\n") != 2 or not page.endswith("</script>\n"):
+        sys.exit("crazy: the page is not the two-script page build_3d makes - nothing to split")
+    page = page.replace(tag, '<script src="assets/%s"></script>' % THREE_FILE)
+    (d / "assets" / THREE_FILE).write_text(three, encoding="utf-8")
+    i = page.rindex("\n<script>\n")
+    code = page[i + len("\n<script>\n"):-len("</script>\n")]
+    name = "game-%s.js" % hashlib.sha1(code.encode("utf-8")).hexdigest()[:8]
+    (d / "assets" / name).write_text(code, encoding="utf-8")
+    page = page[:i] + '\n<script src="assets/%s"></script>\n' % name
+    links = [l for l in open("game_head.html", encoding="utf-8").read().splitlines()
+             if "fonts.googleapis.com" in l or "fonts.gstatic.com" in l]
+    if len(links) != 3 or any(page.count(l + "\n") != 1 for l in links):
+        sys.exit("crazy: game_head.html no longer has the three Google Fonts tags this replaces")
+    faces = open("fonts/fonts.css", encoding="utf-8").read()
+    page = (page.replace(links[0] + "\n", "").replace(links[1] + "\n", "")
+                .replace(links[2] + "\n", "<style>\n" + faces + "</style>\n"))
+    for f in sorted(set(re.findall(r"url\(fonts/([^)]+)\)", faces))):
+        shutil.copyfile("fonts/" + f, d / "fonts" / f)
+    (d / "index.html").write_text(page, encoding="utf-8")
+    (d / "privacy.html").write_text(privacy_page(), encoding="utf-8")
+    files = sorted(p for p in d.rglob("*") if p.is_file())
+    text = "\n".join(p.read_text(encoding="utf-8") for p in files if p.suffix in (".html", ".js"))
+    for p in files:
+        print("  %-34s %7.0f KB" % (p.relative_to(d.parent).as_posix(), p.stat().st_size / 1024))
+    return text, sum(p.stat().st_size for p in files), len(files)
+
+THREE_FILE = "three-0.150.1.min.js"
+
 if "crazy" in targets:
-    out = "../dist/index.html"
-    check_crazy(build("game_head.html", "game_shell.js", out, host="crazy"), out)
+    # ⚠ The 3D game. This folder is the 3D project now; the 2D game, and the
+    # build that made the 2D upload, live on in ../../seatawayO-2D.
+    text, size, count = bundle(build_3d("../dist/index.html", host="crazy"))
+    check_crazy(text, "../dist/", size, count)

@@ -545,6 +545,14 @@ const WIN_ASKED=linkFlag("win");
 const INTRO_ONLY=LINK.get("intro");
 const LEVEL_ASKED=parseInt(LINK.get("level"),10);
 const DBG_ASKED=linkFlag("dbg");
+/* ?cam=diag   the old view, from behind the seats and turned diagonally, kept
+               so the two can be put side by side on the same phone.
+   ?elev=N     the camera's height in degrees, 15..85, for trying a number on a
+               real screen without a rebuild. Out of range is ignored rather
+               than clamped - a typo should not hand anybody a view from under
+               the floor. */
+const CAM_ASKED=LINK.get("cam")==="diag"?"diag":"front";
+const ELEV_ASKED=(e=>e>=15&&e<=85?e:0)(parseFloat(LINK.get("elev")));
 if(RESET_ASKED){
   /* ⚠ Only the address bar here. The save itself is wiped in boot(), AFTER
      PLATFORM.init() - the host copy has to go too, and it does not exist yet. */
@@ -688,6 +696,16 @@ let TILES=[],SEATMESH={},CLOCK=0,LAND=false,LAST=0;
    undoes itself is worse than no control, so the window decides and nothing
    else does. */
 const autoLand=()=>view.clientWidth>view.clientHeight;
+/** True when the camera stands at the FRONT of the room - where the seats face
+    - looking back at them. 93.6% of all 50,932 seats in the campaign face the
+    same way (dir 0, towards row 0), so "the front" is one side of the room on
+    nearly every board, the way it is in a classroom. */
+const PODIUM=()=>CAM_ASKED==="front";
+/** How far the room is turned. ⚠ Not at all from the podium: the camera looks
+    along the way the seats face whichever way up the screen is, so turning the
+    room would only turn the camera with it and change nothing on screen. The
+    diagonal view is the one that lays the room sideways on a wide screen. */
+const roomTurn=()=>(LAND&&!PODIUM())?-Math.PI/2:0;
 let S=null,SEL=null,SPOTS=[],DRAG=null,CUR=1,MOVES=0;
 /** ⚠ Starts TRUE. gameplayStart/Stop only come out as a matched pair if the
     game admits it is not playing yet; starting false means the first
@@ -837,7 +855,13 @@ function buildRoom(g){
   const WALLH=1.34, TH=0.22;
   /* ⚠ A wall standing between the camera and the room has to come down. Which
      one that is depends on the VIEW, not on the board, so it is read here. */
-  const NEARH=LAND?0.66:WALLH;
+  /* From the podium neither long wall is between the camera and the seats -
+     the camera is at the short end - so both stand full height. */
+  const NEARH=(LAND&&!PODIUM())?0.66:WALLH;
+  /* ⚠ Which END wall comes down. The camera has to see over whichever one it
+     stands behind: the back wall for the old view, the front wall from the
+     podium. The other end gets the full height and the windows. */
+  const FRONT_LOW=PODIUM();
   function wall(len,vertical,x,z,glass,height){
     const hh=height||WALLH;
     const m=solid(vertical?TH:len,hh,vertical?len:TH,0.06,mat(ROOM.wall));
@@ -857,8 +881,8 @@ function buildRoom(g){
   for(let c=0;c<W;c++) if(c%2===0) colsAt.push(wx(g,c));
   for(let r=0;r<H;r++) if(r%2===0) rowsAt.push(wz(g,r));
 
-  wall(SX+0.8,false,0,-HH-0.25,colsAt);
-  wall(SX+0.8,false,0,HH+0.25,null,0.62);
+  wall(SX+0.8,false,0,-HH-0.25,FRONT_LOW?null:colsAt,FRONT_LOW?0.62:undefined);
+  wall(SX+0.8,false,0, HH+0.25,FRONT_LOW?colsAt:null,FRONT_LOW?undefined:0.62);
   // the two long walls, each in segments so their doorways stay open
   for(let k=0;k<2;k++){
     const x=k?-HW-0.25:HW+0.25;
@@ -866,7 +890,7 @@ function buildRoom(g){
     const h=k?WALLH:NEARH;
     for(let r=0;r<H;r++){
       if(r===gap) continue;
-      wall(GAP,true,x,wz(g,r),(!LAND&&!k&&r%2===0)?[wz(g,r)]:null,h);
+      wall(GAP,true,x,wz(g,r),(!(LAND&&!PODIUM())&&!k&&r%2===0)?[wz(g,r)]:null,h);
     }
   }
   if(!two){                                     // a handrail, where there is a wall to hang it on
@@ -888,6 +912,11 @@ function buildRoom(g){
 /** Scenery sits beyond the room and both queue corridors, never on puzzle cells. */
 function gardenLounge(g,sx,sz){
   const deco=new THREE.Group(); deco.userData.deco=true; roomG.add(deco);
+  /* ⚠ Always on the far side from the camera. Built at -z for a camera behind
+     the seats; from the podium -z is the near side, and a row of trees and a
+     bench would be the first thing in shot. Mirroring the whole group is one
+     line and keeps every position below as it was written. */
+  if(PODIUM()) deco.scale.z=-1;
   const terrace=solid(sx+3,0.12,2.1,0.12,mat(0xd4c9ae),false);
   terrace.position.set(0,-0.85,-sz/2-1.65); terrace.receiveShadow=true; deco.add(terrace);
   const leaves=mat(0x689c7b,{roughness:0.85}), tips=mat(0x94b88b);
@@ -1191,7 +1220,7 @@ function inFrame(){
 function frame(g){
   resize();
   const keep=rootG.rotation.y;
-  rootG.rotation.y=LAND?-Math.PI/2:0;
+  rootG.rotation.y=roomTurn();
   rootG.updateMatrixWorld(true);
   BOX.makeEmpty();
   for(const ch of roomG.children) if(!ch.userData.deco) BOX.expandByObject(ch);
@@ -1220,8 +1249,13 @@ function frame(g){
      Measured at 393x740, room as a share of the frame:
         50 deg -> 88% wide, 48% tall      32 deg -> 89% wide, 37% tall
      Portrait takes the height; landscape keeps the low, into-the-room angle. */
-  const ELEV=(LAND?32:50)*Math.PI/180;
-  const AZ=LAND?0.35:0.244;             // 20 deg landscape, 14 deg portrait
+  /* From the podium: straight on (no azimuth) and from the side the seats
+     face, so the camera sits at -z looking towards +z. The diagonal view keeps
+     its two elevations and its swing. ?elev overrides either, for trying a
+     number on a real phone. */
+  const POD=PODIUM();
+  const ELEV=(ELEV_ASKED||(POD?52:(LAND?32:50)))*Math.PI/180;
+  const AZ=POD?Math.PI:(LAND?0.35:0.244);   // PI = stand at -z, facing the seats
   const EH=Math.sin(ELEV), ER=Math.cos(ELEV);
   /* ⚠ Start deliberately too CLOSE and back off. The old opening guess was
      already roughly right, so the loop usually accepted it on the first pass -
@@ -1501,7 +1535,7 @@ function tick(t){
   const dt=Math.min(60,t-(LAST||t)); LAST=t;
   if(S&&renderer){
     resize(); step(dt); idle(dt);
-    rootG.rotation.y+=((LAND?-Math.PI/2:0)-rootG.rotation.y)*Math.min(1,dt/110);
+    rootG.rotation.y+=(roomTurn()-rootG.rotation.y)*Math.min(1,dt/110);
     hud();
     renderer.render(scene,camera);
   }

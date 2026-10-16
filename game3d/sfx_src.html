@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chọn tiếng pháo</title>
+<style>
+  :root { --bg: #1d2340; --card: #2b3452; --card-on: #37436a; --ink: #e8edf7; --mute: #a6b0cc; --gold: #ffc21e; --mint: #5fd3a8; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink);
+         display: grid; place-items: center; min-height: 100vh; padding: 16px; box-sizing: border-box; }
+  main { width: 100%; max-width: 460px; }
+  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  h2 { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin: 1.6rem 0 .2rem; }
+  p { color: var(--mute); margin: 0 0 .6rem; line-height: 1.5; }
+  button { display: block; width: 100%; margin: .6rem 0; padding: .95rem 1.1rem; border: 0; border-radius: 14px;
+           text-align: left; cursor: pointer; background: var(--card); color: #fff; font: inherit; font-weight: 700; font-size: 1.05rem; }
+  button:active, button.on { background: var(--card-on); }
+  button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  button span { display: block; font-weight: 400; font-size: .88rem; color: var(--mute); margin-top: .25rem; }
+  .tag { display: inline-block; min-width: 1.6rem; padding: .1rem .45rem; margin-right: .5rem; border-radius: 8px;
+         background: var(--gold); color: var(--bg); text-align: center; }
+  .real .tag { background: var(--mint); }
+  small { display: block; color: var(--mute); margin-top: 1.4rem; font-size: .78rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chọn tiếng pháo</h1>
+  <p>Bật loa điện thoại, bấm từng nút. Hai nút xanh là <b>bản ghi âm thật</b> để so sánh; ba nút vàng là bản tôi tạo cho game, mỗi nút phát đúng như lúc thắng màn (4 chùm, cách nhau 0.25 giây).</p>
+
+  <h2>Bản ghi âm thật</h2>
+  <div class="real">
+    <button data-k="R1"><b class="tag">R1</b>Pháo nổ ngoài phố, đêm giao thừa<span>Đôm đốp dày, nghe gần.</span></button>
+    <button data-k="R2"><b class="tag">R2</b>Giàn pháo hoa<span>Đốp to hơn, thưa hơn, trầm hơn.</span></button>
+  </div>
+
+  <h2>Bản tạo cho game</h2>
+  <button data-k="1"><b class="tag">1</b>Đôm đốp gần<span>Khoảng 20 tiếng đốp nhỏ trong 1.3 giây, như pháo nổ ngay ngoài phố.</span></button>
+  <button data-k="2"><b class="tag">2</b>Đùng... đôm đốp<span>Mỗi chùm: một tiếng đùng to ở xa, rồi một tràng đốp nhỏ theo sau.</span></button>
+  <button data-k="3"><b class="tag">3</b>Đốp to, thưa<span>Mỗi chùm một hai tiếng đốp lớn, có tiếng vọng.</span></button>
+
+  <small>Bản ghi thật lấy từ Wikimedia Commons, phạm vi công cộng: "Silvester fireworks from the street 02" và "Fireworks piece". Trang này chỉ để nghe thử, không nằm trong game.</small>
+</main>
+<script>
+/* ---------- the pop, built to measurements of real recordings ----------
+   Measured on public-domain New Year recordings (Wikimedia Commons):
+   - a close firecracker is ONE pressure pulse: a spike 0.2-0.4 ms wide, then a
+     rebound of the other sign 1-2 ms wide; 20 dB down 3-11 ms after the hit;
+   - often the same pulse again off the ground, 2-8 ms later;
+   - then the street: ~22 dB under the hit, 40 dB down by 100-300 ms;
+   - in the thick of it about 13 pops a second, gaps median 130 ms, p10 40 ms,
+     levels median 6 dB under the loudest.
+   A big shell is the same pulse stretched - 0.6 ms spike, 5 ms rebound, a 10 ms
+   swing back - and a long dark echo after it. */
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function lognorm(median, sigma) {
+  const u = 1 - Math.random(), v = Math.random();
+  return median * Math.exp(sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+}
+function db(d) { return Math.pow(10, d / 20); }
+
+/** A blank stereo buffer to write pops into. */
+function sheet(a, secs) {
+  const b = a.createBuffer(2, Math.ceil(secs * a.sampleRate), a.sampleRate);
+  return { b, sr: a.sampleRate, L: b.getChannelData(0), R: b.getChannelData(1) };
+}
+function gains(amp, pan) {
+  return [Math.cos((pan + 1) * Math.PI / 4) * amp, Math.sin((pan + 1) * Math.PI / 4) * amp];
+}
+/** One pressure pulse: the spike, the rebound, and for a big one a swing back. */
+function pulse(c, t, amp, pan, w1, w2, w3, g3) {
+  const { L, R, sr } = c, [gl, gr] = gains(amp, pan);
+  let i = Math.round(t * sr);
+  const seg = (w, g) => {
+    const n = Math.max(2, Math.round(w * sr));
+    for (let k = 0; k < n && i < L.length; k++, i++) {
+      const v = g * Math.sin(Math.PI * (k + .5) / n); L[i] += v * gl; R[i] += v * gr;
+    }
+  };
+  seg(w1, -1); seg(w2, .62); if (w3) seg(w3, -g3);
+}
+/** Noise after the hit, low-passed and dying away: paper and smoke, or rumble. */
+function grit(c, t, amp, pan, tau, len, fc) {
+  const { L, R, sr } = c, [gl, gr] = gains(amp, pan), k1 = 1 - Math.exp(-2 * Math.PI * fc / sr);
+  const comp = Math.sqrt((2 - k1) / k1);     // keep the level when the cutoff moves
+  let i = Math.round(t * sr), y = 0;
+  for (let k = 0; k < len * sr && i < L.length; k++, i++) {
+    y += k1 * ((Math.random() * 2 - 1) - y);
+    const v = y * comp * .58 * amp * Math.exp(-k / (tau * sr)); L[i] += v * gl; R[i] += v * gr;
+  }
+}
+/** A firecracker. `size` 1 is a small one; 2 is a big one.
+    ⚠ Measured against the street recording: its pops centre near 2.7 kHz and
+    stay within 20 dB of the hit for ~12 ms. A wider pulse with a short tail
+    measured 530 Hz and 2 ms - a thud, not a pop. The brightness is the spike
+    being narrow and the burst of noise after it lasting. */
+function cracker(c, t, amp, pan, size) {
+  const w1 = rnd(.00008, .00016) * size, w2 = rnd(.0005, .0010) * size;
+  pulse(c, t, amp, pan, w1, w2);
+  grit(c, t + .0002, amp * .8, pan, .006 * Math.sqrt(size), .045, 10000);
+  if (Math.random() < .6) pulse(c, t + rnd(.002, .008), amp * rnd(.3, .6), pan, w1 * 1.5, w2 * 1.2);
+}
+/** A shell bursting high up: a stretched pulse and a rumble a phone can play. */
+function shellBang(c, t, amp, pan, size) {
+  pulse(c, t, amp, pan, .0004 * size, .005 * size, .010 * size, .35);
+  grit(c, t + .0003, amp * .45, pan, .006, .04, 9000);
+  grit(c, t + .001, amp * .22, pan, .07 * size, .4, 1200);
+}
+
+/** The place it went off in: decaying noise that darkens as it goes, with a
+    few walls in it. Unit energy - the wet gain sets how much of it there is. */
+function roomIR(a, t60, fc0, fc1, pre, taps) {
+  const sr = a.sampleRate, n = Math.ceil(t60 * sr), b = a.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const x = b.getChannelData(ch), hit = new Float32Array(n);
+    for (const [d, g] of taps) { const i = Math.round(d * rnd(.85, 1.15) * sr); if (i < n) hit[i] = g * rnd(.7, 1); }
+    let y = 0, e = 0, eTap = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, fc = fc0 * Math.pow(fc1 / fc0, t / t60), k1 = 1 - Math.exp(-2 * Math.PI * fc / sr);
+      const on = t < pre ? 0 : Math.min(1, (t - pre) / .012);
+      y += k1 * ((Math.random() * 2 - 1) * on * Math.exp(-6.91 * t / t60) - y);
+      x[i] = y; e += y * y;
+    }
+    const s = 1 / Math.sqrt(e);
+    for (let i = 0; i < n; i++) x[i] *= s;
+    // the walls, low-passed like the rest: added after, at their own level
+    y = 0;
+    for (let i = 0; i < n; i++) {
+      const fc = fc0 * Math.pow(fc1 / fc0, i / sr / t60), k1 = 1 - Math.exp(-2 * Math.PI * fc / sr);
+      y += k1 * (hit[i] / k1 - y); x[i] += y * k1 * 3;
+    }
+  }
+  return b;
+}
+/** Dry and wet into a limiter. */
+function bus(a, dest, ir, wet) {
+  const lim = a.createDynamicsCompressor();
+  lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0; lim.release.value = .08;
+  lim.connect(dest);
+  const input = a.createGain(), conv = a.createConvolver(), wg = a.createGain();
+  conv.normalize = false; conv.buffer = ir; wg.gain.value = wet;
+  input.connect(lim); input.connect(conv); conv.connect(wg); wg.connect(lim);
+  return input;
+}
+function play(a, c, into, t) { const s = a.createBufferSource(); s.buffer = c.b; s.connect(into); s.start(t); }
+
+const SIZE = [1, .9, 1.12, .95];
+const KIND = {
+  /* 1: close firecrackers - four to six pops a burst, gaps as measured */
+  "1": {
+    room: a => roomIR(a, .45, 14000, 5000, .004, [[.007, .35], [.018, .25], [.031, .18], [.049, .12]]), wet: .45,
+    burst(a, into, t, k) {
+      const c = sheet(a, 1.1);
+      let at = 0;
+      for (let i = 0, n = 4 + (Math.random() * 2 | 0); i < n && at < .7; i++) {
+        cracker(c, at, db(-rnd(0, 8)) * .85, rnd(-.7, .7), rnd(.8, 1.3));
+        at += Math.min(.25, Math.max(.025, lognorm(.1, .6)));
+      }
+      play(a, c, into, t);
+    }
+  },
+  /* 2: a shell overhead, then its crackle - farther, darker, more echo */
+  "2": {
+    room: a => roomIR(a, 1.2, 5000, 900, .01, [[.045, .3], [.11, .2], [.2, .12]]), wet: .55,
+    burst(a, into, t, k) {
+      const c = sheet(a, 1.5);
+      shellBang(c, 0, .9, rnd(-.3, .3), SIZE[k % 4]);
+      let at = rnd(.12, .2);
+      for (let i = 0, n = 6 + (Math.random() * 4 | 0); i < n; i++) {
+        cracker(c, at, db(-rnd(3, 12)) * .8, rnd(-.8, .8), rnd(.7, 1.1));
+        at += Math.min(.18, Math.max(.02, lognorm(.07, .6)));
+      }
+      play(a, c, into, t);
+    }
+  },
+  /* 3: one or two big pops a burst, with the echo of a bigger place */
+  "3": {
+    room: a => roomIR(a, .9, 6000, 1200, .006, [[.012, .3], [.034, .22], [.07, .15]]), wet: .5,
+    burst(a, into, t, k) {
+      const c = sheet(a, .8);
+      cracker(c, 0, .85, rnd(-.5, .5), rnd(1.8, 2.4) * SIZE[k % 4]);
+      if (Math.random() < .5) cracker(c, rnd(.06, .15), db(-rnd(3, 9)) * .85, rnd(-.6, .6), rnd(1.4, 2));
+      play(a, c, into, t);
+    }
+  }
+};
+
+/** What the game does on a win: four bursts, 0.25 s apart. */
+function show(a, dest, kind, t0) {
+  const K = KIND[kind], into = bus(a, dest, K.room(a), K.wet);
+  for (let k = 0; k < 4; k++) K.burst(a, into, t0 + k * .25, k);
+}
+
+/* the real recordings, decoded once */
+const REAL = { R1: "__R1__", R2: "__R2__" };
+const DECODED = {};
+async function real(a, key) {
+  if (!DECODED[key]) {
+    const bin = atob(REAL[key]), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    DECODED[key] = await a.decodeAudioData(u.buffer);
+  }
+  return DECODED[key];
+}
+
+let A = null;
+function ctx() { A = A || new (window.AudioContext || window.webkitAudioContext)(); if (A.state === "suspended") A.resume(); return A; }
+for (const b of document.querySelectorAll("button")) b.onclick = async () => {
+  const a = ctx(), k = b.dataset.k;
+  for (const o of document.querySelectorAll("button.on")) o.classList.remove("on");
+  b.classList.add("on"); setTimeout(() => b.classList.remove("on"), 1600);
+  if (k[0] === "R") { const s = a.createBufferSource(); s.buffer = await real(a, k); s.connect(a.destination); s.start(); }
+  else show(a, a.destination, k, a.currentTime + .05);
+};
+
+/* For measuring: one variant rendered offline, as the mono sum. */
+window.__render = async (kind, secs) => {
+  const o = new OfflineAudioContext(2, Math.ceil((secs || 2.6) * 48000), 48000);
+  if (kind[0] === "R") { const s = o.createBufferSource(); s.buffer = await real(o, kind); s.connect(o.destination); s.start(0); }
+  else show(o, o.destination, kind, .02);
+  const r = await o.startRendering(), L = r.getChannelData(0), R = r.getChannelData(1), m = new Array(L.length);
+  for (let i = 0; i < L.length; i++) m[i] = (L[i] + R[i]) / 2;
+  return m;
+};
+</script>
+</body>
+</html>

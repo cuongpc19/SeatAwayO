@@ -2,10 +2,33 @@
 
 What to actually do, in order.
 
+⚠ **This folder ships the 3D game** (since 2026-10-14): `build.py crazy` writes the 3D room into
+`dist/`, about 5.4 MB. The 2D game and the build that made its upload were copied whole to
+`C:\CuongPC\Game\seatawayO-2D` — build a 2D upload there, never here.
+
 ⚠ **The game is called Seat Jam** (since 2026-10-16, was Seat Match). The page title, the
 privacy page, the covers and the home art say so. What did not change, on purpose: the save key
 `seatmatch.save.v3` (renaming it wipes every player's progress) and the Firebase project
 `seatmatch-292b3`. The name in the Developer Portal is set by hand.
+
+The upload is laid out the way Marble Sort's is, and so is `store/`:
+
+```
+dist/                          ← drag the CONTENTS of this into the upload box
+  index.html                   the page: markup and style
+  assets/three-0.150.1.min.js  the 3D library
+  assets/game-<hash>.js        the game, one script
+  fonts/*.woff2                Baloo 2, Lilita One, Nunito - carried, not fetched from Google
+  privacy.html                 the policy, same origin
+store/crazygames/              ← what the submission form asks for
+  cover-1920x1080.png · cover-800x1200.png · cover-800x800.png
+store/source/                  the large renders the covers were cut from - not uploaded
+  seatjam-*.png                AI renders, 2026-10-16; seatjam-home-* is also art/home_cover.jpg
+  cover-*.png                  the old Seat Match renders
+```
+
+The fonts in `dist/fonts/` come from `src/fonts/`, which `src/fetch_fonts.py` wrote once and which
+is committed: the build never reaches the network for them.
 
 Two paths: **§1 every update** (the one you will use), **§2 first submission only**.
 
@@ -26,16 +49,21 @@ the build column stops naming a commit anyone can check out.
 `build.py crazy` self-checks and refuses to finish quietly. It must print:
 
 ```
-Bundle "crazy": ../dist/index.html - 3.99 MB
+Bundle "crazy": ../dist/ - 10 files, 5.43 MB
   OK   under 20 MB - keeps the mobile front page
+  OK   10 files - the limit is 1500
   OK   relative paths only
   OK   CrazyGames SDK wired
   OK   Google Analytics wired
   OK   telemetry endpoint wired
   OK   privacy policy carried
   OK   no unfilled placeholders
+  OK   no test clocks - none of [1000] shipped
   OK   no dev tools
 ```
+
+Then `python test_crazy.py`: it serves `dist/` over http - the way the host fetches it - boots it
+with the SDK blocked, and checks the three faces load from `fonts/` with no request to Google.
 
 The last four are new and each one has a reason:
 
@@ -56,7 +84,9 @@ Then upload:
 please drag and drop the files directly in the upload zone"*. Drag the folder contents; the
 browser keeps the tree. The sibling project lost two attempts to this.
 
-⚠ **Drag `dist/`, never the repo.** `dist/` holds exactly one file, written by `build.py`.
+⚠ **Drag `dist/`, never the repo.** Everything in `dist/` is written by `build.py`, which empties
+it first, so nothing stale rides along. Drag its contents *with* the `assets/` and `fonts/` folders -
+the page loads its script and faces from them by relative path.
 `level_player.html` (the level editor) and `public/stats.html` (the dashboard) are not in it and
 must never be — a dev tool in front of a reviewer is a failed review.
 
@@ -87,7 +117,9 @@ npx firebase-tools deploy --only database
 - [x] Database rules deployed and probed three ways — ANALYTICS.md §1
 - [x] Three covers: [store/crazygames/](store/crazygames/) — 1920×1080 · 800×1200 · 800×800
   (Seat Jam, a kid pushing a red armchair, 2026-10-16)
-- [x] Two preview videos, 15-20s, in `Manythings/` — landscape and portrait, both 17.95s
+- [ ] Two preview videos, 15-20s — ⚠ the pair in `Manythings/` (landscape and portrait, both
+  17.95s) were cut on 2026-09-08 from the **2D** game. The 3D game needs its own pair before they
+  go in front of anyone; when they exist they live in `store/crazygames/`, as Marble Sort's do.
 - [x] A contact address in the privacy policy
 - [x] Hosting deployed — `https://seatmatch-292b3.web.app/privacy.html` answers 200
 - [x] Authentication on, and a uid in the database read rule — ANALYTICS.md §2
@@ -183,7 +215,7 @@ while it runs. Those numbers decide Full Launch.
 | avg session length | 10+ min | watch it in `stats.html` |
 | day-1 retention | 10-15% | localStorage + Progress Save |
 | reached gameplay | 80%+ | one tap from Home |
-| build size | < 20 MB | **3.99 MB** ✓ |
+| build size | < 20 MB | **5.43 MB** ✓ |
 
 ⚠ **"Time to gameplay" is measured to the `gameplayStart` call**, not to first paint. That is why
 `startAnalytics()` loads gtag.js on reaching a *level* rather than at boot, and why nothing may be
