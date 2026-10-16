@@ -290,14 +290,8 @@ const WIDE_FROM = 1.2;             // where furniture becomes a landscape menu
 const WIDE_COL = .95;              // how much room the column beside the art may take
 
 /* The cover is inlined by the build; a served page reads the file beside it.
-   Both layers are the same image - the crisp one, and a blurred copy that fills
-   the box either side of it on a wide frame. */
-{
-  const src = COVER_SRC || "art/home_cover.png";
-  document.getElementById("h-cover").src = src;
-  // the same file again, for the two strips that fill a wide box either side
-  document.getElementById("home").style.setProperty("--cover-url", 'url("' + src + '")');
-}
+   Wide, what fills the box either side of it is --cover-plate, in the CSS. */
+document.getElementById("h-cover").src = COVER_SRC || "art/home_cover.jpg";
 
 function fitDesign() {
   const app = document.getElementById("app");
@@ -359,10 +353,6 @@ function fitDesign() {
   // has been pulled in, and read as the layout having missed them.
   set("--corner-l", wide ? groupL + 36 : 70);
   set("--corner-r", wide ? groupR - 36 : W - 70);
-  set("--edge-r", W - (artCx + artW / 2));
-  document.getElementById("h-scrim").hidden = wide;
-  document.getElementById("h-edge-l").hidden = !wide;
-  document.getElementById("h-edge-r").hidden = !wide;
 }
 
 function refreshHome() {

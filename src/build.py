@@ -241,10 +241,12 @@ def movie_uri():
 
 
 def cover_uri():
-    """The home screen's cover art. Rendered by `art/home_cover.py`, which is
-    slow enough not to belong in a build - the PNG it leaves behind is what is
-    inlined here."""
-    return inline("../art/home_cover.png", "image/png")
+    """The home screen's cover art: the Seat Jam render, cut to 1080 x 1620 from
+    `store/source/seatjam-home-1024x1536.png`. A JPEG because it is inlined into
+    the game script as base64 - 139 KB against about 2 MB as a PNG.
+    `art/home_cover.py` still writes the old Seat Match render to
+    home_cover.png; nothing ships it any more."""
+    return inline("../art/home_cover.jpg", "image/jpeg")
 
 
 def build_stamp():
@@ -283,7 +285,7 @@ def privacy_page():
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Seat Match - Privacy Policy</title>
+<title>Seat Jam - Privacy Policy</title>
 <style>
   :root { color-scheme: light; }
   body { margin: 0; padding: 40px 22px 80px; background: #f6f7fb; color: #22283a;

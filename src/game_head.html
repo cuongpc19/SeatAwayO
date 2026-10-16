@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Seat Match</title>
+<title>Seat Jam</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lilita+One&family=Nunito:wght@600;700;800&display=swap">
@@ -35,12 +35,12 @@
   --ms: "Lilita One", "Baloo 2", Arial, sans-serif;
   --ms-ink: #2b3550; --ms-face: #e9e8f7; --ms-edge: #c6c2e2;
   --ms-win: #4bc84b; --ms-lose: #d8556a; --ms-gold: #ffc21e; --ms-rays: #ffd75e;
-  /* Sampled off the cover's own top and bottom rows, not chosen. A frame whose
-     aspect is taller than the design box's leaves a band above and below the
-     art, and a flat fill there matches the render at one end and steps away
-     from it at the other - a line across the screen at the height the eye is
-     already looking. */
-  --cover-top: #161a36; --cover-foot: #4a548e;
+  /* The ground behind the cover: the art's own sky, hedge and floor with the
+     clouds taken out - per row, the median of its outer columns, ignoring
+     near-white pixels. Sampled, not chosen: wide, it is all there is either side
+     of the art, and a fill picked to look close draws a rectangle round it. */
+  --cover-plate: linear-gradient(180deg, #25b6fd 0%, #56defd 48.4%, #55dc8e 49.6%,
+                 #3dc095 55%, #48c487 60%, #f9e6b4 61.4%, #f6ca91 100%);
   --body: Nunito, "Segoe UI", system-ui, sans-serif;
   /* the notch, the home indicator and the rounded corners */
   --safe-t: env(safe-area-inset-top, 0px);
@@ -74,8 +74,7 @@ body {
    scaled by `--k`, so every number below is the number in its source and there
    is nothing to convert. `--dw` is the box's width, which Home - and only Home -
    widens on a landscape frame, because it is the one screen with no board on it. */
-#home { position: relative; overflow: hidden;
-  background: linear-gradient(180deg, var(--cover-top), var(--cover-foot)); }
+#home { position: relative; overflow: hidden; background: var(--cover-plate); }
 #home .design {
   position: absolute; left: 50%; top: 50%;
   width: calc(var(--dw) * 1px); height: 1160px;
@@ -91,37 +90,20 @@ body {
   left: calc(var(--art-l) * 1px); top: calc(var(--art-t) * 1px);
   width: calc(var(--art-w) * 1px); height: calc(var(--art-h) * 1px);
   animation: breathe 5.2s ease-in-out infinite alternate;
+  /* Wide, the art is fitted to the height and the plate shows either side; the
+     fade is what keeps its clouds and floor tiles from ending on a hard line.
+     Upright, the outer 15% is off the screen anyway. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
 }
 /* A completely still home screen reads as a screenshot rather than as a game
    waiting for you, so the cover breathes - the same idle the title used to have. */
 @keyframes breathe { to { transform: scale(1.03); } }
-/* Wide, the art is fitted to the height and there is bare box either side. The
-   gap is filled by stretching the render's own edge column, not by a colour
-   picked to look close: the cover's edges are a vertical ramp rather than one
-   navy, so any flat fill draws a soft rectangle around the art at exactly the
-   height the eye is already looking. `background-size` does the stretching -
-   1080 / 6 = 180, so sizing the image at 180 gap-widths puts its leftmost six
-   pixels across the whole gap. */
-.edge {
-  top: 0; height: 100%; background-image: var(--cover-url); background-repeat: no-repeat;
-}
-.edge-l {
-  left: 0; width: calc(var(--art-l) * 1px);
-  background-size: calc(var(--art-l) * 180px) 100%; background-position: left top;
-}
-.edge-r {
-  left: calc((var(--art-l) + var(--art-w)) * 1px); width: calc(var(--edge-r) * 1px);
-  background-size: calc(var(--edge-r) * 180px) 100%; background-position: right top;
-}
-.edge[hidden] { display: none; }
-/* A scrim, not a panel: it darkens the lower third *through* the art so the UI
-   has a ground under it. Portrait only - wide, the button has its own column
-   beside the picture and this would just be dimming it. */
-.scrim {
-  left: 0; top: 696px; width: 100%; height: 464px;
-  background: linear-gradient(180deg, rgba(26,27,72,0), rgba(26,27,72,.82) 40%);
-}
-.scrim[hidden] { display: none; }
+/* ⚠ No edge strips and no scrim any more. The strips stretched the render's
+   own edge column across the gap, which worked on the old navy ramp and turned
+   the Seat Jam art's clouds and hedge into long bars. The scrim darkened the
+   lower third for the UI; over a sunlit floor it was a navy fog, and every line
+   down there carries its own ink stroke, so it reads without one. */
 
 /* ⚠ There is no `.logo` rule any more, and that is deliberate. The cover render
    carries the name itself now - home_cover.py bakes it in the same livery, with
@@ -237,7 +219,7 @@ body {
      two new lines ran into it; at 1142 it fell off the bottom of a short
      landscape window. The box has a foot and this belongs on it. */
   left: calc(var(--ui-cx) * 1px); bottom: 10px; transform: translateX(-50%);
-  font-size: 16px; color: #fff; opacity: .55; white-space: nowrap;
+  font-size: 16px; color: var(--ms-ink); opacity: .45; white-space: nowrap;
 }
 
 /* ---------- top bar ---------- */
@@ -1085,10 +1067,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%;
 <div id="app">
   <section id="home" class="screen on">
     <div class="design">
-      <div class="edge edge-l" id="h-edge-l"></div>
-      <div class="edge edge-r" id="h-edge-r"></div>
-      <img class="cover" id="h-cover" alt="Seat Match">
-      <div class="scrim" id="h-scrim"></div>
+      <img class="cover" id="h-cover" alt="Seat Jam">
 
       <!-- Top left, the lives that let you start a level at all; top right, the
            picker. Mirroring each other rather than sitting together: one is a

@@ -2,6 +2,11 @@
 
 What to actually do, in order.
 
+⚠ **The game is called Seat Jam** (since 2026-10-16, was Seat Match). The page title, the
+privacy page, the covers and the home art say so. What did not change, on purpose: the save key
+`seatmatch.save.v3` (renaming it wipes every player's progress) and the Firebase project
+`seatmatch-292b3`. The name in the Developer Portal is set by hand.
+
 Two paths: **§1 every update** (the one you will use), **§2 first submission only**.
 
 ---
@@ -81,6 +86,7 @@ npx firebase-tools deploy --only database
 - [x] Firebase project, Realtime Database (Singapore) and GA4 — [ANALYTICS.md](ANALYTICS.md) §1
 - [x] Database rules deployed and probed three ways — ANALYTICS.md §1
 - [x] Three covers: [store/crazygames/](store/crazygames/) — 1920×1080 · 800×1200 · 800×800
+  (Seat Jam, a kid pushing a red armchair, 2026-10-16)
 - [x] Two preview videos, 15-20s, in `Manythings/` — landscape and portrait, both 17.95s
 - [x] A contact address in the privacy policy
 - [x] Hosting deployed — `https://seatmatch-292b3.web.app/privacy.html` answers 200
