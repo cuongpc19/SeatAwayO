@@ -590,3 +590,55 @@
     return out;
   };
 })();
+
+/* ================= the HUD scales with the screen =================
+   The booster row and the bar of level, clock and gold alike - see #boosters
+   and #play .topbar in game3d.css. Full size from 760 px of height up - an upright
+   phone - and down in proportion below that, never under 68%: a tile of about
+   45 px, still a thumb's worth to press. On a desktop window it grows past full too, up to
+   135%, so the columns keep pace with a room that fills a big screen. The room is refitted to whatever the
+   row leaves, because render3d.js reads the row's rect each time it fits. */
+(function () {
+  const row = $("boosters"), bar = document.querySelector("#play .topbar");
+  if (!row) return;
+  const FULL = 760, LEAST = .68, MOST = 1.35;
+  // ⚠ The same test as the media query that lays the HUD out in columns.
+  const desk = window.matchMedia ? matchMedia("(hover: hover) and (pointer: fine) and (min-aspect-ratio: 1/1)") : null;
+  function size() {
+    const h = window.visualViewport ? visualViewport.height : innerHeight;
+    // A phone never grows past the shell's own sizes. A desktop window does: at
+    // 1080 tall the room is twice a phone's and phone-sized pills beside it
+    // read as an afterthought.
+    const most = desk && desk.matches ? MOST : 1;
+    const k = Math.max(LEAST, Math.min(most, h / FULL)).toFixed(3);
+    row.style.setProperty("--bk", k);
+    if (bar) bar.style.setProperty("--bk", k);     // the level, clock and gold scale with it
+  }
+  addEventListener("resize", size);
+  if (window.visualViewport) visualViewport.addEventListener("resize", size);
+  size();
+})();
+
+/* ================= no streak line on the win card =================
+   "12 IN A ROW · +25 BONUS" under the purse is not shown - asked to go
+   (2026-10-16). The bonus is still paid and still counted in the +total above
+   it; only the line saying so is dropped. Passed on as "" rather than hidden in
+   CSS, so the shell also drops the 34 px it opens for the line (--dz) and the
+   buttons do not sit below a gap. */
+{
+  const card = overlay;
+  overlay = function (title, stars, coins, streak, ...rest) { return card(title, stars, coins, "", ...rest); };
+}
+
+/* ---------------- one room: the concert lawn ----------------
+   The shipped game plays five rooms in turn, five levels each - themeFor() in
+   game_shell.js. The 3D room took its colours from that rotation for a day,
+   and of the five rendered side by side the user kept one: "để mỗi concert
+   thôi" (2026-10-17). So this build is always the concert - its lawn, gold
+   plinth and gold floor, and with them its ambience and its win music, which
+   follow THEME as well. Redeclared, not edited: the last `function themeFor` in
+   the script is the one the shell calls, as with the eight engine functions.
+   ?theme=NAME still pins another, for comparing on a real screen. */
+function themeFor(level) {
+  return THEMES[pinnedTheme] ? pinnedTheme : "concert";
+}

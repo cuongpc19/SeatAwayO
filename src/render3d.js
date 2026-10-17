@@ -104,8 +104,11 @@ const G3 = (function () {
   const LOOKS = {
     soft:  { aces: true,  exposure: 1.06, rough: 0.76, env: 0,    hemi: 0.85, amb: 0.14,
              key: 1.22, fill: 0.22, rim: 0.34, face: 0.25, peep: 0,    edge: 1,    room: 0 },
-    vivid: { aces: false, exposure: 1.0,  rough: 0.42, env: 0.5,  hemi: 0.26, amb: 0.0,
-             key: 0.64, fill: 0.10, rim: 0.18, face: 0.30, peep: ["dk", "md", 0.55], edge: 0.28, room: 0,
+    /* ⚠ hemi 0.26 / key 0.64 first; against two other games side by side the
+       room read darker than both - every face not looking at the key sat at
+       half light. More sky, less key, a touch more exposure (2026-10-17). */
+    vivid: { aces: false, exposure: 1.06, rough: 0.42, env: 0.5,  hemi: 0.44, amb: 0.0,
+             key: 0.50, fill: 0.10, rim: 0.18, face: 0.30, body: 0, peep: ["dk", "md", 0.55], edge: 0.28, room: 0,
              // the lens, in degrees: of 22, 32 and 42 rendered side by side, 32 - the
              // walls lean in and the near rows stand out, and the room keeps its size
              fov: 32 },
@@ -118,18 +121,21 @@ const G3 = (function () {
      the bright tone, not the deep one. `candy` is all three; `candyDeep` keeps
      the deep passengers; `mid` is a lighter checker. Compare with ?look=. */
   LOOKS.candy = Object.assign({}, LOOKS.deep, {
-    cells: [0x5e6369, 0x898e95], line: 0, coat: 0.7, rough: 0.34, env: 0.6, face: 0.45,
+    cells: [0x5e6369, 0x898e95], line: 0, coat: 0.7, rough: 0.34, env: 0.6,
+    // the cushion most of the way to the light tone and the body a step towards
+    // it: the other games' seats are the light tone through and through
+    face: 0.6, body: 0.2,
     peep: ["lt", "md", 0.25],
     // ⚠ The bolted-down grey seat was the checker's own grey, and sank into it.
     // On a dark floor it is silver, as the original draws it.
     grey: { lt: 0xf2f4f7, md: 0xd0d6de, dk: 0x8d94a0 } });
-  LOOKS.candyDeep = Object.assign({}, LOOKS.candy, { peep: ["dk", "md", 0.55] });
+  LOOKS.candyDeep = Object.assign({}, LOOKS.candy, { peep: ["dk", "md", 0.7] });
   LOOKS.mid = Object.assign({}, LOOKS.candyDeep, { cells: [0x9aa0a7, 0xbdc2c8] });
   // candyDeep: picked by the user off the four renders (2026-10-16).
   const LOOK = LOOKS[Q.get("look")] || LOOKS.candyDeep;
   const FOV = FOV_ASKED || LOOK.fov || 30;
   if (LOOK.grey) TONE[0] = LOOK.grey;
-  const HUE = LOOK.room ? {
+  const HUE = Object.assign({}, LOOK.room ? {
     /* The vivid room: the plinth and the door frames in the teal seat's own
        family, the tiles white and a cool pale grey, the walls a clean mint,
        the paving and the sill warmer and brighter. Still quiet next to the
@@ -143,11 +149,38 @@ const G3 = (function () {
     wall: 0xabc6bc, cap: 0xfff2d9, frame: 0x326e68, glass: 0xa5d9dc,
     rail: 0xcaa66b, step: 0xd8cbb3, sill: 0xe8b94e, table: 0xb99770, lock: 0xd9b64a,
     crate: 0x8a6a48, crateTop: 0xa98a63, strap: 0x5c4732,
+  });
+  /* ---- the five rooms ----------------------------------------------------
+     The shipped game plays five rooms in turn, five levels each (THEME_ORDER
+     in game_shell.js; ?theme=NAME pins one), and this room was the same mint
+     box in all of them. Asked against two other games (2026-10-17): "darker
+     than both, and not as lively". A room's colour is the liveliest thing a
+     room has. So each theme brings its own ground, plinth, walls, floor and
+     paving, bright and saturated, as the other games' grass and gold are.
+     The seats are untouched - the colour that means something stays theirs.
+     ⚠ Only colours. The walls, the grid, the doorway and the lane are where
+     the engine says they are; a theme may not move anything. */
+  const THEME_SKIN = {
+    station:   { sky: 0xf6f5f1, ground: 0xe9e8e2, plinth: 0x2f9d93, slab: 0xd9d0b9, wall: 0xf3f6f8, cap: 0xffffff,
+                 frame: 0x1e6f68, step: 0xeadcbc, cells: [0x646a71, 0x8f949b] },
+    classroom: { sky: 0xfff7e8, ground: 0xf4e4c6, plinth: 0x3f9a62, slab: 0xe3cfa8, wall: 0xfff6e6, cap: 0xffffff,
+                 frame: 0x2e7a4a, step: 0xf0dfb8, cells: [0xb98c5e, 0xd6ad7c] },
+    stadium:   { sky: 0xe2f4ff, ground: 0x4fbf5c, plinth: 0xf4f6f2, slab: 0xd9dde0, wall: 0xf7f9fb, cap: 0xffffff,
+                 frame: 0xd9553c, step: 0xe4e8ea, cells: [0x6b7079, 0x959ba4] },
+    concert:   { sky: 0xeefbe6, ground: 0x62c24e, plinth: 0xf0b73a, slab: 0xd9a63a, wall: 0xfff6dc, cap: 0xffffff,
+                 frame: 0xc98a22, step: 0xd4d2c8,
+                 // ⚠ amber, not the yellow seat's yellow: at [0xd9a63a, 0xf2c75a] a
+                 // yellow sofa all but sat in the floor (level 240)
+                 cells: [0xcf9a35, 0xe6b650] },
+    cinema:    { sky: 0xf2e9ff, ground: 0x7a5aa6, plinth: 0xd93c4c, slab: 0x9b7bc4, wall: 0xfbefe2, cap: 0xffffff,
+                 frame: 0x8f2731, step: 0xe6cdb8, cells: [0x5a5466, 0x7d7689] },
   };
+  const themeSkin = () => THEME_SKIN[typeof THEME === "string" ? THEME : "station"] || THEME_SKIN.station;
   const SKY = 0xe9e6dd;                  // clear colour and fog: the far edge of the ground
   // The floor's cells, two alternating, and the slab's line between them - see buildRoom.
   // ⚠ Not FLOOR: that name is the picking plane, further down this scope.
-  const CELLS = LOOK.cells || [0xffffff, 0xf1f2f4], CELL_LINE = LOOK.line === undefined ? 0.05 : LOOK.line;
+  let CELLS = LOOK.cells || [0xffffff, 0xf1f2f4];
+  const CELL_LINE = LOOK.line === undefined ? 0.05 : LOOK.line;
   const ROT = [0, -Math.PI / 2, Math.PI, Math.PI / 2];   // a seat's dir, as a turn
   const FACE = { u: 0, d: Math.PI, l: Math.PI / 2, r: -Math.PI / 2 };
 
@@ -247,15 +280,6 @@ const G3 = (function () {
     pm.dispose();
     return t;
   }
-  function poolTex() {
-    const n = 512, c = document.createElement("canvas"); c.width = c.height = n;
-    const x = c.getContext("2d");
-    const g = x.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-    g.addColorStop(0, "#e9e6dd"); g.addColorStop(0.36, "#e9e6dd");
-    g.addColorStop(0.68, "#e5e2d8"); g.addColorStop(1, "#dedbd0");
-    x.fillStyle = g; x.fillRect(0, 0, n, n);
-    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
-  }
   /* The ground around the room and the sky over it: the board's own floor,
      #e9e6dd, sampled off the rendered tiles and asked for by name - the room
      stands on a ground of its own colour, framed by its teal plinth alone. Only
@@ -272,15 +296,27 @@ const G3 = (function () {
      tone-mapped. ACES greys and darkens whatever it is handed, which is right
      for a lit room and wrong for a backdrop whose colour was chosen by eye -
      it was half of why the old one looked washed out. */
+  const BG = {};
   function backdrop() {
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 32, 20),
-      new THREE.MeshBasicMaterial({
-        map: gradTex([[0, "#efede6"], [0.42, "#e9e6dd"], [0.76, "#e9e6dd"], [1, "#e9e6dd"]]),
-        side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 56),
-      new THREE.MeshBasicMaterial({ map: poolTex(), fog: true, toneMapped: false }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -1.06;
-    scene.add(ground);
+    BG.sky = new THREE.Mesh(new THREE.SphereGeometry(90, 32, 20),
+      new THREE.MeshBasicMaterial({ color: SKY, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }));
+    scene.add(BG.sky);
+    BG.ground = new THREE.Mesh(new THREE.CircleGeometry(40, 56),
+      new THREE.MeshBasicMaterial({ color: SKY, fog: true, toneMapped: false }));
+    BG.ground.rotation.x = -Math.PI / 2; BG.ground.position.y = -1.06;
+    scene.add(BG.ground);
+  }
+  /** The room's colours for this level's theme, on everything the theme owns. */
+  function dress() {
+    if (!LOOK.room) return;
+    const T = themeSkin();
+    Object.assign(HUE, { plinth: T.plinth, slab: T.slab, wall: T.wall, cap: T.cap, frame: T.frame, step: T.step });
+    if (LOOK.cells) CELLS = T.cells;
+    BG.sky.material.color.setHex(T.sky);
+    BG.ground.material.color.setHex(T.ground);
+    renderer.setClearColor(T.ground, 1);
+    scene.fog.color.setHex(T.ground);
+    renderer.domElement.style.background = "#" + T.ground.toString(16).padStart(6, "0");
   }
 
   /* ---- rounded geometry, cached by size -------------------------------- */
@@ -329,6 +365,7 @@ const G3 = (function () {
      garden is out beyond it, at the top of the screen. */
   function buildRoom(g) {
     if (roomG) rootG.remove(roomG);
+    dress();
     roomG = new THREE.Group(); rootG.add(roomG);
     const W = g.W, H = g.H, RX = W * GAP, RZ = H * GAP, HW = RX / 2, HH = RZ / 2;
     const two = g.doors && g.doors.length > 1;
@@ -536,7 +573,8 @@ const G3 = (function () {
     const t = TONE[b.colour] || TONE[0];
     const L = b.len, w = (L - 1) * GAP + CELLW;
     tag(solid(w * 0.80, 0.11, 0.60, 0.04, mat(t.dk))).position.set(0, 0.065, 0.02);
-    tag(solid(w, 0.20, 0.84, 0.085, mat(t.md))).position.set(0, 0.225, -0.01);
+    const bodyC = LOOK.body ? new THREE.Color(t.md).lerp(new THREE.Color(t.lt), LOOK.body).getHex() : t.md;
+    tag(solid(w, 0.20, 0.84, 0.085, mat(bodyC))).position.set(0, 0.225, -0.01);
     /* ⚠ The cushion and the back's face were the LIGHT tone, and from this
        camera the cushion is most of what a seat is - it read as a pale seat in
        a darker frame. Both are now the body's tone with a quarter of the light
@@ -550,7 +588,7 @@ const G3 = (function () {
        the base is hardly seen, and a divider is the line between two places. */
     const edge = new THREE.Color(t.md).lerp(new THREE.Color(t.dk), LOOK.edge).getHex();
     tag(solid(w * 0.88, 0.10, 0.70, 0.05, mat(face))).position.set(0, 0.335, -0.035);
-    tag(solid(w, 0.58, 0.20, 0.085, mat(t.md))).position.set(0, 0.51, 0.32);
+    tag(solid(w, 0.58, 0.20, 0.085, mat(bodyC))).position.set(0, 0.51, 0.32);
     tag(solid(w * 0.86, 0.40, 0.11, 0.05, mat(face))).position.set(0, 0.51, 0.225);
     tag(solid(w * 0.95, 0.10, 0.25, 0.045, mat(edge))).position.set(0, 0.82, 0.32);
     for (let k = 1; k < b.cap; k++) {

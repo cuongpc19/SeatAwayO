@@ -565,6 +565,9 @@ def build_3d(out, host="none"):
     S3D = open("shell3d.js", encoding="utf-8").read()
     if open("game_shell.js", encoding="utf-8").read().count("\nfunction starBurst(") != 1:
         sys.exit("3d: game_shell.js no longer has one `function starBurst(` for the firecrackers to ride")
+    # shell3d.js redeclares themeFor to pin the concert room; both sides proved
+    if open("game_shell.js", encoding="utf-8").read().count("\nfunction themeFor(") != 1 or S3D.count("\nfunction themeFor(") != 1:
+        sys.exit("3d: expected exactly one `function themeFor(` in game_shell.js and one in shell3d.js")
     css3d = open("game3d.css", encoding="utf-8").read()
     # The booster tiles, drawn rather than styled - see cut_boosters.py.
     for name in ("time", "jump", "area"):
