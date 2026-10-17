@@ -5655,28 +5655,139 @@ const G3 = (function () {
     garden(RX, RZ);
   }
 
-  /** Scenery beyond the room, never on a puzzle cell - and behind it. */
+  /** The stage beyond the far wall, where the garden was.
+
+      Asked for (2026-10-17): a music show, with colour and with things on it -
+      "thêm các object phía trên sân khấu". Beyond the far wall, so it stands
+      at the top of the screen as the stage does in the game this was compared
+      against: a wooden deck, a purple backdrop under a red-and-white striped
+      canopy, red curtains, a speaker stack at each front corner, a drum kit,
+      a keyboard, a microphone, three players in white with hats, bunting
+      strung between the speakers and balloons at the back corners.
+
+      Still never on a puzzle cell, and still decoration to the fit: the deck,
+      the backdrop and the balloons are tagged `terrace`, so a frame with no
+      bar does not shrink the room to show the whole of them; the speaker
+      stacks take the planters' tags, so the desktop bar spans between them as
+      it did between the pots - see fit(). */
+  const FEST3 = [0xff4d84, 0xffc93c, 0x4ecbff, 0xa879ff, 0x5be6a2];
   function garden(sx, sz) {
     const deco = new THREE.Group(); deco.userData.deco = true; roomG.add(deco);
     const z0 = -sz / 2;                      // -z: the far end, beyond row 0
-    /* ⚠ Under the vivid look the old tan paving lit up into a solid beige block
-       across the top of a phone's screen, and drew the eye off the board. Now
-       a shade off the ground it stands on: there, not a thing to look at. */
-    const terrace = solid(sx + 3, 0.12, 2.1, 0.12, mat(LOOK.room ? 0xe3dcc8 : 0xd4c9ae), false);
-    terrace.position.set(0, -0.85, z0 - 1.65); terrace.receiveShadow = true; deco.add(terrace);
-    terrace.userData.terrace = true;         // left out of the desktop fit - see fit()
-    const leaves = mat(0x689c7b, { roughness: 0.85 }), tips = mat(0x94b88b);
-    for (const sign of [-1, 1]) {
-      const x = sign * (sx / 2 + 0.7), z = z0 - 1.0;
-      const planter = solid(0.82, 0.58, 0.82, 0.14, mat(0xc08e73));
-      planter.position.set(x, -0.5, z); deco.add(planter);
-      const trunk = tube(0.075, 0.8, mat(0x997957)); trunk.position.set(x, 0, z); deco.add(trunk);
-      // tagged by side: the desktop bar spans between the two - see fit()
-      planter.userData.planter = trunk.userData.planter = sign;
+    const put = (m, x, y, z, tag) => {
+      m.position.set(x, y, z);
+      if (tag === "terrace") m.userData.terrace = true; else if (tag) m.userData.planter = tag;
+      deco.add(m); return m;
+    };
+    // ⚠ A first cut stood the deck 0.4 behind the far wall, and from the camera
+    // the wall hid the front half of it - players, speakers, bunting. Further
+    // back and a little higher, so the whole stage shows over the wall.
+    const W = sx + 3.4, D = 2.9, ZC = z0 - 1.15 - D / 2, TOP = -0.28;
+    const ZF = ZC + D / 2, ZB = ZC - D / 2 + 0.2;          // the deck's front and back edges
+
+    // the deck, with a lighter lip along its front
+    const deck = solid(W, 0.66, D, 0.10, mat(0xc98b4b), false); deck.receiveShadow = true;
+    put(deck, 0, TOP - 0.33, ZC, "terrace");
+    put(solid(W, 0.07, 0.18, 0.03, mat(0xe9b36c), false), 0, TOP + 0.015, ZF - 0.09, "terrace");
+
+    // the backdrop, its canopy and the curtains
+    put(solid(W, 1.7, 0.22, 0.05, mat(0x6d49c9)), 0, TOP + 0.85, ZB, "terrace");
+    const n = Math.max(6, Math.round(W / 0.5)), bw = W / n;
+    for (let i = 0; i < n; i++)
+      put(solid(bw - 0.015, 0.24, 0.56, 0.04, mat(i % 2 ? 0xfff3e4 : 0xe6433f)),
+          -W / 2 + bw * (i + 0.5), TOP + 1.72, ZB + 0.17, "terrace");
+    for (const s of [-1, 1]) {
+      const c = put(solid(0.95, 1.5, 0.16, 0.06, mat(0xd93c4c)), s * (W / 2 - 0.55), TOP + 0.75, ZB + 0.22, "terrace");
+      c.castShadow = true;
+    }
+    // three lamps under the canopy, lit
+    for (const x of [-W / 4, 0, W / 4]) {
+      put(tube(0.09, 0.12, mat(0x2b2f3a)), x, TOP + 1.52, ZB + 0.42, "terrace");
+      put(tube(0.07, 0.03, mat(0xfff1a8, { emissive: 0xffe27a, emissiveIntensity: 0.9 })), x, TOP + 1.45, ZB + 0.42, "terrace");
+    }
+
+    // a speaker stack at each front corner - the desktop bar spans between them
+    for (const s of [-1, 1]) {
+      const x = s * (sx / 2 + 0.7), z = ZF - 0.45;
+      put(solid(0.62, 1.05, 0.52, 0.05, mat(0x2b2f3a)), x, TOP + 0.525, z, s);
+      for (const [y, r] of [[0.72, 0.17], [0.30, 0.12]]) {
+        const cone = tube(r, 0.03, mat(0x8e95a3, { roughness: 0.5 })); cone.rotation.x = Math.PI / 2;
+        put(cone, x, TOP + y, z + 0.27, s);
+      }
+    }
+
+    // the drum kit, right of centre
+    {
+      const x = W / 5.2, z = ZC + 0.1, gold = mat(0xf2c04a, { roughness: 0.3 }), shell = mat(0xe66a3c);
+      const kick = tube(0.30, 0.34, shell); kick.rotation.x = Math.PI / 2; kick.castShadow = true;
+      put(kick, x, TOP + 0.30, z + 0.1, "terrace");
+      const head = tube(0.27, 0.03, mat(0xfff6e8)); head.rotation.x = Math.PI / 2;
+      put(head, x, TOP + 0.30, z + 0.285, "terrace");
+      for (const [dx, dz, r] of [[-0.22, -0.1, 0.15], [0.22, -0.1, 0.15], [-0.48, 0.15, 0.17]]) {
+        const tom = tube(r, 0.18, shell); tom.castShadow = true; put(tom, x + dx, TOP + 0.62, z + dz, "terrace");
+        put(tube(r - 0.02, 0.02, mat(0xfff6e8)), x + dx, TOP + 0.715, z + dz, "terrace");
+      }
+      for (const [dx, dz, h] of [[0.55, 0.05, 1.0], [-0.1, -0.42, 1.1]]) {
+        put(tube(0.015, h, mat(0x8e95a3)), x + dx, TOP + h / 2, z + dz, "terrace");
+        put(tube(0.22, 0.015, gold), x + dx, TOP + h, z + dz, "terrace");
+      }
+    }
+    // the keyboard, left of centre, on two legs
+    {
+      const x = -W / 5.2, z = ZC + 0.15;
+      put(solid(1.15, 0.09, 0.34, 0.03, mat(0x2b2f3a)), x, TOP + 0.56, z, "terrace").castShadow = true;
+      put(solid(1.02, 0.03, 0.15, 0.01, mat(0xfff6e8)), x, TOP + 0.615, z + 0.07, "terrace");
+      for (const s of [-1, 1]) put(tube(0.025, 0.52, mat(0x8e95a3)), x + s * 0.48, TOP + 0.26, z, "terrace");
+    }
+    // the microphone, centre front
+    put(tube(0.016, 0.95, mat(0x8e95a3)), 0, TOP + 0.475, ZC + 0.55, "terrace");
+    put(tube(0.11, 0.02, mat(0x2b2f3a)), 0, TOP + 0.01, ZC + 0.55, "terrace");
+    const mic = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), mat(0x2b2f3a));
+    put(mic, 0, TOP + 0.97, ZC + 0.50, "terrace");
+
+    // the players: white, hatted, facing the room
+    const WHITE = { lt: 0xffffff, md: 0xf3f3f7, dk: 0xdcdce6 };
+    for (const [x, z, pose] of [[-W / 5.2, ZC + 0.5, "key"], [0, ZC + 0.85, "sing"], [W / 5.2, ZC - 0.35, "drum"]]) {
+      const who = buildPeep(1, WHITE); who.rotation.y = Math.PI;
+      const hat = tube(0.12, 0.15, mat(0xffffff)); hat.position.y = 0.88; who.add(hat);
+      const brim = tube(0.21, 0.02, mat(0xffffff)); brim.position.y = 0.81; who.add(brim);
+      const band = tube(0.125, 0.04, mat(0xd93c4c)); band.position.y = 0.83; who.add(band);
+      const u = who.userData;
+      if (pose === "key") { u.arms[0].rotation.x = -1.3; u.arms[1].rotation.x = -1.3; }
+      if (pose === "sing") { u.arms[0].rotation.x = -1.9; u.arms[1].rotation.x = -0.4; }
+      if (pose === "drum") { u.arms[0].rotation.x = -1.1; u.arms[1].rotation.x = -1.5; }
+      put(who, x, TOP, z, "terrace");
+    }
+
+    // bunting between the speaker tops, flags in the party colours
+    {
+      const X = sx / 2 + 0.7, y0 = TOP + 1.3, z = ZF - 0.45, nf = Math.max(7, Math.round(2 * X / 0.42));
+      const pts = [];
+      const sag = t => y0 - 0.34 * Math.sin(Math.PI * t);
+      for (let i = 0; i <= nf; i++) {
+        const t = i / nf, x = -X + 2 * X * t;
+        pts.push(new THREE.Vector3(x, sag(t), z));
+        if (i < nf) {
+          const tm = t + 0.5 / nf;
+          const flag = solid(0.2, 0.16, 0.02, 0.01, mat(FEST3[i % FEST3.length]), false);
+          flag.position.set(-X + 2 * X * tm, sag(tm) - 0.1, z);
+          flag.userData.terrace = true; deco.add(flag);
+        }
+      }
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+                                  new THREE.LineBasicMaterial({ color: 0x6b5a4a }));
+      line.userData.terrace = true; deco.add(line);
+    }
+    // balloons at the back corners
+    for (const s of [-1, 1]) {
+      const bx = s * (W / 2 - 1.5), bz = ZB + 0.55;
       for (let i = 0; i < 3; i++) {
-        const crown = new THREE.Mesh(new THREE.SphereGeometry(0.48 - i * 0.07, 12, 8), i === 2 ? tips : leaves);
-        crown.scale.set(1, 0.9, 0.9); crown.position.set(x + (i === 1 ? 0.17 : 0), 0.40 + i * 0.26, z);
-        crown.castShadow = true; crown.userData.planter = sign; deco.add(crown);
+        const c = FEST3[(i + (s > 0 ? 2 : 0)) % FEST3.length];
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), mat(c, { roughness: 0.25 }));
+        b.scale.set(1, 1.15, 1); b.castShadow = true;
+        const ox = (i - 1) * 0.22, oy = 1.28 + (i % 2) * 0.22;
+        put(b, bx + ox, TOP + oy, bz + (i - 1) * 0.08, "terrace");
+        put(tube(0.006, oy - 0.2, mat(0x8e95a3)), bx + ox * 0.5, TOP + (oy - 0.2) / 2, bz, "terrace");
       }
     }
   }
@@ -5821,9 +5932,9 @@ const G3 = (function () {
     }
     return GEO.get(key);
   }
-  function buildPeep(ci) {
+  function buildPeep(ci, tone) {
     const grp = new THREE.Group();
-    const t = TONE[ci] || TONE[0];
+    const t = tone || TONE[ci] || TONE[0];     // `tone`: the stage's players, in white
     /* ⚠ The DEEP tone: a passenger sits in a seat of their own colour, and a
        body in the cushion's shade vanishes into it. Under the vivid look the
        deep tone is pulled part-way to the body tone - a rich red, not maroon -
@@ -6099,8 +6210,13 @@ const G3 = (function () {
        With the bar there (on a phone, and on a desktop since the level, clock
        and gold went back to the top) the garden goes behind it as it always
        did, and taking it in would only shrink the room. */
+    /* ⚠ `L.side` alone now, bar or no bar: with the stage where the garden was
+       (2026-10-17) a desktop frame that fitted the room to the full height put
+       the whole show above the top bar, and the stage is the one thing asked
+       for. Taking its front - the speakers, bunting height - into the fit
+       costs the room a little height on a desktop and shows the stage. */
     const ALL = BOX.clone();
-    if (L.side && !L.bar)
+    if (L.side)
       for (const ch of roomG.children) if (ch.isGroup && ch.userData.deco)
         for (const part of ch.children) if (!part.userData.terrace) ALL.expandByObject(part);
     const tanH = Math.tan(FOV * Math.PI / 360);
@@ -6477,7 +6593,7 @@ const RUNS_URL = "https://seatmatch-292b3-default-rtdb.asia-southeast1.firebased
 /** Stamped by build.py from the git short hash, so a row says which build
     played it. ⚠ It is the working tree's HEAD - building on a dirty tree
     stamps every row with the PREVIOUS commit. Commit before building. */
-const BUILD = "89c863b+";
+const BUILD = "b844fde+";
 
 /** Hosts whose games are ours, not a player's. Filtered on READ, not blocked on
     write (see ANALYTICS.md §2): a blocked row is gone forever, a filtered one is
