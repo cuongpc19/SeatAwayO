@@ -432,35 +432,38 @@ const G3 = (function () {
       }
     }
 
-    const WALLH = 1.34, TH = 0.22;
-    function wall(len, vertical, x, z, glass, height) {
-      const hh = height || WALLH;
-      const m = solid(vertical ? TH : len, hh, vertical ? len : TH, 0.06, mat(HUE.wall));
-      m.position.set(x, hh / 2 - 0.07, z); roomG.add(m);
-      const cap = solid(vertical ? TH + 0.07 : len + 0.07, 0.10, vertical ? len + 0.07 : TH + 0.07,
-                        0.045, mat(HUE.cap));
-      cap.position.set(x, hh - 0.07, z); roomG.add(cap);
-      if (!glass) return;
-      const gm = mat(HUE.glass, { emissive: 0x8dc9cc, emissiveIntensity: 0.12, roughness: 0.22 });
-      for (const at of glass) {
-        const win = solid(vertical ? 0.05 : 0.58, 0.38, vertical ? 0.58 : 0.05, 0.03, gm, false);
-        const off = TH / 2 + 0.012;
-        win.position.set(vertical ? x + (x < 0 ? off : -off) : at, hh * 0.60,
-                         vertical ? at : z + (z < 0 ? off : -off));
-        roomG.add(win);
+    /* ---- the fence ----
+       No walls (2026-10-17: "bỏ tất cả tường đi, làm cái hàng rào nhẹ xung
+       quanh thôi"). They stood 1.34 tall in a pale mint with a white cap, and
+       from the lens they leaned in over the outer columns and shut the room
+       off from the stage and the lawn. Now a low white fence round the same
+       line: a post at every cell edge and two thin rails between, with the
+       doorway left open. Light enough to see the whole lawn through.
+       ⚠ The fence stands where the walls stood - the fit, the doorway, the
+       lane and the queue all read that line, and none of them moved. */
+    const FENCE_H = 0.46, pick = mat(0xfff8ec, { roughness: 0.5 });
+    function fenceRun(x0, z0, x1, z1) {
+      const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
+      if (L < 0.2) return;
+      const n = Math.max(1, Math.round(L / GAP));
+      for (let i = 0; i <= n; i++) {
+        const post = solid(0.12, FENCE_H, 0.12, 0.035, pick);
+        post.position.set(x0 + dx * i / n, FENCE_H / 2 - 0.07, z0 + dz * i / n); roomG.add(post);
+      }
+      for (const y of [0.15, 0.32]) {
+        const rail = solid(dz ? 0.05 : L, 0.05, dz ? L : 0.05, 0.02, pick);
+        rail.position.set((x0 + x1) / 2, y - 0.07, (z0 + z1) / 2); roomG.add(rail);
       }
     }
-    const colsAt = [];
-    for (let c = 0; c < W; c++) if (c % 2 === 0) colsAt.push(wx(g, c));
-    wall(RX + 0.8, false, 0, -HH - 0.25, colsAt);             // the end the seats face, windows
-    wall(RX + 0.8, false, 0, HH + 0.25, null, 0.62);          // the near end, low
-    for (let k = 0; k < 2; k++) {                             // the long walls, door gaps open
-      const x = k ? -HW - 0.25 : HW + 0.25;
+    const FX = HW + 0.25, FZ = HH + 0.25;
+    fenceRun(-FX, -FZ, FX, -FZ);                              // the end the seats face, open to the stage over it
+    fenceRun(-FX, FZ, FX, FZ);                                // the near end
+    for (let k = 0; k < 2; k++) {                             // the long sides, a gap at each door
+      const x = k ? -FX : FX;
       const gap = k === 0 ? g.doors[0][1] : (two ? g.doors[1][1] : -1);
-      for (let r = 0; r < H; r++) {
-        if (r === gap) continue;
-        wall(GAP, true, x, wz(g, r), (!k && r % 2 === 0) ? [wz(g, r)] : null, WALLH);
-      }
+      if (gap < 0) { fenceRun(x, -FZ, x, FZ); continue; }
+      fenceRun(x, -FZ, x, wz(g, gap) - GAP / 2);
+      fenceRun(x, wz(g, gap) + GAP / 2, x, FZ);
     }
     /* ⚠ No handrail. One ran down the left wall at shoulder height, and read as
        one from the old diagonal camera; from the original's camera, 76 degrees
@@ -498,7 +501,9 @@ const G3 = (function () {
     // ⚠ A first cut stood the deck 0.4 behind the far wall, and from the camera
     // the wall hid the front half of it - players, speakers, bunting. Further
     // back and a little higher, so the whole stage shows over the wall.
-    const W = sx + 3.4, D = 2.9, ZC = z0 - 1.15 - D / 2, TOP = -0.28;
+    // (1.15 while the far wall stood, to clear it; with the wall gone the deck
+    // comes forward to the room's edge)
+    const W = sx + 3.4, D = 2.9, ZC = z0 - 0.75 - D / 2, TOP = -0.28;
     const ZF = ZC + D / 2, ZB = ZC - D / 2 + 0.2;          // the deck's front and back edges
 
     // the deck, with a lighter lip along its front
@@ -612,13 +617,15 @@ const G3 = (function () {
       ⚠ The platform is laid where stopAt() and queueDir() say the line is -
       those decide where people stand, so the floor under them has to agree. */
   function doorway(g, k, HW) {
-    const side = k ? -1 : 1, dz = wz(g, g.doors[k][1]), x = side * (HW + 0.25), hh = 1.34;
+    // Gateposts, a head taller than the fence, and no lintel: a gate in a
+    // fence (2026-10-17), where a door in a 1.34 wall stood before.
+    const side = k ? -1 : 1, dz = wz(g, g.doors[k][1]), x = side * (HW + 0.25), hh = 0.78;
     for (const s of [-1, 1]) {
-      const post = solid(0.20, hh + 0.16, 0.16, 0.05, mat(HUE.frame));
-      post.position.set(x, (hh + 0.16) / 2 - 0.07, dz + s * GAP * 0.54); roomG.add(post);
+      const post = solid(0.18, hh, 0.18, 0.05, mat(HUE.frame));
+      post.position.set(x, hh / 2 - 0.07, dz + s * GAP * 0.54); roomG.add(post);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), mat(HUE.frame));
+      knob.position.set(x, hh - 0.04, dz + s * GAP * 0.54); roomG.add(knob);
     }
-    const lintel = solid(0.20, 0.16, GAP * 1.18, 0.05, mat(HUE.frame));
-    lintel.position.set(x, hh + 0.01, dz); roomG.add(lintel);
     const step = solid(0.94, 0.09, 0.94, 0.05, mat(HUE.tileA), false);
     step.receiveShadow = true;
     step.position.set(wx(g, g.doors[k][0]), 0.005, dz); roomG.add(step);
@@ -627,9 +634,12 @@ const G3 = (function () {
     strip.position.set(side * (HW - 0.06), 0.075, dz); roomG.add(strip);
 
     const [lx, lz] = stopAt(g, k), dir = queueDir(g, k), pitch = to3(QUEUE_PITCH);
-    const n = Math.min(7, queueOf(g, k).length);
-    const len = 1.1 + Math.max(0, n - 1) * pitch;
-    const lane = to3(lx);
+    /* ⚠ The longest it can be, always (2026-10-17: "cứ làm mặc định là dài
+       nhất có thể"): from the doorway out to the end of the plinth on the side
+       the line grows towards, never shorter than seven places. It was cut to
+       the line's length, and grew and shrank with it. */
+    const lane = to3(lx), end = dir * (g.H * GAP / 2 + 0.75);  // the plinth's end, that way
+    const len = Math.max(1.1 + 6 * pitch, Math.abs(end - to3(lz)) + 0.55);
     // from the doorway out to the lane, then along it
     const reach = Math.abs(lane - x) + 0.6;
     const walk = solid(reach, 0.30, 1.05, 0.12, mat(HUE.step), false);
